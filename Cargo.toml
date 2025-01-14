@@ -1,0 +1,19 @@
+[package]
+name = "mines"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# avian3d = { git = "https://github.com/Jondolf/avian", branch = "main" }
+avian3d = "^0.2"
+bevy = { version = "0.15.0", features = ["wayland"] }
+bevy-tnua = "0.21.0"
+bevy-tnua-avian3d = "0.2.0"
+curvo  = "0.1.38" 
+fast-surface-nets = "0.2.0"
+isosurface = "0.1.0-alpha.0"
+nalgebra = "0.33.2"
+noisy_bevy = "0.8.0"
+rayon = "1.10.0"
+strum = { version = "0.26.3", features = ["derive", "strum_macros"] }
+strum_macros = "0.26.4"

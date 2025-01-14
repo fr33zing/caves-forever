@@ -1,0 +1,531 @@
+#import bevy_pbr::{
+    pbr_types::PbrInput,
+    pbr_fragment::pbr_input_from_standard_material,
+    pbr_functions::alpha_discard,
+    mesh_bindings::mesh,
+    mesh_functions,
+    skinning,
+    morph::morph,
+    view_transformations::position_world_to_clip,
+}
+
+#ifdef PREPASS_PIPELINE
+#import bevy_pbr::{
+    prepass_io::VertexOutput,
+    pbr_deferred_functions::deferred_output,
+}
+#else
+#import bevy_pbr::{
+    forward_io::VertexOutput,
+    pbr_functions::{apply_pbr_lighting, main_pass_post_lighting_processing},
+}
+#endif
+
+#import noisy_bevy::simplex_noise_3d
+#import noisy_bevy::simplex_noise_2d
+#import bevy_render::{color_operations::hsv_to_rgb, maths::PI_2}
+#import bevy_pbr::mesh_view_bindings::globals
+
+//
+// Data
+//
+
+@group(2) @binding(100)
+var<uniform> render_voxel_size: f32;
+
+@group(2) @binding(101)
+var<uniform> voxel_type_transition_steps: f32;
+
+struct VoxelMaterialOutput {
+    base_color: vec3<f32>,
+    //roughness: f32,
+    reflectance: f32,
+    emissive: vec4<f32>,
+}
+
+#ifdef PREPASS_PIPELINE // https://docs.rs/crate/bevy_pbr/0.14.0/source/src/prepass/prepass_io.wgsl
+struct MyVertex {
+    @builtin(instance_index) instance_index: u32,
+    @location(0) position: vec3<f32>,
+#ifdef VERTEX_UVS_A
+    @location(1) uv: vec2<f32>,
+#endif
+#ifdef VERTEX_UVS_B
+    @location(2) uv_b: vec2<f32>,
+#endif
+#ifdef NORMAL_PREPASS_OR_DEFERRED_PREPASS
+    @location(3) normal: vec3<f32>,
+#ifdef VERTEX_TANGENTS
+    @location(4) tangent: vec4<f32>,
+#endif
+#endif
+#ifdef SKINNED
+    @location(5) joint_indices: vec4<u32>,
+    @location(6) joint_weights: vec4<f32>,
+#endif
+#ifdef VERTEX_COLORS
+    @location(7) color: vec4<f32>,
+#endif
+#ifdef MORPH_TARGETS
+    @builtin(vertex_index) index: u32,
+#endif
+    // My changes
+    @location(8) voxel_type: vec4u,
+}
+
+struct MyVertexOutput {
+    @builtin(position) position: vec4<f32>,
+#ifdef VERTEX_UVS_A
+    @location(0) uv: vec2<f32>,
+#endif
+#ifdef VERTEX_UVS_B
+    @location(1) uv_b: vec2<f32>,
+#endif
+#ifdef NORMAL_PREPASS_OR_DEFERRED_PREPASS
+    @location(2) world_normal: vec3<f32>,
+#ifdef VERTEX_TANGENTS
+    @location(3) world_tangent: vec4<f32>,
+#endif
+#endif
+    @location(4) world_position: vec4<f32>,
+#ifdef MOTION_VECTOR_PREPASS
+    @location(5) previous_world_position: vec4<f32>,
+#endif
+#ifdef DEPTH_CLAMP_ORTHO
+    @location(6) clip_position_unclamped: vec4<f32>,
+#endif
+#ifdef VERTEX_OUTPUT_INSTANCE_INDEX
+    @location(7) instance_index: u32,
+#endif
+#ifdef VERTEX_COLORS
+    @location(8) color: vec4<f32>,
+#endif
+    // My changes
+    @location(9) voxel_type: vec4u,
+}
+
+#ifdef PREPASS_FRAGMENT
+struct MyFragmentOutput {
+#ifdef NORMAL_PREPASS
+    @location(0) normal: vec4<f32>,
+#endif
+
+#ifdef MOTION_VECTOR_PREPASS
+    @location(1) motion_vector: vec2<f32>,
+#endif
+
+#ifdef DEFERRED_PREPASS
+    @location(2) deferred: vec4<u32>,
+    @location(3) deferred_lighting_pass_id: u32,
+#endif
+
+#ifdef UNCLIPPED_DEPTH_ORTHO_EMULATION
+    @builtin(frag_depth) frag_depth: f32,
+#endif // UNCLIPPED_DEPTH_ORTHO_EMULATION
+
+    // My changes
+    @location(4) voxel_type: vec4u,
+}
+#endif
+
+#else // https://docs.rs/crate/bevy_pbr/0.14.0/source/src/render/forward_io.wgsl
+
+struct MyVertex {
+    @builtin(instance_index) instance_index: u32,
+#ifdef VERTEX_POSITIONS
+    @location(0) position: vec3<f32>,
+#endif
+#ifdef VERTEX_NORMALS
+    @location(1) normal: vec3<f32>,
+#endif
+#ifdef VERTEX_UVS_A
+    @location(2) uv: vec2<f32>,
+#endif
+#ifdef VERTEX_UVS_B
+    @location(3) uv_b: vec2<f32>,
+#endif
+#ifdef VERTEX_TANGENTS
+    @location(4) tangent: vec4<f32>,
+#endif
+#ifdef VERTEX_COLORS
+    @location(5) color: vec4<f32>,
+#endif
+#ifdef SKINNED
+    @location(6) joint_indices: vec4<u32>,
+    @location(7) joint_weights: vec4<f32>,
+#endif
+#ifdef MORPH_TARGETS
+    @builtin(vertex_index) index: u32,
+#endif
+    // My changes
+    @location(8) voxel_type: vec4u,
+};
+
+struct MyVertexOutput {
+    @builtin(position) position: vec4<f32>,
+    @location(0) world_position: vec4<f32>,
+    @location(1) world_normal: vec3<f32>,
+#ifdef VERTEX_UVS_A
+    @location(2) uv: vec2<f32>,
+#endif
+#ifdef VERTEX_UVS_B
+    @location(3) uv_b: vec2<f32>,
+#endif
+#ifdef VERTEX_TANGENTS
+    @location(4) world_tangent: vec4<f32>,
+#endif
+#ifdef VERTEX_COLORS
+    @location(5) color: vec4<f32>,
+#endif
+#ifdef VERTEX_OUTPUT_INSTANCE_INDEX
+    @location(6) @interpolate(flat) instance_index: u32,
+#endif
+#ifdef VISIBILITY_RANGE_DITHER
+    @location(7) @interpolate(flat) visibility_range_dither: i32,
+#endif
+    // My changes
+    @location(8) voxel_type: vec4u,
+}
+
+struct MyFragmentOutput {
+    @location(0) color: vec4<f32>,
+    @location(1) voxel_type: vec4u,
+}
+#endif
+
+//
+// Utility functions
+//
+
+fn quantize(v: f32, steps: f32) -> f32 {
+    return round(v * steps) / steps;
+}
+
+fn quantize_3d(v: vec3<f32>, steps: f32) -> vec3<f32> {
+    return round(v * steps) / steps;
+}
+
+fn clamp_scaled(v: f32, min: f32, max: f32) -> f32 {
+    return v * (max - min) + min;
+}
+
+fn mix_three(a: f32, b: f32, c: f32, fac: vec3f) -> f32 {
+    return a * fac.x + b * fac.y + c * fac.z;
+}
+
+fn mix_three_3d(a: vec3f, b: vec3f, c: vec3f, fac: vec3f) -> vec3f {
+    return vec3(
+        a.r * fac.x + b.r * fac.y + c.r * fac.z,
+        a.g * fac.x + b.g * fac.y + c.g * fac.z,
+        a.b * fac.x + b.b * fac.y + c.b * fac.z,
+    );
+}
+
+fn mix_three_4d(a: vec4f, b: vec4f, c: vec4f, fac: vec3f) -> vec4f {
+    return vec4(
+        a.r * fac.x + b.r * fac.y + c.r * fac.z,
+        a.g * fac.x + b.g * fac.y + c.g * fac.z,
+        a.b * fac.x + b.b * fac.y + c.b * fac.z,
+        a.a * fac.x + b.a * fac.y + c.a * fac.z,
+    );
+}
+
+fn mix_two_voxels(
+    a: VoxelMaterialOutput,
+    b: VoxelMaterialOutput,
+    fac: f32,
+) -> VoxelMaterialOutput {
+    var out: VoxelMaterialOutput;
+    out.base_color = mix(a.base_color, b.base_color, fac);
+    out.reflectance = mix(a.reflectance, b.reflectance, fac);
+    out.emissive = mix(a.emissive, b.emissive, fac);
+    return out;
+}
+
+fn mix_three_voxels(
+    a: VoxelMaterialOutput,
+    b: VoxelMaterialOutput,
+    c: VoxelMaterialOutput,
+    fac: vec3f,
+) -> VoxelMaterialOutput {
+    var out: VoxelMaterialOutput;
+    out.base_color = mix_three_3d(a.base_color, b.base_color, c.base_color, fac);
+    out.reflectance = mix_three(a.reflectance, b.reflectance, c.reflectance, fac);
+    out.emissive = mix_three_4d(a.emissive, b.emissive, c.emissive, fac);
+    return out;
+}
+
+fn reconstruct_pbr_vertex(in: MyVertexOutput) -> VertexOutput {
+#ifdef PREPASS_PIPELINE
+    return VertexOutput(
+        in.position,
+#ifdef VERTEX_UVS_A
+        in.uv,
+#endif
+#ifdef VERTEX_UVS_B
+        in.uv_b,
+#endif
+#ifdef NORMAL_PREPASS_OR_DEFERRED_PREPASS
+        in.world_normal,
+#ifdef VERTEX_TANGENTS
+        in.world_tangent,
+#endif
+#endif
+        in.world_position,
+#ifdef MOTION_VECTOR_PREPASS
+        in.previous_world_position,
+#endif
+#ifdef DEPTH_CLAMP_ORTHO
+        in.clip_position_unclamped,
+#endif
+#ifdef VERTEX_OUTPUT_INSTANCE_INDEX
+        in.instance_index,
+#endif
+#ifdef VERTEX_COLORS
+        in.color,
+#endif
+    );
+#else
+    return VertexOutput(
+        in.position,
+        in.world_position,
+        in.world_normal,
+#ifdef VERTEX_UVS_A
+        in.uv,
+#endif
+#ifdef VERTEX_UVS_B
+        in.uv_b,
+#endif
+#ifdef VERTEX_TANGENTS
+        in.world_tangent,
+#endif
+#ifdef VERTEX_COLORS
+        in.color,
+#endif
+#ifdef VERTEX_OUTPUT_INSTANCE_INDEX
+        in.instance_index,
+#endif
+#ifdef VISIBILITY_RANGE_DITHER
+        in.visibility_range_dither,
+#endif
+    );
+#endif
+}
+
+//
+// Voxel functions
+//
+
+fn voxel_function_by_type(voxel_type: u32, pos: vec3<f32>) -> VoxelMaterialOutput {
+    switch voxel_type {
+        case 0u: { return voxel_0(pos); }
+        case 1u: { return voxel_1(pos); }
+        case 2u: { return voxel_2(pos); }
+        default: { return voxel_default(pos); }
+    }
+}
+
+fn voxel_default(
+    pos: vec3<f32>
+) -> VoxelMaterialOutput {
+    var out: VoxelMaterialOutput;
+    out.base_color = vec3(0.0, 1.0, 0.0);
+    return out;
+}
+
+fn voxel_0(pos: vec3<f32>) -> VoxelMaterialOutput {
+    const vertical_noise_scale = vec3(1.0 / 64.0, 1.0 / 6.0, 1.0 / 64.0);
+    const color1 = vec3(0.32, 0.16, 0.08);
+    const color2 = vec3(0.12, 0.00, 0.00);
+
+    // Standard layered noise
+    var noise = 0.5;
+    noise = mix(noise, simplex_noise_3d(pos / 2.0), 0.3);
+    noise = mix(noise, simplex_noise_3d(pos / 4.0), 0.3);
+    noise = mix(noise, simplex_noise_3d(pos / 8.0), 0.3);
+    noise = clamp_scaled(noise, 0.35, 1.0);
+    noise = quantize(noise, 7.0);
+
+    // Vertical striations
+    var vertical_noise = abs(simplex_noise_3d(pos * vertical_noise_scale));
+    vertical_noise = quantize(vertical_noise, 4.0);
+    let color = mix(color1, color2, vertical_noise);
+
+    var out: VoxelMaterialOutput;
+    out.base_color = mix(vec3(0.0, 0.0, 0.0), color, noise);
+    return out;
+}
+
+fn voxel_1(pos: vec3<f32>) -> VoxelMaterialOutput {
+    const vertical_noise_scale = vec3(1.0 / 64.0, 1.0 / 4.0, 1.0 / 64.0);
+    const color1 = vec3(0.35, 0.35, 0.15);
+    const color2 = vec3(0.65, 0.65, 0.15);
+
+    // Standard layered noise
+    var noise = 0.5;
+    noise = mix(noise, simplex_noise_3d(pos), 0.5);
+    noise = mix(noise, simplex_noise_3d(pos / 5.0), 0.3);
+    noise = clamp_scaled(noise, 0.65, 1.0);
+    noise = quantize(noise, 7.0);
+
+    // Vertical striations
+    var vertical_noise = abs(simplex_noise_3d(pos * vertical_noise_scale));
+    vertical_noise = quantize(vertical_noise, 4.0);
+    let color = mix(color1, color2, vertical_noise);
+
+    var out: VoxelMaterialOutput;
+    out.base_color = mix(vec3(0.0, 0.0, 0.0), color, noise);
+    return out;
+}
+
+fn voxel_2(pos: vec3<f32>) -> VoxelMaterialOutput {
+    const vertical_noise_scale = vec3(1.0 / 64.0, 1.0 / 2.0, 1.0 / 64.0);
+    const color1 = vec3(0.05, 0.05, 0.05);
+    let color2 = hsv_to_rgb(vec3(globals.time / 16.0, 1.0, 0.85));
+
+    // Standard layered noise
+    var noise = 0.5;
+    noise = mix(noise, simplex_noise_3d(pos / 2.0), 0.5);
+    noise = mix(noise, simplex_noise_3d(pos / 16.0), 0.5);
+    noise = clamp_scaled(noise, 0.25, 1.0);
+    noise = quantize(noise, 7.0);
+
+    // Vertical striations
+    var vertical_noise = abs(simplex_noise_3d(pos * vertical_noise_scale));
+    vertical_noise = quantize(vertical_noise, 4.0);
+    let color = mix(color1, color2, vertical_noise);
+
+    var out: VoxelMaterialOutput;
+    out.base_color = mix(vec3(0.0, 0.0, 0.0), color, noise);
+    out.reflectance = vertical_noise;
+    return out;
+}
+
+//
+// Entry points
+//
+
+// https://github.com/bevyengine/bevy/blob/main/crates/bevy_pbr/src/render/mesh.wgsl
+@vertex
+fn vertex(vertex_no_morph: MyVertex) -> MyVertexOutput {
+    var out: MyVertexOutput;
+#ifdef MORPH_TARGETS
+    //var vertex = morph_vertex(vertex_no_morph);
+    var vertex = vertex_no_morph;
+#else
+    var vertex = vertex_no_morph;
+#endif
+    let mesh_world_from_local = mesh_functions::get_world_from_local(vertex_no_morph.instance_index);
+#ifdef SKINNED
+    var world_from_local = skinning::skin_model(
+        vertex.joint_indices,
+        vertex.joint_weights,
+        vertex_no_morph.instance_index
+    );
+#else
+    var world_from_local = mesh_world_from_local;
+#endif
+#ifdef VERTEX_NORMALS
+#ifdef SKINNED
+    out.world_normal = skinning::skin_normals(world_from_local, vertex.normal);
+#else
+    out.world_normal = mesh_functions::mesh_normal_local_to_world(
+        vertex.normal,
+        vertex_no_morph.instance_index
+    );
+#endif
+#endif
+#ifdef VERTEX_POSITIONS
+    out.world_position = mesh_functions::mesh_position_local_to_world(world_from_local, vec4<f32>(vertex.position, 1.0));
+    out.position = position_world_to_clip(out.world_position.xyz);
+#endif
+#ifdef VERTEX_UVS_A
+    out.uv = vertex.uv;
+#endif
+#ifdef VERTEX_UVS_B
+    out.uv_b = vertex.uv_b;
+#endif
+#ifdef VERTEX_TANGENTS
+    out.world_tangent = mesh_functions::mesh_tangent_local_to_world(
+        world_from_local,
+        vertex.tangent,
+        vertex_no_morph.instance_index
+    );
+#endif
+#ifdef VERTEX_COLORS
+    out.color = vertex.color;
+#endif
+#ifdef VERTEX_OUTPUT_INSTANCE_INDEX
+    out.instance_index = vertex_no_morph.instance_index;
+#endif
+#ifdef VISIBILITY_RANGE_DITHER
+    out.visibility_range_dither = mesh_functions::get_visibility_range_dither_level(
+        vertex_no_morph.instance_index, mesh_world_from_local[3]);
+#endif
+
+    // My changes
+    out.voxel_type = vertex.voxel_type;
+
+    return out;
+}
+
+@fragment
+fn fragment(
+    in: MyVertexOutput,
+    @builtin(front_facing) is_front: bool,
+) -> MyFragmentOutput {
+    let quantized_pos = quantize_3d(in.world_position.xyz, render_voxel_size).xyz;
+    let fac = quantize_3d(in.color.rgb, voxel_type_transition_steps);
+    var voxel: VoxelMaterialOutput;
+
+    if in.voxel_type[0] == in.voxel_type[1] {
+        let a = voxel_function_by_type(in.voxel_type[0], quantized_pos);
+
+        if in.voxel_type[0] == in.voxel_type[2] {
+            // Same voxel type for all vertices
+            voxel = a;
+        } else {
+            let b = voxel_function_by_type(in.voxel_type[2], quantized_pos);
+            voxel = mix_two_voxels(a, b, fac.z);
+        }
+    } else if in.voxel_type[0] == in.voxel_type[2] {
+        let a = voxel_function_by_type(in.voxel_type[0], quantized_pos);
+        let b = voxel_function_by_type(in.voxel_type[1], quantized_pos);
+        voxel = mix_two_voxels(a, b, fac.y);
+    } else if in.voxel_type[1] == in.voxel_type[2] {
+        let a = voxel_function_by_type(in.voxel_type[1], quantized_pos);
+        let b = voxel_function_by_type(in.voxel_type[0], quantized_pos);
+        voxel = mix_two_voxels(a, b, fac.x);
+    } else {
+        // Different voxel type for all vertices
+        let a = voxel_function_by_type(in.voxel_type[0], quantized_pos);
+        let b = voxel_function_by_type(in.voxel_type[1], quantized_pos);
+        let c = voxel_function_by_type(in.voxel_type[2], quantized_pos);
+        voxel = mix_three_voxels(a, b, c, fac);
+    }
+
+    var pbr_vertex = reconstruct_pbr_vertex(in);
+
+    var pbr_input = pbr_input_from_standard_material(pbr_vertex, is_front);
+    pbr_input.material.base_color = vec4(voxel.base_color, 1.0);
+    pbr_input.material.reflectance = voxel.reflectance;
+    pbr_input.material.emissive = voxel.emissive;
+    pbr_input.material.perceptual_roughness = 0.0;
+    //pbr_input.material.base_color = alpha_discard(pbr_input.material, pbr_input.material.base_color);
+
+#ifdef PREPASS_PIPELINE
+    let out = deferred_output(in, pbr_input);
+#else
+    var out: MyFragmentOutput;
+
+    out.color = apply_pbr_lighting(pbr_input);
+
+    // (optional) modify the lit color before post-processing is applied here
+
+    out.color = main_pass_post_lighting_processing(pbr_input, out.color);
+
+    // (optional) modify the final result here
+#endif
+
+    return out;
+}
