@@ -1,9 +1,14 @@
 use avian3d::prelude::*;
 use bevy::prelude::*;
 
-use crate::{physics::GameLayer, worldgen::VoxelMaterial};
-
-use super::{ChunksAABB, Sampler, VoxelSample};
+use super::Sampler;
+use crate::{
+    physics::GameLayer,
+    worldgen::{
+        chunk::ChunksAABB,
+        voxel::{VoxelMaterial, VoxelSample},
+    },
+};
 
 #[derive(Component)]
 pub struct ColliderBrush {

@@ -1,13 +1,20 @@
 use avian3d::prelude::*;
-use bevy::pbr::wireframe::{WireframeConfig, WireframePlugin};
-use bevy::render::settings::{RenderCreation, WgpuFeatures, WgpuSettings};
-use bevy::render::RenderPlugin;
-use bevy::window::PresentMode;
-use bevy::{pbr::ExtendedMaterial, prelude::*};
-use mines::debug_aim::DebugAimPlugin;
+use bevy::{
+    pbr::{
+        wireframe::{WireframeConfig, WireframePlugin},
+        ExtendedMaterial,
+    },
+    prelude::*,
+    render::{
+        settings::{RenderCreation, WgpuFeatures, WgpuSettings},
+        RenderPlugin,
+    },
+    window::PresentMode,
+};
 use noisy_bevy::NoisyShaderPlugin;
 
 use mines::{
+    debug_aim::DebugAimPlugin,
     materials::{CaveMaterialExtension, LineMaterialPlugin},
     tnua::PlayerPlugin,
     worldgen::terrain::TerrainPlugin,

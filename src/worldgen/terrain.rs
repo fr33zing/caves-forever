@@ -8,7 +8,6 @@ use bevy::{
     render::{
         mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
         primitives::Aabb,
-        view::NoFrustumCulling,
     },
     utils::HashSet,
 };
@@ -19,19 +18,29 @@ use fast_surface_nets::{
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use super::{
-    brush::{collider::ColliderBrush, curve::*, ChunksAABB, Sampler, VoxelSample},
+    brush::{collider::ColliderBrush, curve::*, Sampler},
+    chunk::ChunksAABB,
     consts::*,
-    layout, VoxelHardness, VoxelMaterial,
+    layout,
+    voxel::{VoxelHardness, VoxelMaterial, VoxelSample},
 };
 use crate::{
     materials::{CaveMaterialExtension, ATTRIBUTE_VOXEL_RATIO, ATTRIBUTE_VOXEL_TYPE},
     physics::GameLayer,
 };
 
+//
+// Types & consts
+//
+
 type ChunkShape =
     ConstShape3u32<{ CHUNK_SAMPLE_SIZE + 2 }, { CHUNK_SAMPLE_SIZE + 2 }, { CHUNK_SAMPLE_SIZE + 2 }>;
 
 const CHUNK_BORDER_INSET: f32 = 0.0;
+
+//
+// Structs
+//
 
 #[derive(Component)]
 pub struct Chunk;
@@ -39,59 +48,52 @@ pub struct Chunk;
 #[derive(Component, Clone)]
 pub struct ChunkData {
     chunk_pos: IVec3,
-    world_pos: Vec3,
     materials: [VoxelMaterial; ChunkShape::USIZE],
     sdf: [f32; ChunkShape::USIZE],
 }
 
 impl ChunkData {
     fn new(chunk_pos: IVec3) -> Self {
-        let world_pos = chunk_pos.as_vec3() * CHUNK_SIZE as f32;
-
         Self {
             chunk_pos,
-            world_pos,
             materials: [VoxelMaterial::Unset; ChunkShape::USIZE],
             sdf: [f32::MAX; ChunkShape::USIZE],
-            //changes: [0.0; ChunkShape::USIZE],
         }
     }
 
-    pub fn sample(&self, world_pos: Vec3) -> Option<VoxelSample> {
-        let local_pos = world_pos - self.world_pos;
-        let voxel_pos = (local_pos / CHUNK_SAMPLE_SIZE as f32).floor() * CHUNK_SAMPLE_SIZE as f32;
-        let max = CHUNK_SAMPLE_SIZE as f32;
-        if voxel_pos.x < 0.0
-            || voxel_pos.x > max
-            || voxel_pos.y < 0.0
-            || voxel_pos.y > max
-            || voxel_pos.z < 0.0
-            || voxel_pos.z > max
-        {
-            println!("{voxel_pos} outside of max {max}",);
-            return None; // Point is outsize chunk
-        }
-
-        let voxel_pos = voxel_pos.as_uvec3();
-        let i = ChunkShape::linearize([voxel_pos.x, voxel_pos.y, voxel_pos.z]) as usize;
-
-        Some(VoxelSample {
-            distance: self.sdf[i],
-            material: self.materials[i],
-        })
+    pub fn world_pos(&self) -> Vec3 {
+        self.chunk_pos.as_vec3() * CHUNK_SIZE_F
     }
 }
 
+//
+// Plugin
+//
+
+pub struct TerrainPlugin;
+
+impl Plugin for TerrainPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_event::<DestroyTerrainEvent>()
+            .add_systems(Startup, (setup, layout::setup_debug_layout.before(setup)))
+            .add_systems(Update, (draw_debug, destroy_terrain));
+    }
+}
+
+//
+// Events
+//
+
 #[derive(Event)]
-pub struct DestroyTerrain {
+pub struct DestroyTerrainEvent {
     pub position: Vec3,
     pub radius: f32,
     pub force: f32,
 }
 
-impl DestroyTerrain {
+impl DestroyTerrainEvent {
     fn world_extents(&self) -> (Vec3, Vec3) {
-        let inflate = 1.0;
+        let inflate = 1.0; // World units, not chunks
         let radius = Vec3::splat(self.radius + inflate);
         let min = self.position - radius;
         let max = self.position + radius;
@@ -100,12 +102,168 @@ impl DestroyTerrain {
     }
 }
 
+//
+// Systems
+//
+
+fn setup(mut commands: Commands, aabb_query: Query<&ChunksAABB>) {
+    let mut chunks = HashSet::<IVec3>::new();
+
+    for aabb in aabb_query.iter() {
+        chunks.extend(&aabb.chunks);
+    }
+
+    for chunk_pos in chunks {
+        let data = ChunkData::new(chunk_pos);
+        commands.queue(SpawnChunkCommand(data, false));
+    }
+}
+
+fn draw_debug(mut gizmos: Gizmos, chunk_query: Query<&Transform, With<Chunk>>) {
+    if CHUNK_RENDER_BORDERS {
+        for transform in chunk_query.iter() {
+            gizmos.cuboid(
+                Transform::from_translation(
+                    (*transform).translation + Vec3::splat(CHUNK_SIZE_F / 2.0 + CHUNK_BORDER_INSET),
+                )
+                .with_scale(Vec3::splat(CHUNK_SIZE_F - CHUNK_BORDER_INSET * 2.0)),
+                Color::srgba(0.0, 0.0, 0.0, 0.25),
+            );
+        }
+    }
+
+    gizmos.axes(
+        Transform::from_translation(Vec3::splat(0.125)),
+        CHUNK_SIZE_F,
+    );
+}
+
+fn sample_all_chunks(world_pos: Vec3, chunk_query: Query<&ChunkData>) -> Option<VoxelSample> {
+    let mut sample: Option<VoxelSample> = None;
+
+    let voxel_pos = (world_pos / CHUNK_SAMPLE_SIZE_F).floor() * CHUNK_SAMPLE_SIZE_F;
+    let max = CHUNK_SAMPLE_SIZE_F;
+
+    for data in chunk_query.iter() {
+        let voxel_pos = voxel_pos - (data.world_pos() / max).floor() * max;
+
+        if voxel_pos.x < 0.0
+            || voxel_pos.x > max
+            || voxel_pos.y < 0.0
+            || voxel_pos.y > max
+            || voxel_pos.z < 0.0
+            || voxel_pos.z > max
+        {
+            // Point is outside chunk
+            continue;
+        }
+
+        let voxel_pos = voxel_pos.as_uvec3();
+        let i = ChunkShape::linearize([voxel_pos.x, voxel_pos.y, voxel_pos.z]) as usize;
+        sample = Some(VoxelSample {
+            distance: data.sdf[i],
+            material: data.materials[i],
+        });
+
+        break;
+    }
+
+    sample
+}
+
+fn destroy_terrain(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut event: EventReader<DestroyTerrainEvent>,
+    mut chunk_query: Query<(Entity, &mut ChunkData)>,
+) {
+    let events: Vec<(&DestroyTerrainEvent, ChunksAABB, ChunksAABB, VoxelHardness)> = event
+        .read()
+        .map(|e| {
+            let mut lens = chunk_query.transmute_lens::<&ChunkData>();
+            let hardness = match sample_all_chunks(e.position, lens.query()) {
+                Some(sample) => sample.material.hardness(),
+                None => VoxelHardness::Unbreakable,
+            };
+            let aabb = ChunksAABB::from_world_aabb(e.world_extents(), 0);
+            let aabb_inflated = aabb.inflated(1);
+
+            (e, aabb, aabb_inflated, hardness)
+        })
+        .collect();
+
+    if events.len() == 0 {
+        return;
+    }
+
+    let mut chunks_to_generate: HashSet<IVec3> =
+        events.iter().flat_map(|e| e.1.chunks.clone()).collect();
+
+    chunk_query.iter_mut().for_each(|(entity, mut data)| {
+        let mut changed = false;
+
+        chunks_to_generate.remove(&data.chunk_pos);
+
+        for (e, _, aabb_inflated, hardness) in events.iter() {
+            // TODO ensure this optimization can't result in non-manifold geometry
+            if !aabb_inflated.chunks.contains(&data.chunk_pos) {
+                continue;
+            }
+
+            let world_pos = data.world_pos();
+
+            changed = changed
+                || merge_sdf_with_hardness(&mut data, &hardness, || {
+                    chunk_samples(&world_pos)
+                        .map(|point| e.position.distance(point) - e.radius)
+                        .collect()
+                });
+        }
+
+        if changed {
+            if let Some((mesh, collider)) = mesh_chunk(&data) {
+                let mut commands = commands.entity(entity);
+                commands.remove::<Collider>();
+                commands.insert(collider);
+                commands.remove::<Mesh3d>();
+                commands.insert(Mesh3d(meshes.add(mesh)));
+            } else {
+                commands.entity(entity).clear();
+            }
+        }
+    });
+
+    for chunk_pos in chunks_to_generate {
+        for (e, _, aabb_inflated, hardness) in events.iter() {
+            // TODO ensure this optimization can't result in non-manifold geometry
+            if !aabb_inflated.chunks.contains(&chunk_pos) {
+                continue;
+            }
+
+            let mut data = ChunkData::new(chunk_pos);
+            let world_pos = data.world_pos();
+
+            merge_sdf_with_hardness(&mut data, &hardness, || {
+                chunk_samples(&world_pos)
+                    .map(|point| e.position.distance(point) - e.radius)
+                    .collect()
+            });
+
+            commands.queue(SpawnChunkCommand(data, true));
+        }
+    }
+}
+
+//
+// Commands
+//
+
 /// Spawns a new chunk, optionally copying border data from adjacent chunks.
-struct SpawnChunk(ChunkData, bool);
+struct SpawnChunkCommand(ChunkData, bool);
 
-struct RemeshChunk(Entity);
+struct RemeshChunkCommand(Entity);
 
-impl Command for SpawnChunk {
+impl Command for SpawnChunkCommand {
     fn apply(mut self, world: &mut World) {
         let mut system_state: SystemState<(
             Commands,
@@ -124,7 +282,7 @@ impl Command for SpawnChunk {
             mut chunk_query,
         ) = system_state.get_mut(world);
 
-        let world_pos = self.0.world_pos.clone();
+        let world_pos = self.0.world_pos();
 
         // Sample curve brushes
         for brush in curve_brush_query.iter() {
@@ -145,17 +303,17 @@ impl Command for SpawnChunk {
         }
 
         // Copy borders from adjacent chunks
-        let mut remesh_commands = Vec::<RemeshChunk>::new();
+        let mut remesh_commands = Vec::<RemeshChunkCommand>::new();
         if self.1 {
             chunk_query.iter_mut().for_each(|(entity, data)| {
                 copy_borders(&mut self.0, &data);
-                remesh_commands.push(RemeshChunk(entity));
+                remesh_commands.push(RemeshChunkCommand(entity));
             });
         }
 
         if let Some((mesh, collider)) = mesh_chunk(&self.0) {
             let scale = Vec3::splat(1.0 / CHUNK_SAMPLE_RESOLUTION);
-            let half_extents = Vec3A::splat(CHUNK_SIZE as f32 / 2.0);
+            let half_extents = Vec3A::splat(CHUNK_SIZE_F / 2.0);
 
             commands.spawn((
                 self.0,
@@ -189,7 +347,7 @@ impl Command for SpawnChunk {
     }
 }
 
-impl Command for RemeshChunk {
+impl Command for RemeshChunkCommand {
     // This can probably be optimized by tracking if copying the borders is actually needed
     fn apply(self, world: &mut World) {
         let mut system_state: SystemState<(
@@ -225,155 +383,6 @@ impl Command for RemeshChunk {
         }
 
         system_state.apply(world);
-    }
-}
-
-pub struct TerrainPlugin;
-
-impl Plugin for TerrainPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_event::<DestroyTerrain>()
-            .add_systems(Startup, (setup, layout::setup_debug_layout.before(setup)))
-            .add_systems(Update, (draw_debug, destroy_terrain));
-    }
-}
-
-fn setup(mut commands: Commands, aabb_query: Query<&ChunksAABB>) {
-    let mut chunks = HashSet::<IVec3>::new();
-
-    for aabb in aabb_query.iter() {
-        chunks.extend(&aabb.chunks);
-    }
-
-    for chunk_pos in chunks {
-        let data = ChunkData::new(chunk_pos);
-        commands.queue(SpawnChunk(data, false));
-    }
-}
-
-fn draw_debug(mut gizmos: Gizmos, chunk_query: Query<&Transform, With<Chunk>>) {
-    if CHUNK_RENDER_BORDERS {
-        for transform in chunk_query.iter() {
-            gizmos.cuboid(
-                Transform::from_translation(
-                    (*transform).translation
-                        + Vec3::splat(CHUNK_SIZE as f32 / 2.0 + CHUNK_BORDER_INSET),
-                )
-                .with_scale(Vec3::splat(CHUNK_SIZE as f32 - CHUNK_BORDER_INSET * 2.0)),
-                Color::srgba(0.0, 0.0, 0.0, 0.25),
-            );
-        }
-    }
-
-    gizmos.axes(
-        Transform::from_translation(Vec3::splat(0.125)),
-        CHUNK_SIZE as f32,
-    );
-}
-
-fn destroy_terrain(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut event: EventReader<DestroyTerrain>,
-    mut chunk_query: Query<(Entity, &mut ChunkData)>,
-) {
-    let events: Vec<(&DestroyTerrain, ChunksAABB, ChunksAABB, VoxelHardness)> = event
-        .read()
-        .map(|e| {
-            let mut hardness: Option<VoxelHardness> = None;
-            let voxel_pos =
-                (e.position / CHUNK_SAMPLE_SIZE as f32).floor() * CHUNK_SAMPLE_SIZE as f32;
-            let max = CHUNK_SAMPLE_SIZE as f32;
-
-            for (_, data) in chunk_query.iter() {
-                let voxel_pos = voxel_pos
-                    - (data.world_pos / CHUNK_SAMPLE_SIZE as f32).floor()
-                        * CHUNK_SAMPLE_SIZE as f32;
-
-                if voxel_pos.x < 0.0
-                    || voxel_pos.x > max
-                    || voxel_pos.y < 0.0
-                    || voxel_pos.y > max
-                    || voxel_pos.z < 0.0
-                    || voxel_pos.z > max
-                {
-                    // Point is outside chunk
-                    continue;
-                }
-
-                let voxel_pos = voxel_pos.as_uvec3();
-                let i = ChunkShape::linearize([voxel_pos.x, voxel_pos.y, voxel_pos.z]) as usize;
-                hardness = Some(data.materials[i].hardness());
-
-                break;
-            }
-
-            let aabb = ChunksAABB::from_world_aabb(e.world_extents(), 0);
-            let aabb_inflated = aabb.inflated(1);
-            (
-                e,
-                aabb,
-                aabb_inflated,
-                hardness.unwrap_or(VoxelHardness::Unbreakable),
-            )
-        })
-        .collect();
-    if events.len() == 0 {
-        return;
-    }
-
-    let mut chunks_to_generate: HashSet<IVec3> =
-        events.iter().flat_map(|e| e.1.chunks.clone()).collect();
-
-    chunk_query.iter_mut().for_each(|(entity, mut data)| {
-        let mut changed = false;
-
-        chunks_to_generate.remove(&data.chunk_pos);
-
-        for (e, _, aabb_inflated, hardness) in events.iter() {
-            if !aabb_inflated.chunks.contains(&data.chunk_pos) {
-                continue;
-            }
-
-            let world_pos = data.world_pos.clone();
-            changed = changed
-                || merge_sdf_with_hardness(&mut data, &hardness, || {
-                    chunk_samples(&world_pos)
-                        .map(|point| e.position.distance(point) - e.radius)
-                        .collect()
-                });
-        }
-
-        if changed {
-            if let Some((mesh, collider)) = mesh_chunk(&data) {
-                let mut commands = commands.entity(entity);
-                commands.remove::<Collider>();
-                commands.insert(collider);
-                commands.remove::<Mesh3d>();
-                commands.insert(Mesh3d(meshes.add(mesh)));
-            } else {
-                commands.entity(entity).clear();
-            }
-        }
-    });
-
-    for chunk_pos in chunks_to_generate {
-        for (e, _, aabb_inflated, hardness) in events.iter() {
-            if !aabb_inflated.chunks.contains(&chunk_pos) {
-                continue;
-            }
-
-            let mut data = ChunkData::new(chunk_pos);
-            let world_pos = data.world_pos.clone();
-
-            merge_sdf_with_hardness(&mut data, &hardness, || {
-                chunk_samples(&world_pos)
-                    .map(|point| e.position.distance(point) - e.radius)
-                    .collect()
-            });
-
-            commands.queue(SpawnChunk(data, true));
-        }
     }
 }
 
@@ -448,6 +457,8 @@ fn chunk_samples(
         .map(move |i| delinearize_to_world_pos(chunk_world_pos, i))
 }
 
+// This function will probably come in handy at some point, so I'll keep it for now.
+#[allow(dead_code)]
 fn merge_sdf<F>(sdf: &mut [f32; ChunkShape::USIZE], sampler: F) -> bool
 where
     F: Fn() -> Vec<f32>,
@@ -465,28 +476,21 @@ where
     changed
 }
 
-fn mix_hardness(a: f32, b: f32) -> f32 {
-    let ratio = 0.5;
-    a * (1.0 - ratio) + b * ratio
-}
-
-// TODO this function might cause holes
-fn merge_sdf_with_hardness<F>(data: &mut ChunkData, hardness: &VoxelHardness, sampler: F) -> bool
+// TODO ensure this can't result in non-manifold geometry
+// TODO consider hardness of the hit material to prevent destroying soft materials behind hard materials
+fn merge_sdf_with_hardness<F>(data: &mut ChunkData, _hardness: &VoxelHardness, sampler: F) -> bool
 where
     F: Fn() -> Vec<f32>,
 {
     let mut changed = false;
     let new_sdf = sampler();
-    let h = hardness.multiplier();
 
     for (i, distance) in new_sdf.into_iter().enumerate() {
         if distance < data.sdf[i] {
-            //let multiplier = h.max(data.materials[i].hardness().multiplier());
             let multiplier = data.materials[i].hardness().multiplier();
 
             let difference = data.sdf[i] - distance;
             data.sdf[i] = distance + difference * (1.0 - (1.0 / multiplier));
-            //data.sdf[i] = distance + difference * (1.0 - (1.0 / multiplier));
 
             changed = true;
         }

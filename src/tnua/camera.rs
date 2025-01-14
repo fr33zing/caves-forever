@@ -59,11 +59,8 @@ fn setup(mut commands: Commands) {
 fn grab_ungrab_mouse(
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     keyboard: Res<ButtonInput<KeyCode>>,
-    mut primary_window_query: Query<&mut Window, With<PrimaryWindow>>,
+    mut window: Single<&mut Window, With<PrimaryWindow>>,
 ) {
-    let Ok(mut window) = primary_window_query.get_single_mut() else {
-        return;
-    };
     if window.cursor_options.visible {
         if mouse_buttons.just_pressed(MouseButton::Left) {
             window.cursor_options.grab_mode = CursorGrabMode::Locked;
@@ -78,17 +75,15 @@ fn grab_ungrab_mouse(
 }
 
 fn apply_camera_controls(
-    primary_window_query: Query<&Window, With<PrimaryWindow>>,
     mut mouse_motion: EventReader<MouseMotion>,
-    mut player_character_query: Query<(&GlobalTransform, &mut ForwardFromCamera)>,
     mut camera_query: Query<&mut Transform, With<Camera>>,
+    window: Option<Single<&mut Window, With<PrimaryWindow>>>,
+    player: Option<Single<(&GlobalTransform, &mut ForwardFromCamera)>>,
 ) {
-    let window = primary_window_query.get_single();
-    if let Err(_) = window {
+    let (Some(window), Some(player)) = (window, player) else {
         mouse_motion.clear();
         return;
-    }
-    let window = window.unwrap();
+    };
 
     let total_delta = if window.cursor_options.visible {
         Vec2::ZERO
@@ -98,23 +93,19 @@ fn apply_camera_controls(
     mouse_motion.clear();
 
     let total_delta = total_delta * SENSITIVITY;
-
-    let Ok((player_transform, mut forward_from_camera)) = player_character_query.get_single_mut()
-    else {
-        return;
-    };
-
+    let (player_transform, mut forward_from_camera) = player.into_inner();
     let yaw = Quaternion::from_rotation_y(-0.01 * total_delta.x);
-    forward_from_camera.forward = yaw.mul_vec3(forward_from_camera.forward);
-
     let pitch = 0.005 * total_delta.y;
+
+    forward_from_camera.forward = yaw.mul_vec3(forward_from_camera.forward);
     forward_from_camera.pitch_angle =
         (forward_from_camera.pitch_angle + pitch).clamp(-FRAC_PI_2, FRAC_PI_2);
 
     for mut camera in camera_query.iter_mut() {
+        let pitch_axis = camera.left();
+
         camera.translation = player_transform.translation() + 1.0 * Vec3::Y;
         camera.look_to(forward_from_camera.forward, Vec3::Y);
-        let pitch_axis = camera.left();
         camera.rotate_around(
             player_transform.translation(),
             Quat::from_axis_angle(*pitch_axis, forward_from_camera.pitch_angle),

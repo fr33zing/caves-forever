@@ -6,9 +6,14 @@ use bevy::{
 use curvo::prelude::*;
 use nalgebra::Point3;
 
-use crate::{materials::LineMaterial, worldgen::VoxelMaterial};
-
-use super::{ChunksAABB, Sampler, VoxelSample};
+use super::Sampler;
+use crate::{
+    materials::LineMaterial,
+    worldgen::{
+        chunk::ChunksAABB,
+        voxel::{VoxelMaterial, VoxelSample},
+    },
+};
 
 #[derive(Component)]
 pub struct CurveBrush {
@@ -27,19 +32,7 @@ impl Sampler for CurveBrush {
             + (closest.z - point.z).powf(2.0))
         .sqrt();
 
-        let parameter = self.curve.find_closest_parameter(&point).unwrap();
-        let max_width = 16.0;
-        let min_width = 6.0;
-        let width = max_width; //min_width.lerp(max_width, parameter);
-
-        // if self.flat_bottom {
-        //     if point.y < closest.y && distance <= width {
-        //         return VoxelSample {
-        //             material: self.material,
-        //             distance: 1.0,
-        //         };
-        //     }
-        // }
+        let width = 16.0;
 
         VoxelSample {
             material: self.material,

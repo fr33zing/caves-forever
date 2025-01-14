@@ -1,6 +1,12 @@
 use strum::EnumProperty;
 use strum_macros::FromRepr;
 
+#[derive(Clone, Copy, Debug)]
+pub struct VoxelSample {
+    pub material: VoxelMaterial,
+    pub distance: f32,
+}
+
 #[derive(Debug)]
 pub enum VoxelHardness {
     Default,
