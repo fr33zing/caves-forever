@@ -9,7 +9,8 @@
 }
 #import "shaders/CaveMaterialExtension/utility.wgsl"::{
     clamp_scaled,
-    quantize
+    quantize,
+    quantize_3d
 }
 
 
@@ -19,18 +20,30 @@ fn voxel_function_by_type(voxel_type: u32, pos: vec3<f32>) -> VoxelMaterialOutpu
         case 0u: { return voxel_0(pos); }
         case 1u: { return voxel_1(pos); }
         case 2u: { return voxel_2(pos); }
-        case 252u: { return boundary(pos); }
-        case 253u: { return boundary(pos); }
-        default: { return voxel_default(pos); }
+
+        case 255u: { return fallback(pos, vec3(0.0, 1.0, 0.0)); } // Unset
+        case 254u: { return fallback(pos, vec3(1.0, 0.0, 0.0)); } // Invalid
+        case 253u: { return boundary(pos); } // Boundary
+        case 252u: { return boundary(pos); } // FakeBoundary
+        default: { return fallback(pos, vec3(1.0, 1.0, 0.0)); }
     }
 }
 
-// Fallback for unregistered voxel type
-fn voxel_default(
-    pos: vec3<f32>
+fn fallback(
+    pos: vec3<f32>,
+    color: vec3<f32>
 ) -> VoxelMaterialOutput {
     var out = VoxelMaterialOutput_default();
-    out.base_color = vec3(0.0, 1.0, 0.0);
+    var quantized_pos = quantize_3d(pos, 32.0);
+    out.base_color = color;
+
+    if quantized_pos.x % 2.0 == 0.0
+       || quantized_pos.y % 2.0 == 0.0
+       || quantized_pos.z % 2.0 == 0.0
+    {
+        out.base_color = vec3(0.0, 0.0, 0.0);
+    }
+
     return out;
 }
 
