@@ -2,10 +2,12 @@ use avian3d::prelude::*;
 use bevy::{
     asset::RenderAssetUsages,
     ecs::system::SystemState,
+    math::Vec3A,
     pbr::{ExtendedMaterial, OpaqueRendererMethod},
     prelude::*,
     render::{
         mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
+        primitives::Aabb,
         view::NoFrustumCulling,
     },
     utils::HashSet,
@@ -153,12 +155,16 @@ impl Command for SpawnChunk {
 
         if let Some((mesh, collider)) = mesh_chunk(&self.0) {
             let scale = Vec3::splat(1.0 / CHUNK_SAMPLE_RESOLUTION);
+            let half_extents = Vec3A::splat(CHUNK_SIZE as f32 / 2.0);
 
             commands.spawn((
-                NoFrustumCulling, // TODO remove this
-                Chunk,
                 self.0,
                 collider,
+                Chunk,
+                Aabb {
+                    center: half_extents,
+                    half_extents,
+                },
                 Transform::from_translation(world_pos).with_scale(scale),
                 RigidBody::Static,
                 CollisionLayers::new(GameLayer::World, LayerMask::ALL),
