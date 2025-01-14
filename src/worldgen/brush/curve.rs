@@ -8,7 +8,7 @@ use nalgebra::Point3;
 
 use crate::{materials::LineMaterial, worldgen::VoxelMaterial};
 
-use super::{bounding_box_chunks, BoundingBoxChunks, Sampler, VoxelSample};
+use super::{ChunksAABB, Sampler, VoxelSample};
 
 #[derive(Component)]
 pub struct CurveBrush {
@@ -51,7 +51,7 @@ impl Sampler for CurveBrush {
 #[derive(Bundle)]
 pub struct CurveBrushBundle {
     brush: CurveBrush,
-    chunks: BoundingBoxChunks,
+    chunks: ChunksAABB,
     mesh: Mesh3d,
     material: MeshMaterial3d<LineMaterial>,
 }
@@ -66,8 +66,8 @@ impl CurveBrushBundle {
         let curve = NurbsCurve3D::<f32>::try_interpolate(&points, 3).unwrap();
         let samples = curve.tessellate(Some(1e-8));
         let mesh = mesh_curve(&samples);
-        let bbox = curve_bounding_box(&samples);
-        let chunks = bounding_box_chunks(bbox, 1);
+        let aabb = curve_bounding_box(&samples);
+        let chunks = ChunksAABB::from_world_aabb(aabb, 1);
 
         CurveBrushBundle {
             brush: CurveBrush {

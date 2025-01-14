@@ -3,7 +3,7 @@ use bevy::prelude::*;
 
 use crate::{physics::GameLayer, worldgen::VoxelMaterial};
 
-use super::{bounding_box_chunks, BoundingBoxChunks, Sampler, VoxelSample};
+use super::{ChunksAABB, Sampler, VoxelSample};
 
 #[derive(Component)]
 pub struct ColliderBrush {
@@ -35,13 +35,13 @@ impl Sampler for ColliderBrush {
 pub struct ColliderBrushBundle {
     pub brush: ColliderBrush,
     pub collision_layers: CollisionLayers,
-    pub chunks: BoundingBoxChunks,
+    pub chunks: ChunksAABB,
 }
 
 impl ColliderBrushBundle {
     pub fn new(width: f32, collider: Collider, transform: Transform) -> Self {
         let aabb = collider.aabb(transform.translation, Rotation(transform.rotation));
-        let chunks = bounding_box_chunks((aabb.min, aabb.max), 0);
+        let chunks = ChunksAABB::from_world_aabb((aabb.min, aabb.max), 0);
 
         Self {
             brush: ColliderBrush {

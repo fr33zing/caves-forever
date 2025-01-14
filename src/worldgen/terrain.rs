@@ -1,23 +1,30 @@
 use avian3d::prelude::*;
-use bevy::asset::RenderAssetUsages;
-use bevy::ecs::system::SystemState;
-use bevy::pbr::{ExtendedMaterial, OpaqueRendererMethod};
-use bevy::prelude::*;
-use bevy::render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues};
-use bevy::render::view::NoFrustumCulling;
-use bevy::utils::tracing::Instrument;
-use bevy::utils::HashSet;
-use fast_surface_nets::ndshape::{ConstShape, ConstShape3u32};
-use fast_surface_nets::{surface_nets, SignedDistance, SurfaceNetsBuffer};
+use bevy::{
+    asset::RenderAssetUsages,
+    ecs::system::SystemState,
+    pbr::{ExtendedMaterial, OpaqueRendererMethod},
+    prelude::*,
+    render::{
+        mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
+        view::NoFrustumCulling,
+    },
+    utils::HashSet,
+};
+use fast_surface_nets::{
+    ndshape::{ConstShape, ConstShape3u32},
+    surface_nets, SurfaceNetsBuffer,
+};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
-use crate::materials::{CaveMaterialExtension, ATTRIBUTE_VOXEL_RATIO, ATTRIBUTE_VOXEL_TYPE};
-use crate::physics::GameLayer;
-
-use super::brush::collider::ColliderBrush;
-use super::brush::{bounding_box_chunks, curve::*, Sampler};
-use super::brush::{BoundingBoxChunks, VoxelSample};
-use super::{consts::*, layout, VoxelHardness, VoxelMaterial};
+use super::{
+    brush::{collider::ColliderBrush, curve::*, ChunksAABB, Sampler, VoxelSample},
+    consts::*,
+    layout, VoxelHardness, VoxelMaterial,
+};
+use crate::{
+    materials::{CaveMaterialExtension, ATTRIBUTE_VOXEL_RATIO, ATTRIBUTE_VOXEL_TYPE},
+    physics::GameLayer,
+};
 
 type ChunkShape =
     ConstShape3u32<{ CHUNK_SAMPLE_SIZE + 2 }, { CHUNK_SAMPLE_SIZE + 2 }, { CHUNK_SAMPLE_SIZE + 2 }>;
@@ -102,8 +109,8 @@ impl Command for SpawnChunk {
             Commands,
             ResMut<Assets<Mesh>>,
             ResMut<Assets<ExtendedMaterial<StandardMaterial, CaveMaterialExtension>>>,
-            Query<(&CurveBrush, &BoundingBoxChunks)>,
-            Query<(&ColliderBrush, &BoundingBoxChunks)>,
+            Query<&CurveBrush>,
+            Query<&ColliderBrush>,
             Query<(Entity, &mut ChunkData)>,
         )> = SystemState::new(world);
         let (
@@ -118,25 +125,21 @@ impl Command for SpawnChunk {
         let world_pos = self.0.world_pos.clone();
 
         // Sample curve brushes
-        for (brush, bbox) in curve_brush_query.iter() {
-            // if bbox.chunks.contains(&self.0.chunk_pos) {
+        for brush in curve_brush_query.iter() {
             merge_chunk(&mut self.0, || {
                 chunk_samples(&world_pos)
                     .map(|point| brush.sample(point))
                     .collect()
             });
-            //  }
         }
 
         // Sample mesh brushes
-        for (brush, bbox) in collider_brush_query.iter() {
-            //  if bbox.chunks.contains(&self.0.chunk_pos) {
+        for brush in collider_brush_query.iter() {
             merge_chunk(&mut self.0, || {
                 chunk_samples(&world_pos)
                     .map(|point| brush.sample(point))
                     .collect()
             });
-            //    }
         }
 
         // Copy borders from adjacent chunks
@@ -229,11 +232,11 @@ impl Plugin for TerrainPlugin {
     }
 }
 
-fn setup(mut commands: Commands, bbox_query: Query<&BoundingBoxChunks>) {
+fn setup(mut commands: Commands, aabb_query: Query<&ChunksAABB>) {
     let mut chunks = HashSet::<IVec3>::new();
 
-    for bbox in bbox_query.iter() {
-        chunks.extend(&bbox.chunks);
+    for aabb in aabb_query.iter() {
+        chunks.extend(&aabb.chunks);
     }
 
     for chunk_pos in chunks {
@@ -268,12 +271,7 @@ fn destroy_terrain(
     mut event: EventReader<DestroyTerrain>,
     mut chunk_query: Query<(Entity, &mut ChunkData)>,
 ) {
-    // let events: Vec<(&DestroyTerrain, BoundingBoxChunks)> = event
-    //     .read()
-    //     .map(|e| (e, bounding_box_chunks(e.world_extents(), 0)))
-    //     .collect();
-
-    let events: Vec<(&DestroyTerrain, BoundingBoxChunks, VoxelHardness)> = event
+    let events: Vec<(&DestroyTerrain, ChunksAABB, ChunksAABB, VoxelHardness)> = event
         .read()
         .map(|e| {
             let mut hardness: Option<VoxelHardness> = None;
@@ -304,9 +302,12 @@ fn destroy_terrain(
                 break;
             }
 
+            let aabb = ChunksAABB::from_world_aabb(e.world_extents(), 0);
+            let aabb_inflated = aabb.inflated(1);
             (
                 e,
-                bounding_box_chunks(e.world_extents(), 0),
+                aabb,
+                aabb_inflated,
                 hardness.unwrap_or(VoxelHardness::Unbreakable),
             )
         })
@@ -323,7 +324,11 @@ fn destroy_terrain(
 
         chunks_to_generate.remove(&data.chunk_pos);
 
-        for (e, _, hardness) in events.iter() {
+        for (e, _, aabb_inflated, hardness) in events.iter() {
+            if !aabb_inflated.chunks.contains(&data.chunk_pos) {
+                continue;
+            }
+
             let world_pos = data.world_pos.clone();
             changed = changed
                 || merge_sdf_with_hardness(&mut data, &hardness, || {
@@ -347,7 +352,11 @@ fn destroy_terrain(
     });
 
     for chunk_pos in chunks_to_generate {
-        for (e, _, hardness) in events.iter() {
+        for (e, _, aabb_inflated, hardness) in events.iter() {
+            if !aabb_inflated.chunks.contains(&chunk_pos) {
+                continue;
+            }
+
             let mut data = ChunkData::new(chunk_pos);
             let world_pos = data.world_pos.clone();
 
@@ -367,8 +376,8 @@ fn destroy_terrain(
 //
 
 fn copy_sdf_plane(
-    a: &mut [f32; ChunkShape::USIZE],
-    b: &[f32; ChunkShape::USIZE],
+    a: &mut ChunkData,
+    b: &ChunkData,
     axis0: usize,
     axis1: usize,
     offset0: u32,
@@ -389,11 +398,12 @@ fn copy_sdf_plane(
             let i = ChunkShape::linearize(point0) as usize;
             let j = ChunkShape::linearize(point1) as usize;
 
-            if a[i] != b[j] {
+            if !changed && (a.sdf[i] != b.sdf[j] || a.materials[i] != b.materials[j]) {
                 changed = true;
             }
 
-            a[i] = b[j];
+            a.sdf[i] = b.sdf[j];
+            a.materials[i] = b.materials[j];
         }
     }
 
@@ -407,12 +417,12 @@ fn copy_borders(a: &mut ChunkData, b: &ChunkData) -> bool {
     let max = CHUNK_SAMPLE_SIZE + 1;
 
     match dir {
-        IVec3 { x: -1, y: 0, z: 0 } => copy_sdf_plane(&mut a.sdf, &b.sdf, 1, 2, max, min + 1),
-        IVec3 { x: 1, y: 0, z: 0 } => copy_sdf_plane(&mut a.sdf, &b.sdf, 1, 2, min, max - 1),
-        IVec3 { x: 0, y: -1, z: 0 } => copy_sdf_plane(&mut a.sdf, &b.sdf, 0, 2, max, min + 1),
-        IVec3 { x: 0, y: 1, z: 0 } => copy_sdf_plane(&mut a.sdf, &b.sdf, 0, 2, min, max - 1),
-        IVec3 { x: 0, y: 0, z: -1 } => copy_sdf_plane(&mut a.sdf, &b.sdf, 0, 1, max, min + 1),
-        IVec3 { x: 0, y: 0, z: 1 } => copy_sdf_plane(&mut a.sdf, &b.sdf, 0, 1, min, max - 1),
+        IVec3 { x: -1, y: 0, z: 0 } => copy_sdf_plane(a, &b, 1, 2, max, min + 1),
+        IVec3 { x: 1, y: 0, z: 0 } => copy_sdf_plane(a, &b, 1, 2, min, max - 1),
+        IVec3 { x: 0, y: -1, z: 0 } => copy_sdf_plane(a, &b, 0, 2, max, min + 1),
+        IVec3 { x: 0, y: 1, z: 0 } => copy_sdf_plane(a, &b, 0, 2, min, max - 1),
+        IVec3 { x: 0, y: 0, z: -1 } => copy_sdf_plane(a, &b, 0, 1, max, min + 1),
+        IVec3 { x: 0, y: 0, z: 1 } => copy_sdf_plane(a, &b, 0, 1, min, max - 1),
         _ => false,
     }
 }
