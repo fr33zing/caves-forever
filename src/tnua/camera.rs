@@ -8,8 +8,6 @@ use bevy::{
 use bevy_egui::{egui, EguiContexts};
 use bevy_tnua::math::{Float, Quaternion, Vector3};
 
-const SENSITIVITY: f32 = 0.01;
-
 #[derive(Component)]
 pub struct ForwardFromCamera {
     pub forward: Vector3,
@@ -120,12 +118,16 @@ fn grab_ungrab_mouse(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut window: Single<&mut Window, With<PrimaryWindow>>,
 ) {
-    if window.cursor_options.visible {
-        if keyboard.just_pressed(KeyCode::KeyT) {
-            window.cursor_options.grab_mode = CursorGrabMode::Locked;
-            window.cursor_options.visible = false;
-        }
-    } else if keyboard.just_released(KeyCode::KeyT) {
+    if !keyboard.just_pressed(KeyCode::KeyT) {
+        return;
+    }
+
+    if window.cursor_options.visible
+        || !matches!(window.cursor_options.grab_mode, CursorGrabMode::Locked)
+    {
+        window.cursor_options.grab_mode = CursorGrabMode::Locked;
+        window.cursor_options.visible = false;
+    } else {
         window.cursor_options.grab_mode = CursorGrabMode::None;
         window.cursor_options.visible = true;
     }
