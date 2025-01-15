@@ -24,13 +24,12 @@ impl Plugin for PlayerControlsPlugin {
 #[derive(Component)]
 pub struct PlayerMotionConfig {
     pub speed: f32,
+    pub sprint_speed_multiplier: f32,
+    pub crouch_speed_multiplier: f32,
     pub walk: TnuaBuiltinWalk,
-    pub actions_in_air: usize,
     pub jump: TnuaBuiltinJump,
     pub crouch: TnuaBuiltinCrouch,
-    pub dash_distance: f32,
-    pub dash: TnuaBuiltinDash,
-    pub knockback: TnuaBuiltinKnockback,
+    pub actions_in_air: usize,
 }
 
 #[allow(clippy::type_complexity)]
@@ -41,7 +40,6 @@ pub fn apply_platformer_controls(
         &PlayerMotionConfig,
         &mut TnuaController,
         &mut TnuaCrouchEnforcer,
-        //&mut TnuaProximitySensor,
         &mut TnuaSimpleAirActionsCounter,
         Option<&ForwardFromCamera>,
     )>,
@@ -50,23 +48,18 @@ pub fn apply_platformer_controls(
         config,
         mut controller,
         mut crouch_enforcer,
-        //mut sensor,
         mut air_actions_counter,
         forward_from_camera,
     ) in query.iter_mut()
     {
-        // This part is just keyboard input processing. In a real game this would probably be done
-        // with a third party plugin.
         let mut direction = Vector3::ZERO;
 
-        // if config.dimensionality == Dimensionality::Dim3 {
         if keyboard.any_pressed([KeyCode::ArrowUp, KeyCode::KeyW]) {
             direction -= Vector3::Z;
         }
         if keyboard.any_pressed([KeyCode::ArrowDown, KeyCode::KeyS]) {
             direction += Vector3::Z;
         }
-        // }
         if keyboard.any_pressed([KeyCode::ArrowLeft, KeyCode::KeyA]) {
             direction -= Vector3::X;
         }
@@ -83,15 +76,8 @@ pub fn apply_platformer_controls(
         }
 
         let jump = keyboard.any_pressed([KeyCode::Space]);
-        let dash = keyboard.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
-
-        let turn_in_place = forward_from_camera.is_none()
-            && keyboard.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]);
-
-        let crouch_buttons = [KeyCode::ControlLeft, KeyCode::ControlRight];
-        let crouch_pressed = keyboard.any_pressed(crouch_buttons);
-        //let crouch_just_pressed = keyboard.any_just_pressed(crouch_buttons);
-        let crouch = crouch_pressed;
+        let sprint = keyboard.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
+        let crouch = keyboard.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
 
         air_actions_counter.update(controller.as_mut());
 
@@ -102,16 +88,14 @@ pub fn apply_platformer_controls(
                 } else {
                     0.2
                 }
+            } else if sprint {
+                config.sprint_speed_multiplier
             } else {
                 1.0
             };
 
         controller.basis(TnuaBuiltinWalk {
-            desired_velocity: if turn_in_place {
-                Vector3::ZERO
-            } else {
-                direction * speed_factor * config.speed
-            },
+            desired_velocity: direction * speed_factor * config.speed,
             desired_forward: Dir3::new(forward_from_camera.unwrap().forward).ok(),
             ..config.walk.clone()
         });
@@ -125,20 +109,6 @@ pub fn apply_platformer_controls(
                 allow_in_air: air_actions_counter.air_count_for(TnuaBuiltinJump::NAME)
                     <= config.actions_in_air,
                 ..config.jump.clone()
-            });
-        }
-
-        if dash {
-            controller.action(TnuaBuiltinDash {
-                displacement: direction.normalize() * config.dash_distance,
-                desired_forward: if forward_from_camera.is_none() {
-                    Dir3::new(direction).ok()
-                } else {
-                    None
-                },
-                allow_in_air: air_actions_counter.air_count_for(TnuaBuiltinDash::NAME)
-                    <= config.actions_in_air,
-                ..config.dash.clone()
             });
         }
     }

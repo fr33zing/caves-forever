@@ -213,7 +213,7 @@ fn destroy_terrain(
             let world_pos = data.world_pos();
 
             changed = changed
-                || merge_sdf_with_hardness(&mut data, &hardness, || {
+                || merge_sdf_with_hardness(&mut data, e.force, || {
                     chunk_samples(&world_pos)
                         .map(|point| e.position.distance(point) - e.radius)
                         .collect()
@@ -243,7 +243,7 @@ fn destroy_terrain(
             let mut data = ChunkData::new(chunk_pos);
             let world_pos = data.world_pos();
 
-            merge_sdf_with_hardness(&mut data, &hardness, || {
+            merge_sdf_with_hardness(&mut data, e.force, || {
                 chunk_samples(&world_pos)
                     .map(|point| e.position.distance(point) - e.radius)
                     .collect()
@@ -475,7 +475,7 @@ where
 
 // TODO ensure this can't result in non-manifold geometry
 // TODO consider hardness of the hit material to prevent destroying soft materials behind hard materials
-fn merge_sdf_with_hardness<F>(data: &mut ChunkData, _hardness: &VoxelHardness, sampler: F) -> bool
+fn merge_sdf_with_hardness<F>(data: &mut ChunkData, force: f32, sampler: F) -> bool
 where
     F: Fn() -> Vec<f32>,
 {
@@ -484,7 +484,7 @@ where
 
     for (i, distance) in new_sdf.into_iter().enumerate() {
         if distance < data.sdf[i] {
-            let multiplier = data.materials[i].hardness().multiplier();
+            let multiplier = data.materials[i].hardness().multiplier() / force;
 
             let difference = data.sdf[i] - distance;
             data.sdf[i] = distance + difference * (1.0 - (1.0 / multiplier));

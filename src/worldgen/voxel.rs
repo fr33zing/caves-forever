@@ -54,6 +54,7 @@ impl VoxelMaterial {
         match self {
             VoxelMaterial::Boundary => VoxelHardness::Unbreakable,
             VoxelMaterial::FakeBoundary => VoxelHardness::Value(5.0),
+            VoxelMaterial::BrownRock => VoxelHardness::Value(1.5),
             VoxelMaterial::ShinyGreenRock => VoxelHardness::Value(4.0),
             _ => VoxelHardness::Default,
         }

@@ -25,7 +25,7 @@ fn update(
 
     // TODO make this only run for the player's main camera
     for camera in camera_query.iter() {
-        let shape = Collider::sphere(0.25);
+        let shape = Collider::sphere(0.2);
         let origin = camera.translation;
         let rotation = Quat::default();
         let direction = camera.forward();
@@ -37,8 +37,8 @@ fn update(
         {
             event.send(DestroyTerrainEvent {
                 position: hit.point1,
-                radius: 6.0,
-                force: 16.0,
+                radius: 2.0,
+                force: 1.0,
             });
         }
     }

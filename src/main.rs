@@ -1,17 +1,5 @@
 use avian3d::prelude::*;
-use bevy::{
-    asset::AssetMetaCheck,
-    pbr::{
-        wireframe::{WireframeConfig, WireframePlugin},
-        ExtendedMaterial,
-    },
-    prelude::*,
-    render::{
-        settings::{RenderCreation, WgpuFeatures, WgpuSettings},
-        RenderPlugin,
-    },
-    window::PresentMode,
-};
+use bevy::{asset::AssetMetaCheck, pbr::ExtendedMaterial, prelude::*, window::PresentMode};
 use bevy_egui::EguiPlugin;
 use noisy_bevy::NoisyShaderPlugin;
 
@@ -41,22 +29,9 @@ fn main() {
                 meta_check: AssetMetaCheck::Never,
                 ..default()
             }),
-        // .set(RenderPlugin {
-        //     render_creation: RenderCreation::Automatic(WgpuSettings {
-        //         features: WgpuFeatures::POLYGON_MODE_LINE,
-        //         ..default()
-        //     }),
-        //     ..default()
-        // }),
     );
 
-    // app.insert_resource(WireframeConfig {
-    //     global: false,
-    //     default_color: bevy::color::palettes::css::WHITE.into(),
-    // });
-
     app.add_plugins((
-        WireframePlugin,
         EguiPlugin,
         PhysicsPlugins::default(),
         LineMaterialPlugin,
