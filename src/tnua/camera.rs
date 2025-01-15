@@ -5,6 +5,7 @@ use bevy::{
     prelude::*,
     window::{CursorGrabMode, PrimaryWindow},
 };
+use bevy_egui::{egui, EguiContexts};
 use bevy_tnua::math::{Float, Quaternion, Vector3};
 
 const SENSITIVITY: f32 = 0.01;
@@ -24,16 +25,75 @@ impl Default for ForwardFromCamera {
     }
 }
 
+#[derive(Resource)]
+struct UiState {
+    sensitivity: f32,
+}
+
+impl Default for UiState {
+    #[cfg(not(feature = "webgl2"))]
+    fn default() -> Self {
+        Self { sensitivity: 0.01 }
+    }
+
+    #[cfg(feature = "webgl2")]
+    fn default() -> Self {
+        Self { sensitivity: 0.5 }
+    }
+}
+
 pub struct PlayerCameraPlugin;
 
 impl Plugin for PlayerCameraPlugin {
     fn build(&self, app: &mut App) {
+        app.init_resource::<UiState>();
+        app.add_systems(Update, ui);
+
         app.add_systems(Startup, setup);
         app.add_systems(Update, grab_ungrab_mouse);
         app.add_systems(PostUpdate, {
             apply_camera_controls.before(bevy::transform::TransformSystem::TransformPropagate)
         });
     }
+}
+
+fn float_edit_field(ui: &mut egui::Ui, value: &mut f32) -> egui::Response {
+    let mut tmp_value = format!("{:.4}", value);
+    let res = ui.text_edit_singleline(&mut tmp_value);
+    if let Ok(result) = tmp_value.parse() {
+        *value = result;
+    }
+    res
+}
+
+fn ui(
+    window: Single<&Window, With<PrimaryWindow>>,
+    mut ui_state: ResMut<UiState>,
+    mut contexts: EguiContexts,
+) {
+    if !window.cursor_options.visible {
+        return;
+    }
+
+    let w = 256.0;
+    egui::Window::new("Info")
+        .fixed_pos(egui::pos2(window.width() / 2.0 - w / 2.0, 16.0))
+        .default_width(w)
+        .title_bar(false)
+        .resizable(false)
+        .show(contexts.ctx_mut(), |ui| {
+            ui.label("Press T to toggle camera control.");
+            ui.label("Left click to destroy terrain.");
+
+            ui.add_space(10.0);
+
+            ui.group(|ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Sensitivity: ");
+                    float_edit_field(ui, &mut ui_state.sensitivity);
+                });
+            });
+        });
 }
 
 fn setup(mut commands: Commands) {
@@ -57,24 +117,22 @@ fn setup(mut commands: Commands) {
 }
 
 fn grab_ungrab_mouse(
-    mouse_buttons: Res<ButtonInput<MouseButton>>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut window: Single<&mut Window, With<PrimaryWindow>>,
 ) {
     if window.cursor_options.visible {
-        if mouse_buttons.just_pressed(MouseButton::Left) {
+        if keyboard.just_pressed(KeyCode::KeyT) {
             window.cursor_options.grab_mode = CursorGrabMode::Locked;
             window.cursor_options.visible = false;
         }
-    } else if keyboard.just_released(KeyCode::Escape)
-        || mouse_buttons.just_pressed(MouseButton::Left)
-    {
+    } else if keyboard.just_released(KeyCode::KeyT) {
         window.cursor_options.grab_mode = CursorGrabMode::None;
         window.cursor_options.visible = true;
     }
 }
 
 fn apply_camera_controls(
+    ui_state: Res<UiState>,
     mut mouse_motion: EventReader<MouseMotion>,
     mut camera_query: Query<&mut Transform, With<Camera>>,
     window: Option<Single<&mut Window, With<PrimaryWindow>>>,
@@ -92,7 +150,7 @@ fn apply_camera_controls(
     };
     mouse_motion.clear();
 
-    let total_delta = total_delta * SENSITIVITY;
+    let total_delta = total_delta * ui_state.sensitivity;
     let (player_transform, mut forward_from_camera) = player.into_inner();
     let yaw = Quaternion::from_rotation_y(-0.01 * total_delta.x);
     let pitch = 0.005 * total_delta.y;

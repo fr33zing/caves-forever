@@ -24,8 +24,31 @@ pub struct CaveMaterialExtension {
     #[uniform(100)]
     pub render_voxel_size: f32,
 
-    #[uniform(101)]
+    #[uniform(100)]
     pub voxel_type_transition_steps: f32,
+
+    #[cfg(feature = "webgl2")]
+    #[uniform(100)]
+    pub _webgl2_padding: Vec2,
+}
+
+impl CaveMaterialExtension {
+    #[cfg(not(feature = "webgl2"))]
+    pub fn new(render_voxel_size: f32, voxel_type_transition_steps: f32) -> Self {
+        Self {
+            render_voxel_size,
+            voxel_type_transition_steps,
+        }
+    }
+
+    #[cfg(feature = "webgl2")]
+    pub fn new(render_voxel_size: f32, voxel_type_transition_steps: f32) -> Self {
+        Self {
+            render_voxel_size,
+            voxel_type_transition_steps,
+            _webgl2_padding: Vec2::ZERO,
+        }
+    }
 }
 
 impl MaterialExtension for CaveMaterialExtension {

@@ -334,10 +334,7 @@ impl Command for SpawnChunkCommand {
                         opaque_render_method: OpaqueRendererMethod::Auto,
                         ..Default::default()
                     },
-                    extension: CaveMaterialExtension {
-                        render_voxel_size: 7.0,
-                        voxel_type_transition_steps: 5.0,
-                    },
+                    extension: CaveMaterialExtension::new(7.0, 5.0),
                 })),
             ));
         }

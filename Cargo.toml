@@ -3,12 +3,22 @@ name = "mines"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+webgl2 = []
+
+[profile.release]
+lto = "thin"
+
+# [profile.release]
+# lto = true
+# codegen-units = 1
+
 [dependencies]
-# avian3d = { git = "https://github.com/Jondolf/avian", branch = "main" }
 avian3d = "^0.2"
 bevy = { version = "0.15.0", features = ["wayland"] }
 bevy-tnua = "0.21.0"
 bevy-tnua-avian3d = "0.2.0"
+bevy_egui = "0.32.0"
 curvo  = "0.1.38" 
 fast-surface-nets = "0.2.0"
 isosurface = "0.1.0-alpha.0"

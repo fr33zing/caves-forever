@@ -1,5 +1,5 @@
 use avian3d::prelude::*;
-use bevy::prelude::*;
+use bevy::{prelude::*, window::PrimaryWindow};
 
 use crate::{tnua::IsPlayer, worldgen::terrain::DestroyTerrainEvent};
 
@@ -16,9 +16,10 @@ fn update(
     camera_query: Query<&Transform, With<Camera>>,
     player: Single<Entity, With<IsPlayer>>,
     buttons: Res<ButtonInput<MouseButton>>,
+    window: Single<&Window, With<PrimaryWindow>>,
     mut event: EventWriter<DestroyTerrainEvent>,
 ) {
-    if !buttons.just_pressed(MouseButton::Right) {
+    if !buttons.just_pressed(MouseButton::Left) || window.cursor_options.visible {
         return;
     }
 

@@ -37,11 +37,17 @@
 }
 #endif
 
-@group(2) @binding(100)
-var<uniform> render_voxel_size: f32;
+struct CaveMaterialExtension {
+    render_voxel_size: f32,
+    voxel_type_transition_steps: f32,
 
-@group(2) @binding(101)
-var<uniform> voxel_type_transition_steps: f32;
+#ifdef WEBGL2
+    _webgl2_padding: vec2<f32>,
+#endif
+}
+
+@group(2) @binding(100)
+var<uniform> cave_material: CaveMaterialExtension;
 
 fn easeInOutSine(x: f32) -> f32 {
     return -(cos(3.14 * x) - 1.0) / 2.0;
@@ -67,8 +73,8 @@ fn fragment(
     in: CaveVertexOutput,
     @builtin(front_facing) is_front: bool,
 ) -> FragmentOutput {
-    let quantized_pos = quantize_3d(in.world_position.xyz, render_voxel_size);
-    let fac = quantize_3d(ease_in_out_sine_3d(in.voxel_ratio), voxel_type_transition_steps);
+    let quantized_pos = quantize_3d(in.world_position.xyz, cave_material.render_voxel_size);
+    let fac = quantize_3d(ease_in_out_sine_3d(in.voxel_ratio), cave_material.voxel_type_transition_steps);
     var voxel: VoxelMaterialOutput;
 
     if in.voxel_type[0] == in.voxel_type[1] {

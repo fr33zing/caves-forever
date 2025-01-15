@@ -1,5 +1,6 @@
 use avian3d::prelude::*;
 use bevy::{
+    asset::AssetMetaCheck,
     pbr::{
         wireframe::{WireframeConfig, WireframePlugin},
         ExtendedMaterial,
@@ -11,6 +12,7 @@ use bevy::{
     },
     window::PresentMode,
 };
+use bevy_egui::EguiPlugin;
 use noisy_bevy::NoisyShaderPlugin;
 
 use mines::{
@@ -27,26 +29,35 @@ fn main() {
             .set(WindowPlugin {
                 primary_window: Some(Window {
                     present_mode: PresentMode::AutoNoVsync,
+                    title: "Bevy game".to_string(),
+                    canvas: Some("#bevy".to_owned()),
+                    fit_canvas_to_parent: true,
+                    prevent_default_event_handling: false,
                     ..default()
                 }),
                 ..default()
             })
-            .set(RenderPlugin {
-                render_creation: RenderCreation::Automatic(WgpuSettings {
-                    features: WgpuFeatures::POLYGON_MODE_LINE,
-                    ..default()
-                }),
+            .set(AssetPlugin {
+                meta_check: AssetMetaCheck::Never,
                 ..default()
             }),
+        // .set(RenderPlugin {
+        //     render_creation: RenderCreation::Automatic(WgpuSettings {
+        //         features: WgpuFeatures::POLYGON_MODE_LINE,
+        //         ..default()
+        //     }),
+        //     ..default()
+        // }),
     );
 
-    app.insert_resource(WireframeConfig {
-        global: false,
-        default_color: bevy::color::palettes::css::WHITE.into(),
-    });
+    // app.insert_resource(WireframeConfig {
+    //     global: false,
+    //     default_color: bevy::color::palettes::css::WHITE.into(),
+    // });
 
     app.add_plugins((
         WireframePlugin,
+        EguiPlugin,
         PhysicsPlugins::default(),
         LineMaterialPlugin,
         NoisyShaderPlugin,
