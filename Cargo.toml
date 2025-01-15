@@ -6,12 +6,19 @@ edition = "2021"
 [features]
 webgl2 = []
 
-[profile.release]
-lto = "thin"
+# Enable a small amount of optimization in debug mode
+[profile.dev]
+opt-level = 1
 
+# Enable high optimizations for dependencies
+[profile.dev.package."*"]
+opt-level = 3
+
+# Only enable this for web builds
 # [profile.release]
 # lto = true
 # codegen-units = 1
+# opt-level = "z"
 
 [dependencies]
 avian3d = "^0.2"
