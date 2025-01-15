@@ -29,7 +29,7 @@ fn main() {
             .set(WindowPlugin {
                 primary_window: Some(Window {
                     present_mode: PresentMode::AutoNoVsync,
-                    title: "Bevy game".to_string(),
+                    title: "Caves Forever".to_string(),
                     canvas: Some("#bevy".to_owned()),
                     fit_canvas_to_parent: true,
                     prevent_default_event_handling: false,
