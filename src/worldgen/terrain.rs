@@ -177,18 +177,13 @@ fn destroy_terrain(
     mut event: EventReader<DestroyTerrainEvent>,
     mut chunk_query: Query<(Entity, &mut ChunkData)>,
 ) {
-    let events: Vec<(&DestroyTerrainEvent, ChunksAABB, ChunksAABB, VoxelHardness)> = event
+    let events: Vec<(&DestroyTerrainEvent, ChunksAABB, ChunksAABB)> = event
         .read()
         .map(|e| {
-            let mut lens = chunk_query.transmute_lens::<&ChunkData>();
-            let hardness = match sample_all_chunks(e.position, lens.query()) {
-                Some(sample) => sample.material.hardness(),
-                None => VoxelHardness::Unbreakable,
-            };
             let aabb = ChunksAABB::from_world_aabb(e.world_extents(), 0);
             let aabb_inflated = aabb.inflated(1);
 
-            (e, aabb, aabb_inflated, hardness)
+            (e, aabb, aabb_inflated)
         })
         .collect();
 
@@ -204,7 +199,7 @@ fn destroy_terrain(
 
         chunks_to_generate.remove(&data.chunk_pos);
 
-        for (e, _, aabb_inflated, hardness) in events.iter() {
+        for (e, _, aabb_inflated) in events.iter() {
             // TODO ensure this optimization can't result in non-manifold geometry
             if !aabb_inflated.chunks.contains(&data.chunk_pos) {
                 continue;
@@ -234,7 +229,7 @@ fn destroy_terrain(
     });
 
     for chunk_pos in chunks_to_generate {
-        for (e, _, aabb_inflated, hardness) in events.iter() {
+        for (e, _, aabb_inflated) in events.iter() {
             // TODO ensure this optimization can't result in non-manifold geometry
             if !aabb_inflated.chunks.contains(&chunk_pos) {
                 continue;
