@@ -15,7 +15,7 @@ use crate::{
     },
 };
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub struct CurveBrush {
     pub material: VoxelMaterial,
     pub curve: NurbsCurve3D<f32>,

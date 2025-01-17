@@ -10,7 +10,7 @@ use crate::{
     },
 };
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub struct ColliderBrush {
     pub material: VoxelMaterial,
     pub width: f32,

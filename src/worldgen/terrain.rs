@@ -1,7 +1,6 @@
 use avian3d::prelude::*;
 use bevy::{
     asset::RenderAssetUsages,
-    ecs::system::SystemState,
     math::Vec3A,
     pbr::{ExtendedMaterial, OpaqueRendererMethod},
     prelude::*,
@@ -9,6 +8,7 @@ use bevy::{
         mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
         primitives::Aabb,
     },
+    tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
     utils::HashSet,
 };
 use fast_surface_nets::{
@@ -86,7 +86,13 @@ impl Plugin for TerrainPlugin {
             .add_systems(Startup, (setup, layout::setup_debug_layout.before(setup)))
             .add_systems(
                 Update,
-                (draw_debug, destroy_terrain, spawn_chunks, remesh_chunks),
+                (
+                    draw_debug,
+                    destroy_terrain,
+                    begin_spawn_chunks,
+                    receive_spawn_chunks,
+                    remesh_chunks,
+                ),
             );
     }
 }
@@ -112,7 +118,7 @@ impl DestroyTerrainEvent {
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub struct DestroyTerrain {
     pub position: Vec3,
     pub radius: f32,
@@ -264,82 +270,86 @@ fn destroy_terrain(
 //
 
 /// Spawns a new chunk, optionally copying border data from adjacent chunks.
-#[derive(Component, Clone, Copy)]
+#[derive(Clone, Copy)]
 struct SpawnChunk {
     pub chunk_pos: IVec3,
     pub copy_borders: bool,
 }
 
-fn spawn_chunks(
+#[derive(Default, Clone)]
+struct ChunkGeneration {
+    pub chunk_pos: IVec3,
+    pub curves: Vec<CurveBrush>,
+    pub colliders: Vec<ColliderBrush>,
+    pub destroy: Vec<DestroyTerrain>,
+}
+
+#[derive(Component)]
+struct ChunkGenerationTask(Task<Option<ChunkGenerationResult>>);
+
+struct ChunkGenerationResult {
+    pub data: ChunkData,
+    pub mesh: Mesh,
+    pub collider: Collider,
+}
+
+fn begin_spawn_chunks(
+    mut commands: Commands,
+    mut state: ResMut<TerrainState>,
+    curve_brush_query: Query<&CurveBrush>,
+    collider_brush_query: Query<&ColliderBrush>,
+    destroy_terrain_query: Query<&DestroyTerrain>,
+) {
+    if state.chunks_to_spawn.len() == 0 {
+        return;
+    }
+
+    let mut generation = ChunkGeneration::default();
+
+    curve_brush_query.iter().for_each(|brush| {
+        generation.curves.push(brush.clone());
+    });
+    collider_brush_query.iter().for_each(|brush| {
+        generation.colliders.push(brush.clone());
+    });
+    destroy_terrain_query.iter().for_each(|brush| {
+        generation.destroy.push(brush.clone());
+    });
+
+    let task_pool = AsyncComputeTaskPool::get();
+
+    state.chunks_to_spawn.iter().for_each(|chunk| {
+        let mut generation = generation.clone();
+        generation.chunk_pos = chunk.chunk_pos;
+        let task = task_pool.spawn(async move { spawn_chunks(generation) });
+        commands.spawn(ChunkGenerationTask(task));
+    });
+
+    state.chunks_to_spawn.clear();
+}
+
+fn receive_spawn_chunks(
     mut commands: Commands,
     mut state: ResMut<TerrainState>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, CaveMaterialExtension>>>,
-    curve_brush_query: Query<&CurveBrush>,
-    collider_brush_query: Query<&ColliderBrush>,
-    destroy_terrain_query: Query<&DestroyTerrain>,
-    mut chunk_query: Query<(Entity, &mut ChunkData)>,
+    mut tasks: Query<(Entity, &mut ChunkGenerationTask)>,
 ) {
-    let spawn = state.chunks_to_spawn.clone();
-    for spawn_chunk in spawn {
-        let mut data = ChunkData::new(spawn_chunk.chunk_pos);
-        let world_pos = data.world_pos();
+    for (entity, mut task) in tasks.iter_mut() {
+        let status = block_on(future::poll_once(&mut task.0));
 
-        if cfg!(debug_assertions) {
-            // Don't spawn chunks where they already exist
-            for (_, other) in chunk_query.iter_mut() {
-                if other.chunk_pos == spawn_chunk.chunk_pos {
-                    panic!("tried to spawn chunk where one already exists");
-                }
-            }
-        }
+        let Some(result) = status else {
+            continue;
+        };
 
-        // Sample curve brushes
-        for brush in curve_brush_query.iter() {
-            merge_chunk(&mut data, || {
-                chunk_samples(&world_pos)
-                    .map(|point| brush.sample(point))
-                    .collect()
-            });
-        }
-
-        // Sample mesh brushes
-        for brush in collider_brush_query.iter() {
-            merge_chunk(&mut data, || {
-                chunk_samples(&world_pos)
-                    .map(|point| brush.sample(point))
-                    .collect()
-            });
-        }
-
-        for destroy in destroy_terrain_query.iter() {
-            merge_sdf_with_hardness(&mut data, destroy.force, || {
-                chunk_samples(&world_pos)
-                    .map(|point| point.distance(destroy.position) - destroy.radius)
-                    .collect()
-            });
-        }
-
-        if spawn_chunk.copy_borders {
-            chunk_query.iter_mut().for_each(|(entity, mut other)| {
-                // Copy borders FROM adjacent chunks
-                copy_borders(&mut data, &other);
-
-                // Copy borders TO adjacent chunks
-                let changed = copy_borders(&mut other, &data);
-                if changed {
-                    state.chunks_to_remesh.push(entity);
-                }
-            });
-        }
-
-        if let Some((mesh, collider)) = mesh_chunk(&data) {
+        if let Some(generated) = result {
             let scale = Vec3::splat(1.0 / CHUNK_SAMPLE_RESOLUTION);
             let half_extents = Vec3A::splat(CHUNK_SIZE_F / 2.0);
+            let world_pos = generated.data.world_pos();
 
             commands.spawn((
-                data,
-                collider,
+                generated.data,
+                generated.collider,
                 Chunk,
                 Aabb {
                     center: half_extents,
@@ -349,7 +359,7 @@ fn spawn_chunks(
                 RigidBody::Static,
                 CollisionLayers::new(GameLayer::World, LayerMask::ALL),
                 DebugRender::default().without_collider().without_axes(),
-                Mesh3d(meshes.add(mesh)),
+                Mesh3d(meshes.add(generated.mesh)),
                 MeshMaterial3d(materials.add(ExtendedMaterial {
                     base: StandardMaterial {
                         base_color: Color::srgb(0.5, 0.5, 0.5),
@@ -360,12 +370,75 @@ fn spawn_chunks(
                 })),
             ));
         }
-    }
 
-    state.chunks_to_spawn.clear();
+        let mut commands = commands.entity(entity);
+        commands.clear();
+    }
 }
 
-// This can probably be optimized by tracking if copying the borders is actually needed
+fn spawn_chunks(generation: ChunkGeneration) -> Option<ChunkGenerationResult> {
+    let mut data = ChunkData::new(generation.chunk_pos);
+    let world_pos = data.world_pos();
+
+    // if cfg!(debug_assertions) {
+    //     // Don't spawn chunks where they already exist
+    //     for (_, other) in chunk_query.iter_mut() {
+    //         if other.chunk_pos == spawn_chunk.chunk_pos {
+    //             panic!("tried to spawn chunk where one already exists");
+    //         }
+    //     }
+    // }
+
+    // Sample curve brushes
+    for brush in generation.curves.iter() {
+        merge_chunk(&mut data, || {
+            chunk_samples(&world_pos)
+                .map(|point| brush.sample(point))
+                .collect()
+        });
+    }
+
+    // Sample mesh brushes
+    for brush in generation.colliders.iter() {
+        merge_chunk(&mut data, || {
+            chunk_samples(&world_pos)
+                .map(|point| brush.sample(point))
+                .collect()
+        });
+    }
+
+    for destroy in generation.destroy.iter() {
+        merge_sdf_with_hardness(&mut data, destroy.force, || {
+            chunk_samples(&world_pos)
+                .map(|point| point.distance(destroy.position) - destroy.radius)
+                .collect()
+        });
+    }
+
+    // if spawn_chunk.copy_borders {
+    //     chunk_query.iter_mut().for_each(|(entity, mut other)| {
+    //         // Copy borders FROM adjacent chunks
+    //         copy_borders(&mut data, &other);
+
+    //         // Copy borders TO adjacent chunks
+    //         let changed = copy_borders(&mut other, &data);
+    //         if changed {
+    //             state.chunks_to_remesh.push(entity);
+    //         }
+    //     });
+    // }
+
+    let Some((mesh, collider)) = mesh_chunk(&data) else {
+        return None;
+    };
+
+    Some(ChunkGenerationResult {
+        data,
+        mesh,
+        collider,
+    })
+}
+
 fn remesh_chunks(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
