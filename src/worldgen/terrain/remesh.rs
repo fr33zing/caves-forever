@@ -8,55 +8,58 @@ use bevy::{
 
 use super::{utility::*, TerrainState, TerrainStateResource};
 
-#[derive(Default, Clone)]
-pub struct ChunkRemeshParams {
-    pub state: Arc<Mutex<TerrainState>>,
+pub struct ChunkRemeshRequest {
     pub chunk_pos: IVec3,
+    pub chunk_entity: Entity,
+}
+
+#[derive(Default, Clone)]
+struct ChunkRemeshParams {
+    state: Arc<Mutex<TerrainState>>,
+    chunk_pos: IVec3,
 }
 
 impl ChunkRemeshParams {
-    pub fn new(state: Arc<Mutex<TerrainState>>) -> Self {
+    fn new(state: Arc<Mutex<TerrainState>>) -> Self {
         Self { state, ..default() }
     }
 
-    pub fn clone_for(&self, chunk_pos: &IVec3) -> Self {
+    fn with_request(&self, request: &ChunkRemeshRequest) -> Self {
         let mut clone = self.clone();
-        clone.chunk_pos = chunk_pos.clone();
+        clone.chunk_pos = request.chunk_pos.clone();
         clone
     }
 }
 
-pub struct ChunkRemeshResult(pub Mesh, pub Collider);
+struct ChunkRemeshResult(Mesh, Collider);
 
 #[derive(Component)]
 pub struct ChunkRemeshTask(Task<Option<ChunkRemeshResult>>, Entity);
 
 pub fn begin_remesh_chunks(mut commands: Commands, state: Res<TerrainStateResource>) {
     let task_pool = AsyncComputeTaskPool::get();
-    let request = ChunkRemeshParams::new(state.clone());
-
-    let state = state.clone();
+    let params = ChunkRemeshParams::new(state.clone());
     let mut state = state.lock().unwrap();
 
-    if state.chunks_to_remesh.len() == 0 {
+    if state.remesh_requests.len() == 0 {
         return;
     }
 
-    state.chunks_to_remesh.iter().for_each(|(chunk, entity)| {
-        let request = request.clone_for(chunk);
-        let task = task_pool.spawn(async move { remesh_chunk(request) });
-        commands.spawn(ChunkRemeshTask(task, *entity));
+    state.remesh_requests.iter().for_each(|request| {
+        let params = params.with_request(&request);
+        let task = task_pool.spawn(async move { remesh_chunk(params) });
+        commands.spawn(ChunkRemeshTask(task, request.chunk_entity));
     });
 
-    state.chunks_to_remesh.clear();
+    state.remesh_requests.clear();
 }
 
 pub fn receive_remesh_chunks(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut tasks: Query<(Entity, &mut ChunkRemeshTask)>,
+    mut remesh_tasks: Query<(Entity, &mut ChunkRemeshTask)>,
 ) {
-    for (task_entity, mut task) in tasks.iter_mut() {
+    for (task_entity, mut task) in remesh_tasks.iter_mut() {
         let status = block_on(future::poll_once(&mut task.0));
 
         let Some(result) = status else {
@@ -79,8 +82,7 @@ pub fn receive_remesh_chunks(
 }
 
 fn remesh_chunk(params: ChunkRemeshParams) -> Option<ChunkRemeshResult> {
-    let state = params.state.clone();
-    let state = state.lock().unwrap();
+    let state = params.state.lock().unwrap();
 
     let Some((data, _)) = state.chunk_data.get(&params.chunk_pos) else {
         if cfg!(debug_assertions) {

@@ -62,8 +62,8 @@ struct TerrainStateResource(pub Arc<Mutex<TerrainState>>);
 struct TerrainState {
     pub chunk_data: HashMap<IVec3, (ChunkData, Entity)>,
 
-    pub chunks_to_remesh: Vec<(IVec3, Entity)>,
-    pub chunks_to_spawn: Vec<SpawnChunkRequest>,
+    pub spawn_requests: Vec<ChunkSpawnRequest>,
+    pub remesh_requests: Vec<ChunkRemeshRequest>,
 }
 
 impl TerrainState {
@@ -106,12 +106,13 @@ impl Plugin for TerrainPlugin {
             .add_systems(
                 Update,
                 (
-                    begin_destroy_terrain,
                     begin_remesh_chunks,
                     receive_remesh_chunks,
                     begin_spawn_chunks,
                     receive_spawn_chunks,
-                ),
+                    begin_destroy_terrain,
+                )
+                    .chain(),
             );
     }
 }
@@ -127,7 +128,7 @@ fn setup(state: Res<TerrainStateResource>, aabb_query: Query<&ChunksAABB>) {
     let mut state = state.lock().unwrap();
 
     for chunk_pos in chunks {
-        state.chunks_to_spawn.push(SpawnChunkRequest {
+        state.spawn_requests.push(ChunkSpawnRequest {
             chunk_pos,
             copy_borders: false,
             ..default()

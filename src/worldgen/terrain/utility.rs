@@ -14,6 +14,7 @@ use crate::{
 
 use super::{
     ChunkData, ChunkShape, CHUNK_INTERNAL_GEOMETRY, CHUNK_SAMPLE_RESOLUTION, CHUNK_SAMPLE_SIZE,
+    CHUNK_SIZE_F,
 };
 
 pub fn copy_sdf_plane(
@@ -113,10 +114,13 @@ where
 
     for (i, distance) in new_sdf.into_iter().enumerate() {
         if distance < data.sdf[i] {
-            let hardness = data.materials[i].hardness().multiplier();
-            let difference = data.sdf[i] - distance;
+            // TODO fix hardness
+            // let hardness = data.materials[i].hardness().multiplier();
+            // let difference = data.sdf[i] - distance;
+            // data.sdf[i] -= difference * force / hardness;
 
-            data.sdf[i] -= difference * force / hardness;
+            data.sdf[i] = distance;
+
             changed = true;
         }
     }

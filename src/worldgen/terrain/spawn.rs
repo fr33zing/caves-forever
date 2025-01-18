@@ -17,31 +17,31 @@ use crate::{
 };
 
 use super::{
-    utility::*, Chunk, ChunkData, DestroyTerrain, TerrainState, TerrainStateResource,
-    CHUNK_SAMPLE_RESOLUTION, CHUNK_SIZE_F,
+    utility::*, Chunk, ChunkData, ChunkRemeshRequest, DestroyTerrain, TerrainState,
+    TerrainStateResource, CHUNK_SAMPLE_RESOLUTION, CHUNK_SIZE_F,
 };
 
 #[derive(Default, Clone)]
-pub struct SpawnChunkRequest {
+pub struct ChunkSpawnRequest {
     pub chunk_pos: IVec3,
     pub copy_borders: bool,
     pub destruction: Option<Vec<DestroyTerrain>>,
 }
 
 #[derive(Default, Clone)]
-pub struct ChunkGenParams {
-    pub state: Arc<Mutex<TerrainState>>,
-    pub request: SpawnChunkRequest,
-    pub curves: Vec<CurveBrush>,
-    pub colliders: Vec<ColliderBrush>,
+struct ChunkSpawnParams {
+    state: Arc<Mutex<TerrainState>>,
+    request: ChunkSpawnRequest,
+    curves: Vec<CurveBrush>,
+    colliders: Vec<ColliderBrush>,
 }
 
-impl ChunkGenParams {
+impl ChunkSpawnParams {
     pub fn new(state: Arc<Mutex<TerrainState>>) -> Self {
         Self { state, ..default() }
     }
 
-    pub fn clone_for(&self, spawn_chunk: &SpawnChunkRequest) -> Self {
+    pub fn with_request(&self, spawn_chunk: &ChunkSpawnRequest) -> Self {
         let mut clone = self.clone();
         clone.request = spawn_chunk.clone();
 
@@ -49,14 +49,14 @@ impl ChunkGenParams {
     }
 }
 
-pub struct ChunkGenResult {
-    pub data: ChunkData,
-    pub mesh: Mesh,
-    pub collider: Collider,
+struct ChunkSpawnResult {
+    data: ChunkData,
+    mesh: Mesh,
+    collider: Collider,
 }
 
 #[derive(Component)]
-pub struct ChunkGenTask(Task<Option<ChunkGenResult>>);
+pub struct ChunkSpawnTask(Task<Option<ChunkSpawnResult>>);
 
 pub fn begin_spawn_chunks(
     mut commands: Commands,
@@ -64,12 +64,10 @@ pub fn begin_spawn_chunks(
     curve_brush_query: Query<&CurveBrush>,
     collider_brush_query: Query<&ColliderBrush>,
 ) {
-    let mut params = ChunkGenParams::new(state.clone());
-
-    let state = state.clone();
+    let mut params = ChunkSpawnParams::new(state.clone());
     let mut state = state.lock().unwrap();
 
-    if state.chunks_to_spawn.len() == 0 {
+    if state.spawn_requests.is_empty() {
         return;
     }
 
@@ -81,14 +79,13 @@ pub fn begin_spawn_chunks(
     });
 
     let task_pool = AsyncComputeTaskPool::get();
-
-    state.chunks_to_spawn.iter().for_each(|chunk| {
-        let params = params.clone_for(&chunk);
+    state.spawn_requests.iter().for_each(|chunk| {
+        let params = params.with_request(&chunk);
         let task = task_pool.spawn(async move { spawn_chunks(params) });
-        commands.spawn(ChunkGenTask(task));
+        commands.spawn(ChunkSpawnTask(task));
     });
 
-    state.chunks_to_spawn.clear();
+    state.spawn_requests.clear();
 }
 
 pub fn receive_spawn_chunks(
@@ -96,9 +93,9 @@ pub fn receive_spawn_chunks(
     state: Res<TerrainStateResource>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, CaveMaterialExtension>>>,
-    mut tasks: Query<(Entity, &mut ChunkGenTask)>,
+    mut spawn_tasks: Query<(Entity, &mut ChunkSpawnTask)>,
 ) {
-    for (entity, mut task) in tasks.iter_mut() {
+    for (task_entity, mut task) in spawn_tasks.iter_mut() {
         let status = block_on(future::poll_once(&mut task.0));
 
         let Some(result) = status else {
@@ -133,26 +130,23 @@ pub fn receive_spawn_chunks(
             ));
             let entity = commands.id();
 
-            let state = state.clone();
             let mut state = state.lock().unwrap();
             state
                 .chunk_data
                 .insert(generated.data.chunk_pos, (generated.data, entity));
         }
 
-        let mut commands = commands.entity(entity);
-        commands.clear();
+        commands.entity(task_entity).despawn();
     }
 }
 
-pub fn spawn_chunks(params: ChunkGenParams) -> Option<ChunkGenResult> {
+fn spawn_chunks(params: ChunkSpawnParams) -> Option<ChunkSpawnResult> {
     let mut data = ChunkData::new(params.request.chunk_pos);
     let world_pos = data.world_pos();
 
     // Don't spawn chunks where they already exist
     if cfg!(debug_assertions) {
-        let state = params.state.clone();
-        let mut state = state.lock().unwrap();
+        let mut state = params.state.lock().unwrap();
 
         for (_, (other, _)) in state.chunk_data.iter_mut() {
             if other.chunk_pos == params.request.chunk_pos {
@@ -162,7 +156,7 @@ pub fn spawn_chunks(params: ChunkGenParams) -> Option<ChunkGenResult> {
     }
 
     // Sample curve brushes
-    for brush in params.curves.iter() {
+    for brush in params.curves {
         merge_chunk(&mut data, || {
             chunk_samples(&world_pos)
                 .map(|point| brush.sample(point))
@@ -171,7 +165,7 @@ pub fn spawn_chunks(params: ChunkGenParams) -> Option<ChunkGenResult> {
     }
 
     // Sample mesh brushes
-    for brush in params.colliders.iter() {
+    for brush in params.colliders {
         merge_chunk(&mut data, || {
             chunk_samples(&world_pos)
                 .map(|point| brush.sample(point))
@@ -190,10 +184,8 @@ pub fn spawn_chunks(params: ChunkGenParams) -> Option<ChunkGenResult> {
     }
 
     if params.request.copy_borders {
-        let state = params.state.clone();
-        let mut state = state.lock().unwrap();
-
-        let mut chunks_to_remesh = Vec::<(IVec3, Entity)>::new();
+        let mut state = params.state.lock().unwrap();
+        let mut remesh_requests = Vec::<ChunkRemeshRequest>::new();
         let neighbors = state.neighbors(&params.request.chunk_pos);
 
         for neighbor in neighbors {
@@ -207,18 +199,21 @@ pub fn spawn_chunks(params: ChunkGenParams) -> Option<ChunkGenResult> {
             // Copy borders TO adjacent chunks
             let changed = copy_borders(neighbor, &data);
             if changed {
-                chunks_to_remesh.push((neighbor.chunk_pos, *entity));
+                remesh_requests.push(ChunkRemeshRequest {
+                    chunk_pos: neighbor.chunk_pos,
+                    chunk_entity: *entity,
+                });
             }
         }
 
-        state.chunks_to_remesh.extend(chunks_to_remesh);
+        state.remesh_requests.extend(remesh_requests);
     }
 
     let Some((mesh, collider)) = mesh_chunk(&data) else {
         return None;
     };
 
-    Some(ChunkGenResult {
+    Some(ChunkSpawnResult {
         data,
         mesh,
         collider,
