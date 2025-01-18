@@ -1,7 +1,7 @@
 use avian3d::prelude::PhysicsSchedule;
 use bevy::prelude::*;
 use bevy_tnua::{
-    builtins::{TnuaBuiltinCrouch, TnuaBuiltinCrouchState, TnuaBuiltinDash, TnuaBuiltinKnockback},
+    builtins::{TnuaBuiltinCrouch, TnuaBuiltinCrouchState},
     control_helpers::{TnuaCrouchEnforcer, TnuaSimpleAirActionsCounter},
     math::Vector3,
     prelude::{TnuaBuiltinJump, TnuaBuiltinWalk, TnuaController},
@@ -86,7 +86,7 @@ pub fn apply_platformer_controls(
                 if matches!(state, TnuaBuiltinCrouchState::Rising) {
                     1.0
                 } else {
-                    0.2
+                    config.crouch_speed_multiplier
                 }
             } else if sprint {
                 config.sprint_speed_multiplier
