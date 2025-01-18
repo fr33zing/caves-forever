@@ -17,8 +17,8 @@ use crate::{
 };
 
 use super::{
-    utility::*, Chunk, ChunkData, ChunkRemeshRequest, DestroyTerrain, TerrainState,
-    TerrainStateResource, CHUNK_SAMPLE_RESOLUTION, CHUNK_SIZE_F,
+    boundary::LoadingBoundary, utility::*, Chunk, ChunkData, ChunkRemeshRequest, DestroyTerrain,
+    TerrainState, TerrainStateResource, CHUNK_SAMPLE_RESOLUTION, CHUNK_SIZE_F,
 };
 
 #[derive(Default, Clone)]
@@ -56,7 +56,7 @@ struct ChunkSpawnResult {
 }
 
 #[derive(Component)]
-pub struct ChunkSpawnTask(Task<Option<ChunkSpawnResult>>);
+pub struct ChunkSpawnTask(Task<Option<ChunkSpawnResult>>, Entity);
 
 pub fn begin_spawn_chunks(
     mut commands: Commands,
@@ -79,10 +79,12 @@ pub fn begin_spawn_chunks(
     });
 
     let task_pool = AsyncComputeTaskPool::get();
-    state.spawn_requests.iter().for_each(|chunk| {
-        let params = params.with_request(&chunk);
+    state.spawn_requests.iter().for_each(|request| {
+        let params = params.with_request(&request);
         let task = task_pool.spawn(async move { spawn_chunks(params) });
-        commands.spawn(ChunkSpawnTask(task));
+
+        let boundary = commands.spawn(LoadingBoundary::new(request.chunk_pos)).id();
+        commands.spawn(ChunkSpawnTask(task, boundary));
     });
 
     state.spawn_requests.clear();
@@ -136,6 +138,7 @@ pub fn receive_spawn_chunks(
                 .insert(generated.data.chunk_pos, (generated.data, entity));
         }
 
+        commands.entity(task.1).clear();
         commands.entity(task_entity).despawn();
     }
 }

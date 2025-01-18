@@ -66,6 +66,9 @@ fn setup_player(mut commands: Commands) {
     cmd.insert(RigidBody::Dynamic);
     cmd.insert(LockedAxes::new().lock_rotation_x().lock_rotation_z());
     cmd.insert(PLAYER_COLLIDER);
+    cmd.insert(Sleeping);
+    cmd.insert(TnuaToggle::Disabled);
+    cmd.insert(GravityScale(0.0));
 
     cmd.insert(TnuaController::default());
 
@@ -93,8 +96,6 @@ fn setup_player(mut commands: Commands) {
     });
 
     cmd.insert(ForwardFromCamera::default());
-
-    cmd.insert(TnuaToggle::default());
 
     cmd.insert(TnuaCrouchEnforcer::new(0.5 * Vector3::Y, |cmd| {
         let bundle = TnuaAvian3dSensorShape(
