@@ -104,7 +104,7 @@ impl Plugin for TerrainPlugin {
         app.init_resource::<TerrainStateResource>()
             .add_event::<DestroyTerrainEvent>()
             .add_systems(Startup, (setup, layout::setup_debug_layout.before(setup)))
-            .add_systems(Startup, draw_debug)
+            .add_systems(Update, draw_debug)
             .add_systems(Update, enforce_loading_chunk_boundaries)
             .add_systems(
                 Update,
