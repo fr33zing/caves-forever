@@ -176,6 +176,14 @@ fn spawn_chunks(params: ChunkSpawnParams) -> Option<ChunkSpawnResult> {
         });
     }
 
+    // Apply material-specific noise
+    merge_sdf_additive(&mut data, |data| {
+        chunk_samples_enumerated(&world_pos)
+            .map(|(i, point)| data.materials[i].sdf_noise(&point, &data.sdf[i]))
+            .collect()
+    });
+
+    // Apply destruction
     if let Some(destruction) = params.request.destruction {
         for destroy in destruction.iter() {
             merge_sdf_with_hardness(&mut data, destroy.force, || {
@@ -186,6 +194,7 @@ fn spawn_chunks(params: ChunkSpawnParams) -> Option<ChunkSpawnResult> {
         }
     }
 
+    // Copy borders
     if params.request.copy_borders {
         let mut state = params.state.lock().unwrap();
         let mut remesh_requests = Vec::<ChunkRemeshRequest>::new();

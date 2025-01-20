@@ -24,20 +24,19 @@ pub struct CurveBrush {
 
 impl Sampler for CurveBrush {
     fn sample(&self, point: Vec3) -> VoxelSample {
-        let point = Point3::<f32>::new(point.x, point.y, point.z);
+        let na_point = Point3::<f32>::new(point.x, point.y, point.z);
 
-        let closest = self.curve.find_closest_point(&point).unwrap();
-        let distance = ((closest.x - point.x).powf(2.0)
-            + (closest.y - point.y).powf(2.0)
-            + (closest.z - point.z).powf(2.0))
+        let closest: Vec3 = self.curve.find_closest_point(&na_point).unwrap().into();
+        let distance = ((closest.x - na_point.x).powf(2.0)
+            + (closest.y - na_point.y).powf(2.0)
+            + (closest.z - na_point.z).powf(2.0))
         .sqrt();
 
-        let width = 16.0;
+        let radius = 16.0;
+        let distance = distance - radius;
+        let material = self.material;
 
-        VoxelSample {
-            material: self.material,
-            distance: distance - width,
-        }
+        VoxelSample { material, distance }
     }
 }
 

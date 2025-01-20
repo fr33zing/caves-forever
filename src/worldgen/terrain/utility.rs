@@ -14,7 +14,6 @@ use crate::{
 
 use super::{
     ChunkData, ChunkShape, CHUNK_INTERNAL_GEOMETRY, CHUNK_SAMPLE_RESOLUTION, CHUNK_SAMPLE_SIZE,
-    CHUNK_SIZE_F,
 };
 
 pub fn copy_sdf_plane(
@@ -84,6 +83,15 @@ pub fn chunk_samples(
         .map(move |i| delinearize_to_world_pos(chunk_world_pos, i))
 }
 
+pub fn chunk_samples_enumerated(
+    chunk_world_pos: &Vec3,
+) -> rayon::iter::Map<rayon::range::Iter<u32>, impl Fn(u32) -> (usize, Vec3)> {
+    let chunk_world_pos = chunk_world_pos.clone();
+    (0u32..ChunkShape::SIZE)
+        .into_par_iter()
+        .map(move |i| (i as usize, delinearize_to_world_pos(chunk_world_pos, i)))
+}
+
 // This function will probably come in handy at some point, so I'll keep it for now.
 #[allow(dead_code)]
 pub fn merge_sdf<F>(sdf: &mut [f32; ChunkShape::USIZE], sampler: F) -> bool
@@ -96,6 +104,23 @@ where
     for (i, distance) in new_sdf.into_iter().enumerate() {
         if distance < sdf[i] {
             sdf[i] = distance;
+            changed = true;
+        }
+    }
+
+    changed
+}
+
+pub fn merge_sdf_additive<F>(data: &mut ChunkData, sampler: F) -> bool
+where
+    F: Fn(&ChunkData) -> Vec<f32>,
+{
+    let mut changed = false;
+    let new_sdf = sampler(&data);
+
+    for (i, distance) in new_sdf.into_iter().enumerate() {
+        if distance != 0.0 {
+            data.sdf[i] += distance;
             changed = true;
         }
     }

@@ -27,12 +27,10 @@ impl Sampler for ColliderBrush {
             true,
         );
 
-        let distance = point.distance(closest);
+        let distance = point.distance(closest) - self.width;
+        let material = self.material;
 
-        VoxelSample {
-            material: self.material,
-            distance: distance - self.width,
-        }
+        VoxelSample { material, distance }
     }
 }
 

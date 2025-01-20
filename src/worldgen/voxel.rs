@@ -1,3 +1,5 @@
+use bevy::prelude::*;
+use noisy_bevy::simplex_noise_3d;
 use strum::EnumProperty;
 use strum_macros::FromRepr;
 
@@ -58,5 +60,29 @@ impl VoxelMaterial {
             VoxelMaterial::ShinyGreenRock => VoxelHardness::Value(4.0),
             _ => VoxelHardness::Default,
         }
+    }
+
+    pub fn sdf_noise(&self, point: &Vec3, distance: &f32) -> f32 {
+        let external = *distance >= 0.0;
+        let mut noise = 0.0;
+
+        match self {
+            VoxelMaterial::BrownRock => {
+                if external {
+                    noise += simplex_noise_3d(point / 2.0) * 0.25;
+                    noise += simplex_noise_3d(point / 4.0) * 0.25;
+                    noise += simplex_noise_3d(point / 8.0) * 0.25;
+                    noise += simplex_noise_3d(point / Vec3::new(64.0, 6.0, 64.0)) * 0.75;
+                }
+            }
+            VoxelMaterial::YellowRock => {
+                noise += simplex_noise_3d(*point) * 0.25;
+                noise += simplex_noise_3d(point / 5.0) * 0.25;
+            }
+
+            _ => {}
+        };
+
+        noise
     }
 }
