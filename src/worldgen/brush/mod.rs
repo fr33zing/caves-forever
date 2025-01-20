@@ -4,6 +4,7 @@ use super::voxel::VoxelSample;
 
 pub mod collider;
 pub mod curve;
+pub mod sweep;
 
 pub trait Sampler {
     fn sample(&self, point: Vec3) -> VoxelSample;

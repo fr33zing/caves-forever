@@ -1,5 +1,6 @@
 use avian3d::prelude::*;
 use bevy::{
+    math::VectorSpace,
     pbr::{
         wireframe::{WireframeConfig, WireframePlugin},
         ExtendedMaterial,
@@ -14,8 +15,9 @@ use bevy::{
 use mines::{
     debug_camera::DebugCameraPlugin,
     materials::{CaveMaterialExtension, LineMaterialPlugin},
-    worldgen::terrain::TerrainPlugin,
+    worldgen::{brush::sweep::SweepBrush, terrain::TerrainPlugin},
 };
+use nalgebra::Point3;
 use noisy_bevy::NoisyShaderPlugin;
 
 fn main() {

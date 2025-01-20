@@ -13,7 +13,7 @@ use rayon::iter::ParallelIterator;
 use crate::{
     materials::CaveMaterialExtension,
     physics::GameLayer,
-    worldgen::brush::{collider::ColliderBrush, curve::CurveBrush, Sampler},
+    worldgen::brush::{collider::ColliderBrush, curve::CurveBrush, sweep::SweepBrush, Sampler},
 };
 
 use super::{
@@ -33,6 +33,7 @@ struct ChunkSpawnParams {
     state: Arc<Mutex<TerrainState>>,
     request: ChunkSpawnRequest,
     curves: Vec<CurveBrush>,
+    sweeps: Vec<SweepBrush>,
     colliders: Vec<ColliderBrush>,
 }
 
@@ -62,6 +63,7 @@ pub fn begin_spawn_chunks(
     mut commands: Commands,
     state: Res<TerrainStateResource>,
     curve_brush_query: Query<&CurveBrush>,
+    sweep_brush_query: Query<&SweepBrush>,
     collider_brush_query: Query<&ColliderBrush>,
 ) {
     let mut params = ChunkSpawnParams::new(state.clone());
@@ -73,6 +75,9 @@ pub fn begin_spawn_chunks(
 
     curve_brush_query.iter().for_each(|brush| {
         params.curves.push(brush.clone());
+    });
+    sweep_brush_query.iter().for_each(|brush| {
+        params.sweeps.push(brush.clone());
     });
     collider_brush_query.iter().for_each(|brush| {
         params.colliders.push(brush.clone());
@@ -160,6 +165,15 @@ fn spawn_chunks(params: ChunkSpawnParams) -> Option<ChunkSpawnResult> {
 
     // Sample curve brushes
     for brush in params.curves {
+        merge_chunk(&mut data, || {
+            chunk_samples(&world_pos)
+                .map(|point| brush.sample(point))
+                .collect()
+        });
+    }
+
+    // Sample sweep brushes
+    for brush in params.sweeps {
         merge_chunk(&mut data, || {
             chunk_samples(&world_pos)
                 .map(|point| brush.sample(point))

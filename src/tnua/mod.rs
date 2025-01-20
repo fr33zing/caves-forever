@@ -61,7 +61,7 @@ impl Plugin for PlayerPlugin {
 fn setup_player(mut commands: Commands) {
     let mut cmd = commands.spawn(IsPlayer);
 
-    cmd.insert(Transform::from_translation(Vec3::new(32.0, 32.0, -32.0)));
+    cmd.insert(Transform::from_translation(Vec3::new(32.0, 16.0, -32.0)));
 
     cmd.insert(RigidBody::Dynamic);
     cmd.insert(LockedAxes::new().lock_rotation_x().lock_rotation_z());

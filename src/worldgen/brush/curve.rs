@@ -79,7 +79,7 @@ impl CurveBrushBundle {
     }
 }
 
-fn mesh_curve(samples: &[Point3<f32>]) -> Mesh {
+pub fn mesh_curve(samples: &[Point3<f32>]) -> Mesh {
     let vertices = samples
         .iter()
         .map(|p| p.cast::<f32>())
@@ -92,7 +92,7 @@ fn mesh_curve(samples: &[Point3<f32>]) -> Mesh {
     )
 }
 
-fn curve_bounding_box(samples: &[Point3<f32>]) -> (Vec3, Vec3) {
+pub fn curve_bounding_box(samples: &[Point3<f32>]) -> (Vec3, Vec3) {
     let mut min = Vec3::ZERO;
     let mut max = Vec3::ZERO;
 
