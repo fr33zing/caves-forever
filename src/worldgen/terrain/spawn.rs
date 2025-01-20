@@ -13,6 +13,7 @@ use rayon::iter::ParallelIterator;
 use crate::{
     materials::CaveMaterialExtension,
     physics::GameLayer,
+    tnua::IsPlayer,
     worldgen::brush::{collider::ColliderBrush, curve::CurveBrush, sweep::SweepBrush, Sampler},
 };
 
@@ -65,6 +66,8 @@ pub fn begin_spawn_chunks(
     curve_brush_query: Query<&CurveBrush>,
     sweep_brush_query: Query<&SweepBrush>,
     collider_brush_query: Query<&ColliderBrush>,
+    player: Option<Single<&Transform, With<IsPlayer>>>,
+    spawn_tasks: Query<&ChunkSpawnTask>,
 ) {
     let mut params = ChunkSpawnParams::new(state.clone());
     let mut state = state.lock().unwrap();
@@ -83,16 +86,34 @@ pub fn begin_spawn_chunks(
         params.colliders.push(brush.clone());
     });
 
+    let mut max_tasks: usize = 128;
+    if let Some(player) = player {
+        let player_chunk = player.translation / CHUNK_SIZE_F;
+        let player_chunk_ivec = player_chunk.as_ivec3();
+
+        state
+            .spawn_requests
+            .sort_unstable_by_key(|a| a.chunk_pos.distance_squared(player_chunk_ivec));
+
+        let chunks_from_closest = state.spawn_requests[0]
+            .chunk_pos
+            .as_vec3()
+            .distance(player_chunk);
+
+        if chunks_from_closest <= 2.0 {
+            max_tasks = 4;
+        }
+    };
+    let n = (max_tasks - spawn_tasks.iter().count()).clamp(0, state.spawn_requests.len());
+    let requests = state.spawn_requests.drain(0..n);
+
     let task_pool = AsyncComputeTaskPool::get();
-    state.spawn_requests.iter().for_each(|request| {
+    requests.for_each(|request| {
         let params = params.with_request(&request);
         let task = task_pool.spawn(async move { spawn_chunks(params) });
-
         let boundary = commands.spawn(LoadingBoundary::new(request.chunk_pos)).id();
         commands.spawn(ChunkSpawnTask(task, boundary));
     });
-
-    state.spawn_requests.clear();
 }
 
 pub fn receive_spawn_chunks(
@@ -144,7 +165,7 @@ pub fn receive_spawn_chunks(
         }
 
         commands.entity(task.1).clear();
-        commands.entity(task_entity).despawn();
+        commands.entity(task_entity).clear();
     }
 }
 
