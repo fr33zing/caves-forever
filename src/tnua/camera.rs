@@ -3,7 +3,7 @@ use std::f32::consts::FRAC_PI_2;
 use bevy::{
     input::mouse::MouseMotion,
     prelude::*,
-    window::{CursorGrabMode, PrimaryWindow},
+    window::{CursorGrabMode, PrimaryWindow, WindowMode},
 };
 use bevy_egui::{egui, EguiContexts};
 use bevy_tnua::math::{Float, Vector3};
@@ -44,6 +44,9 @@ impl Default for UiState {
     }
 }
 
+#[derive(Component)]
+pub struct Flashlight(pub f32);
+
 pub struct PlayerCameraPlugin;
 
 impl Plugin for PlayerCameraPlugin {
@@ -52,7 +55,10 @@ impl Plugin for PlayerCameraPlugin {
         app.add_systems(Update, ui);
 
         app.add_systems(Startup, setup);
-        app.add_systems(Update, grab_ungrab_mouse);
+        app.add_systems(
+            Update,
+            (grab_ungrab_mouse, toggle_fullscreen_and_flashlight),
+        );
         app.add_systems(PostUpdate, {
             apply_camera_controls.before(bevy::transform::TransformSystem::TransformPropagate)
         });
@@ -85,6 +91,8 @@ fn ui(
         .resizable(false)
         .show(contexts.ctx_mut(), |ui| {
             ui.label("Press T to toggle camera control.");
+            ui.label("Press L to toggle flashlight.");
+            ui.label("Press F to toggle fullscreen.");
             ui.label("Left click to destroy terrain.");
 
             ui.add_space(10.0);
@@ -100,22 +108,44 @@ fn ui(
 
 fn setup(mut commands: Commands) {
     commands.spawn((
-        Camera3d { ..default() },
+        Camera3d::default(),
         Projection::Perspective(PerspectiveProjection {
             fov: 45.0_f32.to_radians(),
             ..default()
         }),
+        Flashlight(10_000_000.0),
         SpotLight {
-            intensity: 12_000_000.0,
+            intensity: 10_000_000.0,
             color: Color::WHITE.into(),
             shadows_enabled: true,
-            inner_angle: 0.1,
-            outer_angle: 0.5,
+            inner_angle: 0.35,
+            outer_angle: 0.45,
             range: 4000.0,
             radius: 4000.0,
             ..default()
         },
     ));
+}
+
+fn toggle_fullscreen_and_flashlight(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut window: Single<&mut Window, With<PrimaryWindow>>,
+    light: Single<(&mut SpotLight, &Flashlight)>,
+) {
+    if keyboard.just_pressed(KeyCode::KeyF) {
+        window.mode = match window.mode {
+            WindowMode::Windowed => WindowMode::BorderlessFullscreen(MonitorSelection::Current),
+            _ => WindowMode::Windowed,
+        }
+    }
+
+    let mut light = light.into_inner();
+    if keyboard.just_pressed(KeyCode::KeyL) {
+        light.0.intensity = match light.0.intensity {
+            0.0 => light.1 .0,
+            _ => 0.0,
+        };
+    }
 }
 
 fn grab_ungrab_mouse(
