@@ -2,8 +2,19 @@
 name = "mines"
 version = "0.1.0"
 edition = "2021"
+default-run = "game"
+
+[[bin]]
+name = "game"
+path = "src/bin/game/main.rs"
+
+[[bin]]
+name = "editor"
+path = "src/bin/editor/main.rs"
+
 
 [features]
+demo-layout = []
 webgl2 = []
 
 # Enable a small amount of optimization in debug mode
@@ -26,9 +37,13 @@ bevy = { version = "0.15.0", features = ["wayland"] }
 bevy-tnua = "0.21.0"
 bevy-tnua-avian3d = "0.2.0"
 bevy_egui = "0.32.0"
+bevy_infinite_grid = "0.14.1"
+bevy_trackball = { version = "0.9.0", features = ["bevy_egui"] }
 curvo  = "0.1.46"
+egui = "0.30.0"
 fast-surface-nets = "0.2.0"
 isosurface = "0.1.0-alpha.0"
+meshtext = "0.3.1"
 nalgebra = "0.33.2"
 noisy_bevy = "0.8.0"
 rayon = "1.10.0"

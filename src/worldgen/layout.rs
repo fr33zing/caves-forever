@@ -1,5 +1,3 @@
-use std::f32::consts::TAU;
-
 use avian3d::prelude::*;
 use bevy::prelude::*;
 use nalgebra::{Point2, Point3};
@@ -15,6 +13,10 @@ pub fn setup_debug_layout(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<LineMaterial>>,
 ) {
+    if !cfg!(feature = "demo-layout") {
+        return;
+    }
+
     let rail_points = vec![
         Point3::new(200.0, -64.0, 32.0),
         Point3::new(32.0, -32.0, 32.0),

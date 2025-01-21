@@ -19,7 +19,7 @@ mod controls;
 
 pub use camera::ForwardFromCamera;
 
-mod consts {
+pub mod consts {
     use avian3d::prelude::ColliderConstructor;
 
     pub const PLAYER_FLOAT_HEIGHT_FROM_GROUND: f32 = 0.5;

@@ -152,8 +152,10 @@ fn draw_debug(mut gizmos: Gizmos, chunk_query: Query<&Transform, With<Chunk>>) {
         }
     }
 
-    gizmos.axes(
-        Transform::from_translation(Vec3::splat(0.125)),
-        CHUNK_SIZE_F,
-    );
+    if WORLD_RENDER_ORIGIN {
+        gizmos.axes(
+            Transform::from_translation(Vec3::splat(0.125)),
+            CHUNK_SIZE_F,
+        );
+    }
 }
