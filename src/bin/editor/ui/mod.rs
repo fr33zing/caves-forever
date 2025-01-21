@@ -1,18 +1,16 @@
 mod icons;
 
 use core::f32;
-use std::collections::HashMap;
 
 use bevy::{
     app::{App, Plugin, Update},
-    math::Vec3,
     prelude::{MouseButton, ResMut, Single},
 };
 use bevy_egui::{
     egui::{self, menu, Color32, Margin, Ui},
     EguiContexts,
 };
-use bevy_trackball::{prelude::Frame, TrackballCamera, TrackballController};
+use bevy_trackball::{TrackballCamera, TrackballController};
 use egui::{RichText, SelectableLabel};
 use nalgebra::{Point3, Vector3};
 use strum::{EnumProperty, IntoEnumIterator};

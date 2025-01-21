@@ -16,7 +16,7 @@ pub enum EditorMode {
     Rooms = 1,
 }
 
-#[derive(EnumProperty, EnumIter, Default, Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(EnumProperty, EnumIter, Default, Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
 pub enum EditorViewMode {
     #[default]

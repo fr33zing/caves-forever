@@ -39,6 +39,7 @@ bevy-tnua-avian3d = "0.2.0"
 bevy_egui = "0.32.0"
 bevy_infinite_grid = "0.14.1"
 bevy_trackball = { version = "0.9.0", features = ["bevy_egui"] }
+common_macros = "0.1.1"
 curvo  = "0.1.46"
 egui = "0.30.0"
 fast-surface-nets = "0.2.0"

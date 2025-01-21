@@ -5,16 +5,9 @@ use mines::{
     worldgen::consts::CHUNK_SIZE_F,
 };
 
-use crate::{state::EditorViewMode, util::mesh_text};
+use crate::{state::EditorMode, util::mesh_text};
 
-#[derive(Component)]
-pub struct TunnelsModeEntity(Option<EditorViewMode>);
-
-pub fn exit(mut commands: Commands, entities: Query<Entity, With<TunnelsModeEntity>>) {
-    entities.iter().for_each(|entity| {
-        commands.entity(entity).clear();
-    });
-}
+use super::ModeSpecific;
 
 pub fn enter(
     mut commands: Commands,
@@ -23,7 +16,7 @@ pub fn enter(
 ) {
     // "Player"
     commands.spawn((
-        TunnelsModeEntity(Some(EditorViewMode::Editor)),
+        ModeSpecific(EditorMode::Tunnels, None),
         Transform::from_rotation(Quat::from_euler(
             EulerRot::XYZ,
             -90.0_f32.to_radians(),
@@ -46,7 +39,7 @@ pub fn enter(
 
     // "Chunk"
     commands.spawn((
-        TunnelsModeEntity(Some(EditorViewMode::Editor)),
+        ModeSpecific(EditorMode::Tunnels, None),
         Transform::from_rotation(Quat::from_euler(
             EulerRot::XYZ,
             -90.0_f32.to_radians(),

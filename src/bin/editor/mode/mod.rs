@@ -1,4 +1,6 @@
-use bevy::{ecs::system::SystemId, prelude::*, utils::HashMap};
+use std::collections::HashMap;
+
+use bevy::{ecs::system::SystemId, prelude::*};
 
 use crate::{
     camera,
@@ -11,7 +13,8 @@ mod tunnels;
 struct ModeSystems {
     exit: Option<SystemId>,
     enter: Option<SystemId>,
-    change_view: Option<SystemId>,
+    //exit_view: HashMap<EditorViewMode, SystemId>,
+    enter_view: HashMap<EditorViewMode, SystemId>,
     update: Vec<SystemId>,
 }
 
@@ -20,8 +23,12 @@ struct ModeSwitcher {
     pub prev_mode: Option<EditorMode>,
     pub prev_view: Option<EditorViewMode>,
     pub mode_systems: HashMap<EditorMode, ModeSystems>,
+    pub cleanup: SystemId,
     pub camera_on_change_mode_system: SystemId,
 }
+
+#[derive(Component)]
+pub struct ModeSpecific(pub EditorMode, pub Option<EditorViewMode>);
 
 pub struct EditorModesPlugin;
 
@@ -29,11 +36,13 @@ impl Plugin for EditorModesPlugin {
     fn build(&self, app: &mut App) {
         let world = app.world_mut();
         let camera_on_change_mode_system = world.register_system(camera::on_change_mode);
+        let cleanup = world.register_system(cleanup);
 
         app.insert_resource(ModeSwitcher {
             prev_mode: default(),
             prev_view: default(),
             mode_systems: default(),
+            cleanup,
             camera_on_change_mode_system,
         });
 
@@ -47,13 +56,35 @@ pub fn setup(world: &mut World) {
         switcher.mode_systems.insert(
             EditorMode::Tunnels,
             ModeSystems {
-                exit: Some(world.register_system(tunnels::exit)),
                 enter: Some(world.register_system(tunnels::enter)),
                 update: vec![world.register_system(tunnels::update)],
                 ..default()
             },
         );
     });
+}
+
+pub fn cleanup(
+    mut commands: Commands,
+    state: Res<EditorState>,
+    mode_specific_entities: Query<(Entity, &ModeSpecific)>,
+) {
+    mode_specific_entities
+        .iter()
+        .for_each(|(entity, ModeSpecific(mode, view))| {
+            let mut remove = false;
+            if *mode != state.mode {
+                remove = true;
+            } else {
+                if let Some(view) = view {
+                    remove = *view != state.view;
+                }
+            }
+            if remove {
+                println!("removing entity: {entity}");
+                commands.entity(entity).clear();
+            }
+        });
 }
 
 fn switch_modes(world: &mut World) {
@@ -82,7 +113,7 @@ fn switch_modes(world: &mut World) {
 
         if changed_view {
             if let Some(curr_systems) = switcher.mode_systems.get(&curr_mode) {
-                systems.push(curr_systems.change_view);
+                systems.push(curr_systems.enter_view.get(&curr_view).copied());
             }
 
             switcher.prev_view = Some(curr_view);
@@ -90,6 +121,7 @@ fn switch_modes(world: &mut World) {
 
         if changed_mode || changed_view {
             systems.push(Some(switcher.camera_on_change_mode_system));
+            systems.push(Some(switcher.cleanup));
         }
 
         systems
