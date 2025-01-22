@@ -56,8 +56,13 @@ pub fn setup(world: &mut World) {
         switcher.mode_systems.insert(
             EditorMode::Tunnels,
             ModeSystems {
-                enter: Some(world.register_system(tunnels::enter)),
-                update: vec![world.register_system(tunnels::update)],
+                enter: Some(world.register_system(tunnels::spawn_size_reference_labels)),
+                update: vec![
+                    world.register_system(tunnels::draw_size_references),
+                    world.register_system(tunnels::pick_profile_point),
+                    world.register_system(tunnels::drag_profile_point),
+                    world.register_system(tunnels::update_profile_mesh),
+                ],
                 ..default()
             },
         );
@@ -81,7 +86,6 @@ pub fn cleanup(
                 }
             }
             if remove {
-                println!("removing entity: {entity}");
                 commands.entity(entity).clear();
             }
         });

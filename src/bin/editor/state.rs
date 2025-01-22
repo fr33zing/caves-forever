@@ -1,4 +1,8 @@
+use core::f32;
+use std::f32::consts::PI;
+
 use bevy::prelude::*;
+use nalgebra::Point2;
 use strum::{EnumIter, EnumProperty};
 
 //
@@ -34,11 +38,28 @@ pub enum EditorViewMode {
 #[derive(Debug)]
 pub struct TunnelsModeState {
     pub mirror: bool,
+    pub profile: Vec<Point2<f32>>,
+    pub drag_point: Option<usize>,
+    pub drag_start: Option<(Point2<f32>, Vec2)>,
 }
 
 impl Default for TunnelsModeState {
     fn default() -> Self {
-        Self { mirror: true }
+        let n = 10;
+        let radius = 5.0;
+        let mut profile = Vec::new();
+
+        for i in 0..n {
+            let radians = (i as f32 / n as f32) * PI * 2.0;
+            profile.push(Point2::new(radians.sin(), -radians.cos()) * radius);
+        }
+
+        Self {
+            mirror: true,
+            profile,
+            drag_point: None,
+            drag_start: None,
+        }
     }
 }
 
@@ -46,23 +67,9 @@ impl Default for TunnelsModeState {
 // Main state
 //
 
-#[derive(Resource, Debug)]
+#[derive(Resource, Default, Debug)]
 pub struct EditorState {
-    pub sensitivity: f32,
     pub mode: EditorMode,
     pub view: EditorViewMode,
     pub tunnels_mode: TunnelsModeState,
-    pub filename_filter: String,
-}
-
-impl Default for EditorState {
-    fn default() -> Self {
-        Self {
-            sensitivity: 1.0,
-            mode: EditorMode::default(),
-            view: EditorViewMode::default(),
-            tunnels_mode: TunnelsModeState::default(),
-            filename_filter: String::default(),
-        }
-    }
 }
