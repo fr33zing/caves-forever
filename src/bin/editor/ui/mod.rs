@@ -1,78 +1,111 @@
-mod icons;
-
-use core::f32;
-
+use anyhow::anyhow;
 use bevy::{
     app::{App, Plugin, Update},
-    prelude::{MouseButton, ResMut, Single},
+    prelude::{MouseButton, ResMut, Resource, Single},
 };
 use bevy_egui::{
     egui::{self, menu, Color32, Margin, Ui},
     EguiContexts,
 };
 use bevy_trackball::{TrackballCamera, TrackballController};
-use egui::{RichText, SelectableLabel};
+use egui::{Frame, Label, RichText, SelectableLabel, SidePanel, TopBottomPanel, Visuals};
 use nalgebra::{Point3, Vector3};
 use strum::{EnumProperty, IntoEnumIterator};
 
 use crate::state::{EditorMode, EditorState, EditorViewMode};
 
+mod file_browser;
+mod icons;
+
+use file_browser::{file_browser, save_as_dialog};
+
+#[derive(Resource, Default)]
+pub struct EditorDialogs {
+    pub show_save_as_dialog: bool,
+}
+
+#[derive(Resource, Default)]
+pub struct SaveAsDialogState {
+    pub filename: String,
+}
+
 pub struct EditorUiPlugin;
 
 impl Plugin for EditorUiPlugin {
     fn build(&self, app: &mut App) {
+        app.init_resource::<EditorDialogs>();
+        app.init_resource::<SaveAsDialogState>();
         app.add_systems(Update, ui);
     }
 }
 
 fn ui(
     mut state: ResMut<EditorState>,
+    mut dialogs: ResMut<EditorDialogs>,
+    mut name_file_dialog_state: ResMut<SaveAsDialogState>,
     mut contexts: EguiContexts,
     trackball: Option<Single<(&mut TrackballController, &mut TrackballCamera)>>,
 ) {
     let ctx = contexts.ctx_mut();
-
-    ctx.style_mut(|style| {
-        style.visuals.panel_fill = Color32::from_rgba_premultiplied(25, 25, 25, 235);
-    });
-
-    let mut frame = egui::Frame::side_top_panel(&ctx.style());
-    frame.inner_margin = Margin {
-        left: 8.0,
-        right: 8.0,
-        top: 8.0,
-        bottom: 8.0,
-    };
-
-    // Left panel
-    // SidePanel::left("left_panel")
-    //     .frame(frame)
-    //     .max_width(300.0)
-    //     .show(ctx, |ui| {
-    //         left_panel(&mut state, ui);
-    //         ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
-    //     });
+    ctx.set_visuals(Visuals::dark());
 
     // Top panel
-    egui::TopBottomPanel::top("top_panel")
-        .frame(frame)
+    let mut top_frame = Frame::side_top_panel(&ctx.style());
+    top_frame.inner_margin = Margin::same(8.0);
+    TopBottomPanel::top("top_panel")
+        .frame(top_frame)
         .show(ctx, |ui| {
-            top_panel(&mut state, ui, trackball);
+            top_panel(&mut state, &mut dialogs, ui, trackball);
         });
+
+    // Left panel
+    let left_panel_width = 200.0;
+    let mut left_frame = Frame::side_top_panel(&ctx.style());
+    left_frame.inner_margin = Margin::ZERO;
+    SidePanel::left("left_panel")
+        .frame(left_frame)
+        .default_width(left_panel_width)
+        .resizable(false)
+        .show(ctx, |ui| {
+            file_browser(&mut state, ui);
+            ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
+        });
+
+    // Save as dialog
+    let save_as_result = egui::Window::new("Save as...")
+        .default_width(200.0)
+        .max_width(200.0)
+        .resizable(false)
+        .collapsible(false)
+        .open(&mut dialogs.show_save_as_dialog)
+        .show(ctx, |ui| {
+            save_as_dialog(&mut state, &mut name_file_dialog_state, ui)
+        });
+    if let Some(inner) = save_as_result {
+        if let Some((close, save)) = inner.inner {
+            if close {
+                dialogs.show_save_as_dialog = false;
+            }
+            if save {
+                save_current(&mut state, &mut dialogs).unwrap();
+            }
+        }
+    }
 }
 
 fn top_panel(
     state: &mut EditorState,
+    dialogs: &mut EditorDialogs,
     ui: &mut Ui,
     trackball: Option<Single<(&mut TrackballController, &mut TrackballCamera)>>,
 ) {
     ui.horizontal(|ui| {
         // Menu bar
-        egui::Frame::none().show(ui, |ui| {
+        Frame::none().show(ui, |ui| {
             ui.shrink_width_to_current();
             menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
-                    file_menu(ui);
+                    file_menu(state, dialogs, ui);
                 });
                 ui.menu_button("Viewport", |ui| {
                     let allow_orbit = !(state.mode == EditorMode::Tunnels
@@ -83,6 +116,18 @@ fn top_panel(
         });
 
         ui.separator();
+
+        if let Some(picker) = state.file_picker() {
+            let current = picker.current_file();
+            if let Some(current) = current {
+                ui.add(Label::new(current.name.clone()).selectable(false));
+                if current.changed {
+                    icons::changed_default(ui);
+                }
+
+                ui.separator();
+            }
+        }
 
         // Mode switcher
         ui.label("Mode:");
@@ -127,19 +172,23 @@ fn top_panel(
     });
 }
 
-fn file_menu(ui: &mut Ui) {
-    if ui.selectable_label(false, "Open").clicked() {};
-
-    ui.separator();
-
+fn file_menu(state: &mut EditorState, dialogs: &mut EditorDialogs, ui: &mut Ui) {
     if ui.selectable_label(false, "New").clicked() {};
     if ui.selectable_label(false, "Duplicate").clicked() {};
     if ui.selectable_label(false, "Delete").clicked() {};
 
     ui.separator();
 
-    if ui.selectable_label(false, "Save").clicked() {};
-    if ui.selectable_label(false, "Save as").clicked() {};
+    if ui.selectable_label(false, "Save").clicked() {
+        ui.close_menu();
+        // TODO handle this
+        save_current(state, dialogs).expect("save failed");
+    };
+    if ui.selectable_label(false, "Save as...").clicked() {
+        ui.close_menu();
+        save_as(dialogs);
+    };
+    if ui.selectable_label(false, "Save all").clicked() {};
 }
 
 fn viewport_menu(
@@ -222,4 +271,34 @@ fn viewport_menu(
         controller.input.slide_button = slide;
         ui.close_menu();
     }
+}
+
+//
+// Utility
+//
+
+/// Save the current file OR open the "save as" dialog if it has no path
+pub fn save_current(state: &mut EditorState, dialogs: &mut EditorDialogs) -> anyhow::Result<()> {
+    let Some(picker) = state.file_picker_mut() else {
+        return Err(anyhow!("current mode has no file picker"));
+    };
+    let path = match picker.current {
+        Some(ref path) => path.clone(),
+        None => {
+            save_as(dialogs);
+            return Ok(());
+        }
+    };
+    let Some(file) = picker.current_file_mut() else {
+        return Err(anyhow!("no current file"));
+    };
+
+    file.write(path.to_path_buf())?;
+
+    Ok(())
+}
+
+// Open the "save as" dialog
+pub fn save_as(dialogs: &mut EditorDialogs) {
+    dialogs.show_save_as_dialog = true;
 }

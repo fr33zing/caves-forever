@@ -145,55 +145,54 @@ pub fn pick_profile_point(
     let radius = 0.25;
     let mut picked: Option<usize> = None;
 
-    state
-        .tunnels_mode
-        .profile
-        .iter()
-        .enumerate()
-        .for_each(|(i, p)| {
-            let isometry = Isometry3d {
-                rotation: Quat::from_euler(EulerRot::XYZ, -90.0_f32.to_radians(), 0.0, 0.0),
-                translation: Vec3A::new(p.x, 0.0, p.y),
-            };
+    let Some(current) = state.tunnels_mode.files.current_data() else {
+        return;
+    };
 
-            let mut picked_this = false;
-            if let Some(cursor) = cursor {
-                if state.tunnels_mode.drag_point.is_none()
-                    && picked.is_none()
-                    && cursor.distance(Vec2::new(p.x, p.y)) <= radius
-                {
-                    picked_this = true;
-                }
+    current.points.iter().enumerate().for_each(|(i, p)| {
+        let isometry = Isometry3d {
+            rotation: Quat::from_euler(EulerRot::XYZ, -90.0_f32.to_radians(), 0.0, 0.0),
+            translation: Vec3A::new(p.x, 0.0, p.y),
+        };
+
+        let mut picked_this = false;
+        if let Some(cursor) = cursor {
+            if state.tunnels_mode.drag_point.is_none()
+                && picked.is_none()
+                && cursor.distance(Vec2::new(p.x, p.y)) <= radius
+            {
+                picked_this = true;
             }
+        }
 
-            if picked_this {
-                picked = Some(i);
+        if picked_this {
+            picked = Some(i);
+        }
+
+        let mut color = Color::srgba(1.0, 1.0, 1.0, 0.35);
+
+        if picked_this {
+            color = Color::srgb(1.0, 1.0, 1.0);
+        }
+
+        if let Some(drag_point) = state.tunnels_mode.drag_point {
+            if drag_point == i {
+                color = Color::srgb(0.0, 1.0, 1.0);
             }
-
-            let mut color = Color::srgba(1.0, 1.0, 1.0, 0.35);
-
-            if picked_this {
-                color = Color::srgb(1.0, 1.0, 1.0);
-            }
-
-            if let Some(drag_point) = state.tunnels_mode.drag_point {
-                if drag_point == i {
-                    color = Color::srgb(0.0, 1.0, 1.0);
-                }
-            }
-            gizmos.circle(isometry, radius, color);
-        });
+        }
+        gizmos.circle(isometry, radius, color);
+    });
 
     if state.tunnels_mode.drag_point.is_none() && mouse.just_pressed(MouseButton::Left) {
         if let Some(picked) = picked {
             if let Some(cursor) = cursor {
+                state.tunnels_mode.drag_start = Some((current.points[picked], cursor));
                 state.tunnels_mode.drag_point = Some(picked);
-                state.tunnels_mode.drag_start = Some((state.tunnels_mode.profile[picked], cursor));
             }
         }
     } else if mouse.just_released(MouseButton::Left) {
-        state.tunnels_mode.drag_point = None;
         state.tunnels_mode.drag_start = None;
+        state.tunnels_mode.drag_point = None;
     }
 }
 
@@ -212,12 +211,19 @@ pub fn drag_profile_point(
         return;
     };
 
+    let mirror = state.tunnels_mode.mirror;
+    let current = state.tunnels_mode.files.current_data_mut();
+
+    let Some(current) = current else {
+        return;
+    };
+
     let cursor_diff = cursor - cursor_start;
     let point_new_pos = Point2::new(point_start.x + cursor_diff.x, point_start.y + cursor_diff.y);
-    state.tunnels_mode.profile[drag_point] = point_new_pos;
+    current.points[drag_point] = point_new_pos;
 
-    let len = state.tunnels_mode.profile.len();
-    if !state.tunnels_mode.mirror {
+    let len = current.points.len();
+    if !mirror {
         return;
     }
 
@@ -230,7 +236,7 @@ pub fn drag_profile_point(
     }
 
     let mirror_point = (len - drag_point) % len;
-    state.tunnels_mode.profile[mirror_point] = point_new_pos;
+    current.points[mirror_point] = point_new_pos;
 }
 
 pub fn update_profile_mesh(
@@ -240,8 +246,14 @@ pub fn update_profile_mesh(
     state: Res<EditorState>,
     mesh: Option<Single<(Entity, &mut ProfileMesh)>>,
 ) {
+    let current = state.tunnels_mode.files.current_data();
+
+    let Some(current) = current else {
+        return;
+    };
+
     let Some(profile) = mesh else {
-        let profile = ProfileMesh(state.tunnels_mode.profile.clone());
+        let profile = ProfileMesh(current.points.clone());
         let mesh = profile.to_mesh();
         commands.spawn((
             ModeSpecific(EditorMode::Tunnels, None),
@@ -258,11 +270,11 @@ pub fn update_profile_mesh(
 
     let (entity, mut profile) = profile.into_inner();
 
-    if state.tunnels_mode.profile == profile.0 {
+    if current.points == profile.0 {
         return;
     }
 
-    profile.0 = state.tunnels_mode.profile.clone();
+    profile.0 = current.points.clone();
 
     let mut commands = commands.entity(entity);
     commands.insert(Mesh3d(meshes.add(profile.to_mesh())));
