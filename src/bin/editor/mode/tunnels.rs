@@ -1,7 +1,8 @@
 use bevy::math::Vec3A;
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy_trackball::TrackballCamera;
-use egui::{Align, ComboBox, Label, Layout, ScrollArea, Ui};
+use egui::{Align, ComboBox, Label, Layout, RichText, ScrollArea, Ui};
+use mines::worldgen::asset::TunnelPoint;
 use nalgebra::Point2;
 use strum::IntoEnumIterator;
 
@@ -263,9 +264,11 @@ pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
 
     ui.style_mut().spacing.item_spacing.y = 8.0;
 
+    ui.add(Label::new(RichText::new("Tunnel").heading()).selectable(false));
+
     // Environment
     ui.columns_const(|[left, right]| {
-        left.add(Label::new("Environment"));
+        left.add(Label::new("Environment").selectable(false));
         right.with_layout(Layout::right_to_left(Align::Min), |right| {
             ComboBox::from_id_salt("tunnel_environment")
                 .selected_text(format!("{}", data.environment))
@@ -279,7 +282,7 @@ pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
 
     // Knot style
     ui.columns_const(|[left, right]| {
-        left.add(Label::new("Rarity"));
+        left.add(Label::new("Rarity").selectable(false));
         right.with_layout(Layout::right_to_left(Align::Min), |right| {
             ComboBox::from_id_salt("tunnel_rarity")
                 .selected_text(format!("{}", data.rarity))
@@ -293,18 +296,25 @@ pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
 
     ui.separator();
 
+    // Point
     ScrollArea::vertical().show(ui, |ui| {
         if let Some(selection_index) = state.tunnels_mode.selected_point {
-            let selection = &data.points[selection_index];
-            ui.horizontal(|ui| {
-                ui.add(
-                    Label::new(format!(
-                        "{selection_index}: ({}, {})",
-                        selection.position.x, selection.position.y
-                    ))
+            ui.add(
+                Label::new(RichText::new(format!("Point {selection_index}")).heading())
                     .selectable(false),
-                )
-            });
+            );
+
+            let selection = &data.points[selection_index];
+            ui.add(
+                Label::new(format!(
+                    "{selection_index}: ({}, {})",
+                    selection.position.x, selection.position.y
+                ))
+                .selectable(false),
+            );
+        } else {
+            ui.add(Label::new(RichText::new("Point").heading()).selectable(false));
+            ui.add(Label::new("No point selected.").selectable(false));
         }
     });
 }

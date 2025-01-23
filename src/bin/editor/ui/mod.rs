@@ -93,7 +93,7 @@ fn ui(
 
     // Left panel
     let left_panel_width = if side_panel_visibility.left {
-        200.0
+        230.0
     } else {
         0.0
     };
@@ -146,12 +146,18 @@ fn ui(
 
     // Panel toggles
     Area::new(Id::new("toggle_left_panel"))
-        .anchor(Align2::LEFT_BOTTOM, vec2(left_panel_width + 8.0, -8.0))
+        .anchor(
+            Align2::LEFT_TOP,
+            vec2(left_panel_width + 8.0, top_panel_height + 8.0),
+        )
         .show(ctx, |ui| {
             ui.checkbox(&mut side_panel_visibility.left, "File browser");
         });
     let right_panel_toggle_hovered = Area::new(Id::new("toggle_right_panel"))
-        .anchor(Align2::RIGHT_BOTTOM, vec2(-right_panel_width - 8.0, -8.0))
+        .anchor(
+            Align2::RIGHT_TOP,
+            vec2(-right_panel_width - 8.0, top_panel_height + 8.0),
+        )
         .show(ctx, |ui| {
             ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.checkbox(&mut side_panel_visibility.right, "Properties")
