@@ -1,18 +1,25 @@
 use anyhow::anyhow;
 use bevy::{
     app::{App, Plugin, Update},
-    prelude::{MouseButton, ResMut, Resource, Single},
+    prelude::{MouseButton, ResMut, Resource, Single, With},
+    window::{PrimaryWindow, Window},
 };
 use bevy_egui::{
     egui::{self, menu, Color32, Margin, Ui},
     EguiContexts,
 };
 use bevy_trackball::{TrackballCamera, TrackballController};
-use egui::{Frame, Label, RichText, SelectableLabel, SidePanel, TopBottomPanel, Visuals};
+use egui::{
+    vec2, Align2, Area, Frame, Id, Label, Layout, RichText, SelectableLabel, SidePanel,
+    TopBottomPanel, Vec2, Visuals,
+};
 use nalgebra::{Point3, Vector3};
 use strum::{EnumProperty, IntoEnumIterator};
 
-use crate::state::{EditorMode, EditorState, EditorViewMode};
+use crate::{
+    mode::tunnels,
+    state::{EditorMode, EditorState, EditorViewMode},
+};
 
 mod file_browser;
 mod icons;
@@ -29,47 +36,131 @@ pub struct SaveAsDialogState {
     pub filename: String,
 }
 
+#[derive(Resource)]
+pub struct SidePanelVisibility {
+    pub left: bool,
+    pub right: bool,
+}
+
+impl Default for SidePanelVisibility {
+    fn default() -> Self {
+        Self {
+            left: true,
+            right: false,
+        }
+    }
+}
+
+#[derive(Resource, Default)]
+pub struct CursorOverEditSelectionPanel(pub bool);
+
 pub struct EditorUiPlugin;
 
 impl Plugin for EditorUiPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<EditorDialogs>();
+        app.init_resource::<SidePanelVisibility>();
         app.init_resource::<SaveAsDialogState>();
+        app.init_resource::<CursorOverEditSelectionPanel>();
         app.add_systems(Update, ui);
     }
 }
 
 fn ui(
     mut state: ResMut<EditorState>,
+    mut side_panel_visibility: ResMut<SidePanelVisibility>,
     mut dialogs: ResMut<EditorDialogs>,
-    mut name_file_dialog_state: ResMut<SaveAsDialogState>,
+    mut save_as_dialog_state: ResMut<SaveAsDialogState>,
+    mut cursor_over_edit_selection_panel: ResMut<CursorOverEditSelectionPanel>,
     mut contexts: EguiContexts,
     trackball: Option<Single<(&mut TrackballController, &mut TrackballCamera)>>,
+    window: Option<Single<&Window, With<PrimaryWindow>>>,
 ) {
     let ctx = contexts.ctx_mut();
     ctx.set_visuals(Visuals::dark());
 
     // Top panel
+    let top_panel_height = 30.0;
     let mut top_frame = Frame::side_top_panel(&ctx.style());
     top_frame.inner_margin = Margin::same(8.0);
     TopBottomPanel::top("top_panel")
         .frame(top_frame)
+        .default_height(top_panel_height)
+        .resizable(false)
         .show(ctx, |ui| {
             top_panel(&mut state, &mut dialogs, ui, trackball);
         });
 
     // Left panel
-    let left_panel_width = 200.0;
-    let mut left_frame = Frame::side_top_panel(&ctx.style());
-    left_frame.inner_margin = Margin::ZERO;
-    SidePanel::left("left_panel")
-        .frame(left_frame)
-        .default_width(left_panel_width)
-        .resizable(false)
+    let left_panel_width = if side_panel_visibility.left {
+        200.0
+    } else {
+        0.0
+    };
+    if side_panel_visibility.left {
+        let mut left_frame = Frame::side_top_panel(&ctx.style());
+        left_frame.inner_margin = Margin::ZERO;
+        SidePanel::left("file_browser")
+            .frame(left_frame)
+            .default_width(left_panel_width)
+            .resizable(false)
+            .show(ctx, |ui| {
+                file_browser(&mut state, ui);
+                ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
+            });
+    }
+
+    // Right panel
+    let right_panel_width = if side_panel_visibility.right {
+        200.0
+    } else {
+        0.0
+    };
+    if side_panel_visibility.right {
+        let mut right_frame = Frame::side_top_panel(&ctx.style());
+        right_frame.inner_margin = Margin::same(8.0);
+        SidePanel::right("selection_editor")
+            .frame(right_frame)
+            .default_width(right_panel_width)
+            .resizable(false)
+            .show(ctx, |ui| {
+                match state.mode {
+                    EditorMode::Tunnels => tunnels::sidebar(&mut state, ui),
+                    EditorMode::Rooms => {}
+                }
+                ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
+            });
+    }
+    cursor_over_edit_selection_panel.0 = if let Some(window) = window {
+        if let Some(cursor) = window.cursor_position() {
+            side_panel_visibility.right
+                && cursor.x >= window.width() - right_panel_width
+                && cursor.y > top_panel_height
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
+    // Panel toggles
+    Area::new(Id::new("toggle_left_panel"))
+        .anchor(Align2::LEFT_BOTTOM, vec2(left_panel_width + 8.0, -8.0))
         .show(ctx, |ui| {
-            file_browser(&mut state, ui);
-            ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
+            ui.checkbox(&mut side_panel_visibility.left, "File browser");
         });
+    let right_panel_toggle_hovered = Area::new(Id::new("toggle_right_panel"))
+        .anchor(Align2::RIGHT_BOTTOM, vec2(-right_panel_width - 8.0, -8.0))
+        .show(ctx, |ui| {
+            ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.checkbox(&mut side_panel_visibility.right, "Properties")
+            })
+        })
+        .inner
+        .inner
+        .contains_pointer();
+    cursor_over_edit_selection_panel.0 =
+        cursor_over_edit_selection_panel.0 || right_panel_toggle_hovered;
 
     // Save as dialog
     let save_as_result = egui::Window::new("Save as...")
@@ -79,7 +170,7 @@ fn ui(
         .collapsible(false)
         .open(&mut dialogs.show_save_as_dialog)
         .show(ctx, |ui| {
-            save_as_dialog(&mut state, &mut name_file_dialog_state, ui)
+            save_as_dialog(&mut state, &mut save_as_dialog_state, ui)
         });
     if let Some(inner) = save_as_result {
         if let Some((close, save)) = inner.inner {

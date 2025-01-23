@@ -68,8 +68,14 @@ impl Default for TunnelProfile {
 pub struct TunnelsModeState {
     pub files: FilePickerState<TunnelProfile>,
     pub mirror: bool,
-    pub drag_point: Option<usize>,
+    pub selected_point: Option<usize>,
     pub drag_start: Option<(Point2<f32>, Vec2)>,
+}
+
+impl TunnelsModeState {
+    pub fn dragging(&self) -> bool {
+        self.drag_start.is_some()
+    }
 }
 
 impl Default for TunnelsModeState {
@@ -77,7 +83,7 @@ impl Default for TunnelsModeState {
         Self {
             files: FilePickerState::from_directory("assets/worldgen/tunnels"),
             mirror: true,
-            drag_point: None,
+            selected_point: None,
             drag_start: None,
         }
     }
@@ -282,6 +288,16 @@ pub struct EditorState {
 }
 
 impl EditorState {
+    /// Determine if the user has selected an object
+    pub fn has_selection(&self) -> bool {
+        match self.mode {
+            EditorMode::Tunnels => {
+                self.tunnels_mode.selected_point.is_some() && !self.tunnels_mode.dragging()
+            }
+            _ => false,
+        }
+    }
+
     pub fn file_picker(
         &self,
     ) -> Option<&FilePickerState<impl Serialize + DeserializeOwned + Default + Clone>> {

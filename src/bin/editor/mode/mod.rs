@@ -7,7 +7,7 @@ use crate::{
     state::{EditorMode, EditorState, EditorViewMode},
 };
 
-mod tunnels;
+pub mod tunnels;
 
 #[derive(Default, Clone)]
 struct ModeSystems {

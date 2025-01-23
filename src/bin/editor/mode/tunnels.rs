@@ -8,6 +8,7 @@ use bevy::{
 
 use bevy_trackball::TrackballCamera;
 use curvo::prelude::*;
+use egui::{Label, ScrollArea, Ui};
 use mines::{
     materials::LineMaterial,
     tnua::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
@@ -17,6 +18,7 @@ use nalgebra::{Const, OPoint, Point2, Point3};
 
 use crate::{
     state::{EditorMode, EditorState, EditorViewMode},
+    ui::CursorOverEditSelectionPanel,
     util::mesh_text,
 };
 
@@ -136,6 +138,7 @@ pub fn pick_profile_point(
     window: Single<&Window, With<PrimaryWindow>>,
     camera: Single<(&Camera, &GlobalTransform), With<TrackballCamera>>,
     mouse: Res<ButtonInput<MouseButton>>,
+    cursor_over_edit_selection_panel: Res<CursorOverEditSelectionPanel>,
 ) {
     if state.view != EditorViewMode::Editor {
         return;
@@ -157,7 +160,7 @@ pub fn pick_profile_point(
 
         let mut picked_this = false;
         if let Some(cursor) = cursor {
-            if state.tunnels_mode.drag_point.is_none()
+            if !state.tunnels_mode.dragging()
                 && picked.is_none()
                 && cursor.distance(Vec2::new(p.x, p.y)) <= radius
             {
@@ -175,24 +178,26 @@ pub fn pick_profile_point(
             color = Color::srgb(1.0, 1.0, 1.0);
         }
 
-        if let Some(drag_point) = state.tunnels_mode.drag_point {
+        if let Some(drag_point) = state.tunnels_mode.selected_point {
             if drag_point == i {
                 color = Color::srgb(0.0, 1.0, 1.0);
             }
         }
         gizmos.circle(isometry, radius, color);
+        gizmos.circle(isometry, radius * 0.2, color);
     });
 
-    if state.tunnels_mode.drag_point.is_none() && mouse.just_pressed(MouseButton::Left) {
+    if mouse.just_pressed(MouseButton::Left) {
         if let Some(picked) = picked {
             if let Some(cursor) = cursor {
                 state.tunnels_mode.drag_start = Some((current.points[picked], cursor));
-                state.tunnels_mode.drag_point = Some(picked);
+                state.tunnels_mode.selected_point = Some(picked);
             }
+        } else if !cursor_over_edit_selection_panel.0 {
+            state.tunnels_mode.selected_point = None;
         }
     } else if mouse.just_released(MouseButton::Left) {
         state.tunnels_mode.drag_start = None;
-        state.tunnels_mode.drag_point = None;
     }
 }
 
@@ -201,7 +206,7 @@ pub fn drag_profile_point(
     window: Single<&Window, With<PrimaryWindow>>,
     camera: Single<(&Camera, &GlobalTransform), With<TrackballCamera>>,
 ) {
-    let Some(drag_point) = state.tunnels_mode.drag_point else {
+    let Some(drag_point) = state.tunnels_mode.selected_point else {
         return;
     };
     let Some((point_start, cursor_start)) = state.tunnels_mode.drag_start else {
@@ -278,6 +283,36 @@ pub fn update_profile_mesh(
 
     let mut commands = commands.entity(entity);
     commands.insert(Mesh3d(meshes.add(profile.to_mesh())));
+}
+
+//
+// Sidebar
+//
+
+pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
+    let picker = &mut state.tunnels_mode.files;
+    let Some(file) = picker.files.get_mut(&picker.current) else {
+        return;
+    };
+
+    let Some(ref mut data) = file.data else {
+        return;
+    };
+
+    ScrollArea::vertical().show(ui, |ui| {
+        if let Some(selection_index) = state.tunnels_mode.selected_point {
+            let selection = data.points[selection_index];
+            ui.horizontal(|ui| {
+                ui.add(
+                    Label::new(format!(
+                        "{selection_index}: ({}, {})",
+                        selection.x, selection.y
+                    ))
+                    .selectable(false),
+                )
+            });
+        }
+    });
 }
 
 //
