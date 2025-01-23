@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    f32::consts::PI,
     fs::File,
     io::{Read, Write},
     path::PathBuf,
@@ -13,31 +12,25 @@ use bevy::prelude::*;
 use mines::worldgen::asset::Tunnel;
 use nalgebra::Point2;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use strum::{EnumIter, EnumProperty};
+use strum::EnumIter;
 
 //
 // Modes
 //
 
-#[derive(EnumProperty, EnumIter, Default, Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(EnumIter, strum_macros::Display, Default, Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
 pub enum EditorMode {
     #[default]
-    #[strum(props(Name = "Tunnels"))]
     Tunnels = 0,
-
-    #[strum(props(Name = "Rooms"))]
     Rooms = 1,
 }
 
-#[derive(EnumProperty, EnumIter, Default, Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(EnumIter, strum_macros::Display, Default, Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
 pub enum EditorViewMode {
     #[default]
-    #[strum(props(Name = "Editor"))]
     Editor = 0,
-
-    #[strum(props(Name = "Preview"))]
     Preview = 1,
 }
 

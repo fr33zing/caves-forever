@@ -8,36 +8,14 @@ use bevy::{
 use curvo::prelude::{KnotStyle, NurbsCurve, NurbsCurve3D, Tessellation};
 use nalgebra::{Const, OPoint, Point2, Point3};
 use serde::{Deserialize, Serialize};
-use strum::{EnumIter, EnumProperty};
 
-use super::Environment;
+use super::{Environment, Rarity};
 
 // All tunnel profiles must have this number of points.
 pub const TUNNEL_POINTS: usize = 12;
 
 const TUNNEL_DEFAULT_RADIUS: f32 = 5.0;
 const TUNNEL_DEFAULT_VARIANCE: f32 = 1.0;
-
-#[derive(EnumIter, EnumProperty, Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
-#[repr(u8)]
-pub enum KnotStyleU8 {
-    #[strum(props(Name = "Uniform"))]
-    Uniform = 0,
-    #[strum(props(Name = "Chordal"))]
-    Chordal = 1,
-    #[strum(props(Name = "Centripedal"))]
-    Centripedal = 2,
-}
-
-impl KnotStyleU8 {
-    pub fn as_curvo_knot_style(&self) -> KnotStyle {
-        match self {
-            KnotStyleU8::Uniform => KnotStyle::Uniform,
-            KnotStyleU8::Chordal => KnotStyle::Chordal,
-            KnotStyleU8::Centripedal => KnotStyle::Centripetal,
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Default)]
 pub struct TunnelPoint {
@@ -48,8 +26,8 @@ pub struct TunnelPoint {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Tunnel {
     pub environment: Environment,
+    pub rarity: Rarity,
     pub points: [TunnelPoint; TUNNEL_POINTS],
-    pub knot_style: KnotStyleU8,
 }
 
 impl Default for Tunnel {
@@ -64,7 +42,7 @@ impl Default for Tunnel {
         Self {
             points,
             environment: Environment::Development,
-            knot_style: KnotStyleU8::Chordal,
+            rarity: Rarity::Uncommon,
         }
     }
 }
@@ -79,13 +57,7 @@ impl Tunnel {
 
     pub fn to_curve_3d(&self) -> NurbsCurve<f32, Const<4>> {
         let points = self.to_3d();
-
-        NurbsCurve3D::<f32>::try_periodic_interpolate(
-            &points,
-            3,
-            self.knot_style.as_curvo_knot_style(),
-        )
-        .unwrap()
+        NurbsCurve3D::<f32>::try_periodic_interpolate(&points, 3, KnotStyle::Centripetal).unwrap()
     }
 
     pub fn to_mesh(&self) -> Mesh {

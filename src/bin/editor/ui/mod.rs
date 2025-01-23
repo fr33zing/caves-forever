@@ -11,10 +11,10 @@ use bevy_egui::{
 use bevy_trackball::{TrackballCamera, TrackballController};
 use egui::{
     vec2, Align2, Area, Frame, Id, Label, Layout, RichText, SelectableLabel, SidePanel,
-    TopBottomPanel, Vec2, Visuals,
+    TopBottomPanel, Visuals,
 };
 use nalgebra::{Point3, Vector3};
-use strum::{EnumProperty, IntoEnumIterator};
+use strum::IntoEnumIterator;
 
 use crate::{
     mode::tunnels,
@@ -224,10 +224,7 @@ fn top_panel(
         // Mode switcher
         ui.label("Mode:");
         EditorMode::iter().for_each(|mode| {
-            let button = ui.add_enabled(
-                state.mode != mode,
-                egui::Button::new(mode.get_str("Name").unwrap()),
-            );
+            let button = ui.add_enabled(state.mode != mode, egui::Button::new(format!("{mode}")));
             if button.clicked() {
                 state.mode = mode;
             }
@@ -238,10 +235,7 @@ fn top_panel(
         // View switcher
         ui.label("View:");
         EditorViewMode::iter().for_each(|mode| {
-            let button = ui.add_enabled(
-                state.view != mode,
-                egui::Button::new(mode.get_str("Name").unwrap()),
-            );
+            let button = ui.add_enabled(state.view != mode, egui::Button::new(format!("{mode}")));
             if button.clicked() {
                 state.view = mode;
             }

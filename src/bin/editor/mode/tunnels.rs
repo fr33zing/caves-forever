@@ -1,25 +1,25 @@
 use bevy::math::Vec3A;
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy_trackball::TrackballCamera;
-use egui::{vec2, Align, Button, ComboBox, Label, Layout, ScrollArea, TextEdit, Ui};
+use egui::{Align, ComboBox, Label, Layout, ScrollArea, Ui};
+use nalgebra::Point2;
+use strum::IntoEnumIterator;
+
 use mines::{
     materials::LineMaterial,
     tnua::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
     worldgen::{
-        asset::{Environment, KnotStyleU8, Tunnel},
+        asset::{Environment, Rarity, Tunnel},
         consts::CHUNK_SIZE_F,
     },
 };
-use nalgebra::Point2;
-use strum::{EnumProperty, IntoEnumIterator};
 
+use super::ModeSpecific;
 use crate::{
     state::{EditorMode, EditorState, EditorViewMode},
     ui::CursorOverEditSelectionPanel,
     util::mesh_text,
 };
-
-use super::ModeSpecific;
 
 #[derive(Component)]
 pub struct ProfileMesh(Tunnel);
@@ -268,14 +268,10 @@ pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
         left.add(Label::new("Environment"));
         right.with_layout(Layout::right_to_left(Align::Min), |right| {
             ComboBox::from_id_salt("tunnel_environment")
-                .selected_text(data.environment.get_str("Name").unwrap().to_owned())
+                .selected_text(format!("{}", data.environment))
                 .show_ui(right, |ui| {
                     Environment::iter().for_each(|env| {
-                        ui.selectable_value(
-                            &mut data.environment,
-                            env,
-                            env.get_str("Name").unwrap(),
-                        );
+                        ui.selectable_value(&mut data.environment, env, format!("{env}"));
                     });
                 });
         });
@@ -283,17 +279,13 @@ pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
 
     // Knot style
     ui.columns_const(|[left, right]| {
-        left.add(Label::new("Knot style"));
+        left.add(Label::new("Rarity"));
         right.with_layout(Layout::right_to_left(Align::Min), |right| {
-            ComboBox::from_id_salt("tunnel_knotstyle")
-                .selected_text(data.knot_style.get_str("Name").unwrap().to_owned())
+            ComboBox::from_id_salt("tunnel_rarity")
+                .selected_text(format!("{}", data.rarity))
                 .show_ui(right, |ui| {
-                    KnotStyleU8::iter().for_each(|knot_style| {
-                        ui.selectable_value(
-                            &mut data.knot_style,
-                            knot_style,
-                            knot_style.get_str("Name").unwrap(),
-                        );
+                    Rarity::iter().for_each(|rarity| {
+                        ui.selectable_value(&mut data.rarity, rarity, format!("{rarity}"));
                     });
                 });
         });
