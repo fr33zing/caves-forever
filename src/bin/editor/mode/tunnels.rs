@@ -1,20 +1,17 @@
-use bevy::{
-    asset::RenderAssetUsages,
-    math::Vec3A,
-    prelude::*,
-    render::mesh::{PrimitiveTopology, VertexAttributeValues},
-    window::PrimaryWindow,
-};
-
+use bevy::math::Vec3A;
+use bevy::{prelude::*, window::PrimaryWindow};
 use bevy_trackball::TrackballCamera;
-use curvo::prelude::*;
-use egui::{Label, ScrollArea, Ui};
+use egui::{vec2, Align, Button, ComboBox, Label, Layout, ScrollArea, TextEdit, Ui};
 use mines::{
     materials::LineMaterial,
     tnua::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
-    worldgen::consts::CHUNK_SIZE_F,
+    worldgen::{
+        asset::{Environment, KnotStyleU8, Tunnel},
+        consts::CHUNK_SIZE_F,
+    },
 };
-use nalgebra::{Const, OPoint, Point2, Point3};
+use nalgebra::Point2;
+use strum::{EnumProperty, IntoEnumIterator};
 
 use crate::{
     state::{EditorMode, EditorState, EditorViewMode},
@@ -25,41 +22,7 @@ use crate::{
 use super::ModeSpecific;
 
 #[derive(Component)]
-pub struct ProfileMesh(Vec<Point2<f32>>);
-
-impl ProfileMesh {
-    pub fn to_3d(&self) -> Vec<OPoint<f32, Const<3>>> {
-        let mut points = self
-            .0
-            .iter()
-            .map(|p| Point3::new(p.x, 0.0, p.y))
-            .collect::<Vec<_>>();
-        points.push(points[0]);
-
-        points
-    }
-
-    pub fn to_curve_3d(&self) -> NurbsCurve<f32, Const<4>> {
-        let points = self.to_3d();
-
-        NurbsCurve3D::<f32>::try_interpolate(&points, 3).unwrap()
-    }
-
-    pub fn to_mesh(&self) -> Mesh {
-        let curve = self.to_curve_3d();
-        let samples = curve.tessellate(Some(1e-8));
-        let vertices = samples
-            .iter()
-            .map(|p| p.cast::<f32>())
-            .map(|p| [p.x, p.y, p.z])
-            .collect();
-
-        Mesh::new(PrimitiveTopology::LineStrip, RenderAssetUsages::all()).with_inserted_attribute(
-            Mesh::ATTRIBUTE_POSITION,
-            VertexAttributeValues::Float32x3(vertices),
-        )
-    }
-}
+pub struct ProfileMesh(Tunnel);
 
 /// Hook: enter
 pub fn spawn_size_reference_labels(
@@ -155,14 +118,14 @@ pub fn pick_profile_point(
     current.points.iter().enumerate().for_each(|(i, p)| {
         let isometry = Isometry3d {
             rotation: Quat::from_euler(EulerRot::XYZ, -90.0_f32.to_radians(), 0.0, 0.0),
-            translation: Vec3A::new(p.x, 0.0, p.y),
+            translation: Vec3A::new(p.position.x, 0.0, p.position.y),
         };
 
         let mut picked_this = false;
         if let Some(cursor) = cursor {
             if !state.tunnels_mode.dragging()
                 && picked.is_none()
-                && cursor.distance(Vec2::new(p.x, p.y)) <= radius
+                && cursor.distance(Vec2::new(p.position.x, p.position.y)) <= radius
             {
                 picked_this = true;
             }
@@ -190,7 +153,7 @@ pub fn pick_profile_point(
     if mouse.just_pressed(MouseButton::Left) {
         if let Some(picked) = picked {
             if let Some(cursor) = cursor {
-                state.tunnels_mode.drag_start = Some((current.points[picked], cursor));
+                state.tunnels_mode.drag_start = Some((current.points[picked].position, cursor));
                 state.tunnels_mode.selected_point = Some(picked);
             }
         } else if !cursor_over_edit_selection_panel.0 {
@@ -225,7 +188,7 @@ pub fn drag_profile_point(
 
     let cursor_diff = cursor - cursor_start;
     let point_new_pos = Point2::new(point_start.x + cursor_diff.x, point_start.y + cursor_diff.y);
-    current.points[drag_point] = point_new_pos;
+    current.points[drag_point].position = point_new_pos;
 
     let len = current.points.len();
     if !mirror {
@@ -241,7 +204,7 @@ pub fn drag_profile_point(
     }
 
     let mirror_point = (len - drag_point) % len;
-    current.points[mirror_point] = point_new_pos;
+    current.points[mirror_point].position = point_new_pos;
 }
 
 pub fn update_profile_mesh(
@@ -258,8 +221,8 @@ pub fn update_profile_mesh(
     };
 
     let Some(profile) = mesh else {
-        let profile = ProfileMesh(current.points.clone());
-        let mesh = profile.to_mesh();
+        let profile = ProfileMesh(current.clone());
+        let mesh = profile.0.to_mesh();
         commands.spawn((
             ModeSpecific(EditorMode::Tunnels, None),
             profile,
@@ -275,14 +238,14 @@ pub fn update_profile_mesh(
 
     let (entity, mut profile) = profile.into_inner();
 
-    if current.points == profile.0 {
+    if *current == profile.0 {
         return;
     }
 
-    profile.0 = current.points.clone();
+    profile.0 = current.clone();
 
     let mut commands = commands.entity(entity);
-    commands.insert(Mesh3d(meshes.add(profile.to_mesh())));
+    commands.insert(Mesh3d(meshes.add(profile.0.to_mesh())));
 }
 
 //
@@ -294,19 +257,58 @@ pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
     let Some(file) = picker.files.get_mut(&picker.current) else {
         return;
     };
-
     let Some(ref mut data) = file.data else {
         return;
     };
 
+    ui.style_mut().spacing.item_spacing.y = 8.0;
+
+    // Environment
+    ui.columns_const(|[left, right]| {
+        left.add(Label::new("Environment"));
+        right.with_layout(Layout::right_to_left(Align::Min), |right| {
+            ComboBox::from_id_salt("tunnel_environment")
+                .selected_text(data.environment.get_str("Name").unwrap().to_owned())
+                .show_ui(right, |ui| {
+                    Environment::iter().for_each(|env| {
+                        ui.selectable_value(
+                            &mut data.environment,
+                            env,
+                            env.get_str("Name").unwrap(),
+                        );
+                    });
+                });
+        });
+    });
+
+    // Knot style
+    ui.columns_const(|[left, right]| {
+        left.add(Label::new("Knot style"));
+        right.with_layout(Layout::right_to_left(Align::Min), |right| {
+            ComboBox::from_id_salt("tunnel_knotstyle")
+                .selected_text(data.knot_style.get_str("Name").unwrap().to_owned())
+                .show_ui(right, |ui| {
+                    KnotStyleU8::iter().for_each(|knot_style| {
+                        ui.selectable_value(
+                            &mut data.knot_style,
+                            knot_style,
+                            knot_style.get_str("Name").unwrap(),
+                        );
+                    });
+                });
+        });
+    });
+
+    ui.separator();
+
     ScrollArea::vertical().show(ui, |ui| {
         if let Some(selection_index) = state.tunnels_mode.selected_point {
-            let selection = data.points[selection_index];
+            let selection = &data.points[selection_index];
             ui.horizontal(|ui| {
                 ui.add(
                     Label::new(format!(
                         "{selection_index}: ({}, {})",
-                        selection.x, selection.y
+                        selection.position.x, selection.position.y
                     ))
                     .selectable(false),
                 )

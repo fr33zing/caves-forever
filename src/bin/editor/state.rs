@@ -10,6 +10,7 @@ use std::{
 
 use anyhow::anyhow;
 use bevy::prelude::*;
+use mines::worldgen::asset::Tunnel;
 use nalgebra::Point2;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use strum::{EnumIter, EnumProperty};
@@ -44,29 +45,9 @@ pub enum EditorViewMode {
 // Tunnels mode
 //
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct TunnelProfile {
-    pub points: Vec<Point2<f32>>,
-}
-
-impl Default for TunnelProfile {
-    fn default() -> Self {
-        let n = 10;
-        let radius = 5.0;
-        let mut points = Vec::<Point2<f32>>::new();
-
-        for i in 0..n {
-            let radians = (i as f32 / n as f32) * PI * 2.0;
-            points.push(Point2::new(radians.sin(), -radians.cos()) * radius);
-        }
-
-        Self { points }
-    }
-}
-
 #[derive(Debug)]
 pub struct TunnelsModeState {
-    pub files: FilePickerState<TunnelProfile>,
+    pub files: FilePickerState<Tunnel>,
     pub mirror: bool,
     pub selected_point: Option<usize>,
     pub drag_start: Option<(Point2<f32>, Vec2)>,

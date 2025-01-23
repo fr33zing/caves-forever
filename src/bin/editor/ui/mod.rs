@@ -112,7 +112,7 @@ fn ui(
 
     // Right panel
     let right_panel_width = if side_panel_visibility.right {
-        200.0
+        230.0
     } else {
         0.0
     };
@@ -122,6 +122,7 @@ fn ui(
         SidePanel::right("selection_editor")
             .frame(right_frame)
             .default_width(right_panel_width)
+            .max_width(right_panel_width)
             .resizable(false)
             .show(ctx, |ui| {
                 match state.mode {
