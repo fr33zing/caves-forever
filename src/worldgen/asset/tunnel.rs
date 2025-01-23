@@ -2,6 +2,7 @@ use std::f32::consts::PI;
 
 use bevy::{
     asset::RenderAssetUsages,
+    math::Vec2,
     prelude::Mesh,
     render::mesh::{PrimitiveTopology, VertexAttributeValues},
 };
@@ -16,6 +17,11 @@ pub const TUNNEL_POINTS: usize = 12;
 
 const TUNNEL_DEFAULT_RADIUS: f32 = 5.0;
 const TUNNEL_DEFAULT_VARIANCE: f32 = 1.0;
+
+pub struct TunnelMeshInfo {
+    pub center: Vec2,
+    pub size: Vec2,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Default)]
 pub struct TunnelPoint {
@@ -73,5 +79,36 @@ impl Tunnel {
             Mesh::ATTRIBUTE_POSITION,
             VertexAttributeValues::Float32x3(vertices),
         )
+    }
+}
+
+impl TunnelMeshInfo {
+    pub const ZERO: Self = Self {
+        size: Vec2::ZERO,
+        center: Vec2::ZERO,
+    };
+
+    pub fn from_mesh(mesh: &Mesh) -> Self {
+        let mut min = Vec2::INFINITY;
+        let mut max = Vec2::NEG_INFINITY;
+
+        let Some(positions) = mesh.attribute(Mesh::ATTRIBUTE_POSITION) else {
+            return Self::ZERO;
+        };
+        let Some(positions) = positions.as_float3() else {
+            return Self::ZERO;
+        };
+
+        positions.iter().for_each(|p| {
+            min.x = min.x.min(p[0]);
+            min.y = min.y.min(p[2]);
+            max.x = max.x.max(p[0]);
+            max.y = max.y.max(p[2]);
+        });
+
+        let size = max - min;
+        let center = min + size / 2.0;
+
+        Self { size, center }
     }
 }

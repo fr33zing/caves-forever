@@ -2,7 +2,7 @@ use bevy::math::Vec3A;
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy_trackball::TrackballCamera;
 use egui::{Align, ComboBox, Label, Layout, RichText, ScrollArea, Ui};
-use mines::worldgen::asset::TunnelPoint;
+use mines::worldgen::asset::TunnelMeshInfo;
 use nalgebra::Point2;
 use strum::IntoEnumIterator;
 
@@ -15,7 +15,7 @@ use mines::{
     },
 };
 
-use super::ModeSpecific;
+use super::{EditorHandleGizmos, ModeSpecific};
 use crate::{
     state::{EditorMode, EditorState, EditorViewMode},
     ui::CursorOverEditSelectionPanel,
@@ -23,7 +23,7 @@ use crate::{
 };
 
 #[derive(Component)]
-pub struct ProfileMesh(Tunnel);
+pub struct TunnelInfo(Tunnel, TunnelMeshInfo);
 
 /// Hook: enter
 pub fn spawn_size_reference_labels(
@@ -79,7 +79,7 @@ pub fn spawn_size_reference_labels(
 }
 
 /// Hook: update
-pub fn draw_size_references(mut gizmos: Gizmos) {
+pub fn draw_size_references(mut gizmos: Gizmos, info: Option<Single<&TunnelInfo>>) {
     // Player
     gizmos.rounded_cuboid(
         Vec3::ZERO,
@@ -93,11 +93,33 @@ pub fn draw_size_references(mut gizmos: Gizmos) {
         Vec3::new(CHUNK_SIZE_F, 0.0, CHUNK_SIZE_F),
         Color::srgb(0.776, 0.294, 0.769),
     );
+
+    // Tunnel AABB
+    if let Some(info) = info {
+        let TunnelMeshInfo { center, size } = info.1;
+        let color = Color::srgba(1.0, 1.0, 1.0, 0.03);
+
+        gizmos.rounded_cuboid(
+            Vec3::new(center.x, 0.0, center.y),
+            Vec3::new(size.x, 0.0, size.y),
+            color,
+        );
+        gizmos.line(
+            Vec3::new(center.x, 0.0, center.y - size.y / 2.0),
+            Vec3::new(center.x, 0.0, center.y + size.y / 2.0),
+            color,
+        );
+        gizmos.line(
+            Vec3::new(center.x - size.x / 2.0, 0.0, center.y),
+            Vec3::new(center.x + size.x / 2.0, 0.0, center.y),
+            color,
+        );
+    }
 }
 
 /// Hook: update
 pub fn pick_profile_point(
-    mut gizmos: Gizmos,
+    mut gizmos: Gizmos<EditorHandleGizmos>,
     mut state: ResMut<EditorState>,
     window: Single<&Window, With<PrimaryWindow>>,
     camera: Single<(&Camera, &GlobalTransform), With<TrackballCamera>>,
@@ -165,6 +187,7 @@ pub fn pick_profile_point(
     }
 }
 
+// Hook: update
 pub fn drag_profile_point(
     mut state: ResMut<EditorState>,
     window: Single<&Window, With<PrimaryWindow>>,
@@ -208,12 +231,13 @@ pub fn drag_profile_point(
     current.points[mirror_point].position = point_new_pos;
 }
 
-pub fn update_profile_mesh(
+// Hook: update
+pub fn update_tunnel_info(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<LineMaterial>>,
     state: Res<EditorState>,
-    mesh: Option<Single<(Entity, &mut ProfileMesh)>>,
+    info: Option<Single<(Entity, &mut TunnelInfo)>>,
 ) {
     let current = state.tunnels_mode.files.current_data();
 
@@ -221,12 +245,15 @@ pub fn update_profile_mesh(
         return;
     };
 
-    let Some(profile) = mesh else {
-        let profile = ProfileMesh(current.clone());
-        let mesh = profile.0.to_mesh();
+    let Some(info) = info else {
+        let tunnel = current.clone();
+        let mesh = tunnel.to_mesh();
+        let mesh_info = TunnelMeshInfo::from_mesh(&mesh);
+        let model = TunnelInfo(tunnel, mesh_info);
+
         commands.spawn((
             ModeSpecific(EditorMode::Tunnels, None),
-            profile,
+            model,
             Mesh3d(meshes.add(mesh)),
             MeshMaterial3d(materials.add(LineMaterial {
                 color: Color::srgb(1.0, 1.0, 1.0),
@@ -237,16 +264,18 @@ pub fn update_profile_mesh(
         return;
     };
 
-    let (entity, mut profile) = profile.into_inner();
+    let (entity, mut info) = info.into_inner();
 
-    if *current == profile.0 {
+    if *current == info.0 {
         return;
     }
 
-    profile.0 = current.clone();
+    info.0 = current.clone();
+    let mesh = info.0.to_mesh();
+    info.1 = TunnelMeshInfo::from_mesh(&mesh);
 
     let mut commands = commands.entity(entity);
-    commands.insert(Mesh3d(meshes.add(profile.0.to_mesh())));
+    commands.insert(Mesh3d(meshes.add(mesh)));
 }
 
 //

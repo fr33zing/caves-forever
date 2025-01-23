@@ -30,10 +30,16 @@ struct ModeSwitcher {
 #[derive(Component)]
 pub struct ModeSpecific(pub EditorMode, pub Option<EditorViewMode>);
 
+/// These gizmos will render above the rest.
+#[derive(Default, Reflect, GizmoConfigGroup)]
+pub struct EditorHandleGizmos;
+
 pub struct EditorModesPlugin;
 
 impl Plugin for EditorModesPlugin {
     fn build(&self, app: &mut App) {
+        app.init_gizmo_group::<EditorHandleGizmos>();
+
         let world = app.world_mut();
         let camera_on_change_mode_system = world.register_system(camera::on_change_mode);
         let cleanup = world.register_system(cleanup);
@@ -52,16 +58,23 @@ impl Plugin for EditorModesPlugin {
 }
 
 pub fn setup(world: &mut World) {
+    world.resource_scope(|_, mut gizmos_config: Mut<GizmoConfigStore>| {
+        gizmos_config
+            .config_mut::<EditorHandleGizmos>()
+            .0
+            .depth_bias = -1.0;
+    });
+
     world.resource_scope(|world, mut switcher: Mut<ModeSwitcher>| {
         switcher.mode_systems.insert(
             EditorMode::Tunnels,
             ModeSystems {
                 enter: Some(world.register_system(tunnels::spawn_size_reference_labels)),
                 update: vec![
-                    world.register_system(tunnels::draw_size_references),
                     world.register_system(tunnels::pick_profile_point),
                     world.register_system(tunnels::drag_profile_point),
-                    world.register_system(tunnels::update_profile_mesh),
+                    world.register_system(tunnels::update_tunnel_info),
+                    world.register_system(tunnels::draw_size_references),
                 ],
                 ..default()
             },
