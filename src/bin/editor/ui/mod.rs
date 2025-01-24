@@ -222,6 +222,7 @@ fn ui(
                 .files
                 .save_current_file_with_name(save_as_dialog_state.filename.clone())
                 .unwrap();
+            save_as_dialog_state.filename.clear();
         }
     }
 }
