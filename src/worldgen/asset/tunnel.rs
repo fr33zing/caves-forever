@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use super::{Environment, Rarity};
 
 // All tunnel profiles must have this number of points.
-pub const TUNNEL_POINTS: usize = 12;
+pub const TUNNEL_POINTS: usize = 16;
 
 const TUNNEL_DEFAULT_RADIUS: f32 = 5.0;
 const TUNNEL_DEFAULT_VARIANCE: f32 = 1.0;
