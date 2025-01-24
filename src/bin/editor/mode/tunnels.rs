@@ -142,6 +142,7 @@ pub fn pick_profile_point(
         panic!("pick_profile_point ran in the wrong mode");
     };
 
+    let len = data.points.len();
     data.points.iter().enumerate().for_each(|(i, p)| {
         let isometry = Isometry3d {
             rotation: Quat::from_euler(EulerRot::XYZ, -90.0_f32.to_radians(), 0.0, 0.0),
@@ -173,8 +174,12 @@ pub fn pick_profile_point(
                 color = Color::srgb(0.0, 1.0, 1.0);
             }
         }
+
         gizmos.circle(isometry, radius, color);
         gizmos.circle(isometry, radius * 0.2, color);
+        if i == 0 || i == len / 2 {
+            gizmos.circle(isometry, radius * 0.4, color);
+        }
     });
 
     if mouse.just_pressed(MouseButton::Left) {
@@ -220,27 +225,20 @@ pub fn drag_profile_point(
     let cursor_diff = cursor - cursor_start;
     let point_new_pos = Point2::new(point_start.x + cursor_diff.x, point_start.y + cursor_diff.y);
 
-    'change: {
-        data.points[drag_point].position = point_new_pos;
-        let len = data.points.len();
+    data.points[drag_point].position = point_new_pos;
+    let len = data.points.len();
 
-        if !mirror {
-            break 'change;
-        }
-
-        let mut point_new_pos = Point2::new(
-            -point_start.x - cursor_diff.x,
-            point_start.y + cursor_diff.y,
-        );
-        if drag_point == 0 || drag_point == len / 2 {
-            point_new_pos.x = 0.0;
-        }
-
-        let mirror_point = (len - drag_point) % len;
-        data.points[mirror_point].position = point_new_pos;
+    if !mirror || drag_point == 0 || drag_point == len / 2 {
+        return;
     }
 
-    state.files.current_file_mut().unwrap().changed = true;
+    let point_new_pos = Point2::new(
+        -point_start.x - cursor_diff.x,
+        point_start.y + cursor_diff.y,
+    );
+
+    let mirror_point = (len - drag_point) % len;
+    data.points[mirror_point].position = point_new_pos;
 }
 
 // Hook: update
