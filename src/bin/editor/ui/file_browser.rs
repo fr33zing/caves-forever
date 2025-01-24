@@ -30,7 +30,14 @@ pub fn file_browser(state: &mut EditorState, ui: &mut Ui) {
 
         // TODO This is gonna be slow. Sorry.
         let mut sorted = state.files.files.iter().enumerate().collect::<Vec<_>>();
-        sorted.sort_by_key(|(_, file)| (file.changed, file.modified_time));
+        sorted.sort_by_key(|(_, file)| {
+            (
+                file.path.is_none(),
+                -(file.mode as i16),
+                file.changed,
+                file.modified_time,
+            )
+        });
         sorted.reverse();
 
         let mut row_i = 0; // For alternative bg colors
