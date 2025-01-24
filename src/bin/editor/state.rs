@@ -99,7 +99,7 @@ impl Default for TunnelsModeState {
 // Rooms mode
 //
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Room {}
 
 impl Default for Room {
@@ -121,7 +121,7 @@ impl Default for RoomsModeState {
 // File picker state
 //
 
-#[derive(Serialize, Deserialize, strum_macros::Display, Debug, Clone)]
+#[derive(Serialize, Deserialize, strum_macros::Display, Debug, Clone, PartialEq)]
 pub enum FilePayload {
     Tunnel(Tunnel),
     Room(Room),
@@ -218,6 +218,7 @@ impl FilePickerState {
                 mode,
                 changed: true,
                 data: Some(FilePayload::default_for_mode(mode)),
+                last_saved_data: Some(FilePayload::default_for_mode(mode)),
                 modified_time: SystemTime::now(),
             },
         );
@@ -302,6 +303,7 @@ impl FilePickerState {
                         path: Some(f.path().clone()),
                         changed: false,
                         data: None,
+                        last_saved_data: None,
                         modified_time,
                     })
                 }
@@ -323,23 +325,12 @@ pub struct FileState {
     pub path: Option<PathBuf>,
     /// If data is None, it's because the file isn't loaded, not because it's empty.
     pub data: Option<FilePayload>,
+    pub last_saved_data: Option<FilePayload>,
     pub mode: EditorMode,
+    // Don't touch this, it's automatically updated by EditorModesPlugin.
     pub changed: bool,
     /// Only tracks the modified time according to the file metadata.
     pub modified_time: SystemTime,
-}
-
-impl FileState {
-    fn default_for_mode(mode: EditorMode) -> Self {
-        Self {
-            mode,
-            data: Some(FilePayload::default_for_mode(mode)),
-            name: Default::default(),
-            path: Default::default(),
-            changed: Default::default(),
-            modified_time: SystemTime::now(),
-        }
-    }
 }
 
 impl FileState {
@@ -353,7 +344,7 @@ impl FileState {
         file.read_to_string(&mut s)?;
 
         self.data = Some(ron::from_str(&s)?);
-        self.changed = false;
+        self.last_saved_data = self.data.clone();
 
         Ok(())
     }
@@ -371,7 +362,7 @@ impl FileState {
         file.write_all(s.as_bytes())?;
 
         self.modified_time = SystemTime::now();
-        self.changed = false;
+        self.last_saved_data = self.data.clone();
 
         Ok(())
     }

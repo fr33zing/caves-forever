@@ -352,13 +352,18 @@ pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
                 .selected_text(format!("{}", data.environment))
                 .show_ui(right, |ui| {
                     Environment::iter().for_each(|env| {
-                        ui.selectable_value(&mut data.environment, env, format!("{env}"));
+                        if ui
+                            .selectable_value(&mut data.environment, env, format!("{env}"))
+                            .clicked()
+                        {
+                            //file.changed = true;
+                        };
                     });
                 });
         });
     });
 
-    // Knot style
+    // Rarity
     ui.columns_const(|[left, right]| {
         left.add(Label::new("Rarity").selectable(false));
         right.with_layout(Layout::right_to_left(Align::Min), |right| {
@@ -366,7 +371,12 @@ pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
                 .selected_text(format!("{}", data.rarity))
                 .show_ui(right, |ui| {
                     Rarity::iter().for_each(|rarity| {
-                        ui.selectable_value(&mut data.rarity, rarity, format!("{rarity}"));
+                        if ui
+                            .selectable_value(&mut data.rarity, rarity, format!("{rarity}"))
+                            .clicked()
+                        {
+                            //file.changed = true;
+                        };
                     });
                 });
         });

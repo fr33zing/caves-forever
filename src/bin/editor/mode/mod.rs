@@ -23,8 +23,9 @@ struct ModeSwitcher {
     pub prev_mode: Option<EditorMode>,
     pub prev_view: Option<EditorViewMode>,
     pub mode_systems: HashMap<EditorMode, ModeSystems>,
-    pub cleanup: SystemId,
+    pub cleanup_system: SystemId,
     pub camera_on_change_mode_system: SystemId,
+    pub update_files_changed_status_system: SystemId,
 }
 
 #[derive(Component)]
@@ -42,14 +43,16 @@ impl Plugin for EditorModesPlugin {
 
         let world = app.world_mut();
         let camera_on_change_mode_system = world.register_system(camera::on_change_mode);
-        let cleanup = world.register_system(cleanup);
+        let cleanup_system = world.register_system(cleanup);
+        let update_files_changed_status_system = world.register_system(update_files_changed_status);
 
         app.insert_resource(ModeSwitcher {
             prev_mode: default(),
             prev_view: default(),
             mode_systems: default(),
-            cleanup,
+            cleanup_system,
             camera_on_change_mode_system,
+            update_files_changed_status_system,
         });
 
         app.add_systems(Startup, (camera::setup, setup).chain());
@@ -138,8 +141,10 @@ fn switch_modes(world: &mut World) {
 
         if changed_mode || changed_view {
             systems.push(Some(switcher.camera_on_change_mode_system));
-            systems.push(Some(switcher.cleanup));
+            systems.push(Some(switcher.cleanup_system));
         }
+
+        systems.push(Some(switcher.update_files_changed_status_system));
 
         systems
             .into_iter()
@@ -163,5 +168,15 @@ fn update_curr_mode(world: &mut World) {
             .update
             .iter()
             .for_each(|s| world.run_system(s.clone()).unwrap());
+    });
+}
+
+fn update_files_changed_status(world: &mut World) {
+    world.resource_scope(|_, mut state: Mut<EditorState>| {
+        state
+            .files
+            .files
+            .iter_mut()
+            .for_each(|f| f.changed = f.data != f.last_saved_data);
     });
 }
