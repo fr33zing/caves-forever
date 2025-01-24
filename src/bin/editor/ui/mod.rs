@@ -176,16 +176,18 @@ fn ui(
         .resizable(false)
         .collapsible(false)
         .open(&mut dialogs.show_save_as_dialog)
-        .show(ctx, |ui| {
-            save_as_dialog(&mut state, &mut save_as_dialog_state, ui)
-        });
+        .show(ctx, |ui| save_as_dialog(&mut save_as_dialog_state, ui));
     if let Some(inner) = save_as_result {
         if let Some((close, save)) = inner.inner {
             if close {
                 dialogs.show_save_as_dialog = false;
             }
             if save {
-                save_current(&mut state, &mut dialogs).unwrap();
+                if let Some(picker) = state.file_picker_mut() {
+                    picker
+                        .save_current_file_with_name(save_as_dialog_state.filename.clone())
+                        .unwrap();
+                }
             }
         }
     }
@@ -217,14 +219,12 @@ fn top_panel(
 
         if let Some(picker) = state.file_picker() {
             let current = picker.current_file();
-            if let Some(current) = current {
-                ui.add(Label::new(current.name.clone()).selectable(false));
-                if current.changed {
-                    icons::changed_default(ui);
-                }
-
-                ui.separator();
+            ui.add(Label::new(current.name.clone()).selectable(false));
+            if current.changed {
+                icons::changed_default(ui);
             }
+
+            ui.separator();
         }
 
         // Mode switcher
@@ -257,7 +257,10 @@ fn top_panel(
 }
 
 fn file_menu(state: &mut EditorState, dialogs: &mut EditorDialogs, ui: &mut Ui) {
-    if ui.selectable_label(false, "New").clicked() {};
+    if ui.selectable_label(false, "New").clicked() {
+        ui.close_menu();
+        state.file_picker_mut().unwrap().create_new_file();
+    };
     if ui.selectable_label(false, "Duplicate").clicked() {};
     if ui.selectable_label(false, "Delete").clicked() {};
 
@@ -266,11 +269,11 @@ fn file_menu(state: &mut EditorState, dialogs: &mut EditorDialogs, ui: &mut Ui) 
     if ui.selectable_label(false, "Save").clicked() {
         ui.close_menu();
         // TODO handle this
-        save_current(state, dialogs).expect("save failed");
+        save_current_file(state, dialogs).expect("save failed");
     };
     if ui.selectable_label(false, "Save as...").clicked() {
         ui.close_menu();
-        save_as(dialogs);
+        open_save_as_dialog(dialogs);
     };
     if ui.selectable_label(false, "Save all").clicked() {};
 }
@@ -362,27 +365,22 @@ fn viewport_menu(
 //
 
 /// Save the current file OR open the "save as" dialog if it has no path
-pub fn save_current(state: &mut EditorState, dialogs: &mut EditorDialogs) -> anyhow::Result<()> {
+pub fn save_current_file(
+    state: &mut EditorState,
+    dialogs: &mut EditorDialogs,
+) -> anyhow::Result<()> {
     let Some(picker) = state.file_picker_mut() else {
         return Err(anyhow!("current mode has no file picker"));
     };
-    let path = match picker.current {
-        Some(ref path) => path.clone(),
-        None => {
-            save_as(dialogs);
-            return Ok(());
-        }
-    };
-    let Some(file) = picker.current_file_mut() else {
-        return Err(anyhow!("no current file"));
-    };
 
-    file.write(path.to_path_buf())?;
+    if !picker.save_current_file()? {
+        open_save_as_dialog(dialogs);
+    }
 
     Ok(())
 }
 
 // Open the "save as" dialog
-pub fn save_as(dialogs: &mut EditorDialogs) {
+pub fn open_save_as_dialog(dialogs: &mut EditorDialogs) {
     dialogs.show_save_as_dialog = true;
 }

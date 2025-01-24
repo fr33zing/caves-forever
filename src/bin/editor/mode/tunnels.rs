@@ -233,10 +233,7 @@ pub fn drag_profile_point(
         data.points[mirror_point].position = point_new_pos;
     }
 
-    let file = state.tunnels_mode.files.current_file_mut();
-    if let Some(file) = file {
-        file.changed = true;
-    };
+    state.tunnels_mode.files.current_file_mut().changed = true;
 }
 
 // Hook: update
@@ -320,7 +317,7 @@ pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
 
 pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
     let picker = &mut state.tunnels_mode.files;
-    let Some(file) = picker.files.get_mut(&picker.current) else {
+    let Some(file) = picker.files.get_mut(picker.current) else {
         return;
     };
     let Some(ref mut data) = file.data else {

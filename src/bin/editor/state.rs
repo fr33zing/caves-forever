@@ -99,55 +99,61 @@ where
     T: Serialize + DeserializeOwned + Default + Clone,
 {
     pub directory: PathBuf,
-    pub files: HashMap<Option<PathBuf>, FileState<T>>,
+    pub files: Vec<FileState<T>>,
     pub filter: String,
-    pub current: Option<PathBuf>,
+    pub current: usize,
 }
 
 impl<T> FilePickerState<T>
 where
     T: Serialize + DeserializeOwned + Default + Clone,
 {
-    pub fn current_file(&self) -> Option<&FileState<T>> {
-        self.files.get(&self.current)
+    pub fn current_file(&self) -> &FileState<T> {
+        self.files
+            .get(self.current)
+            .expect("current file does not exist")
     }
 
-    pub fn current_file_mut(&mut self) -> Option<&mut FileState<T>> {
-        self.files.get_mut(&self.current)
+    pub fn current_file_mut(&mut self) -> &mut FileState<T> {
+        self.files
+            .get_mut(self.current)
+            .expect("current file does not exist")
     }
 
     pub fn current_data(&self) -> &Option<T> {
-        let Some(file) = self.current_file() else {
-            return &None;
-        };
-        &file.data
+        &self.current_file().data
     }
 
     pub fn current_data_mut(&mut self) -> Option<&mut T> {
-        let Some(file) = self.current_file_mut() else {
-            return None;
-        };
-        let Some(ref mut data) = file.data else {
+        let Some(ref mut data) = self.current_file_mut().data else {
             return None;
         };
         Some(data)
     }
 
-    pub fn open(&mut self, path: Option<PathBuf>) -> anyhow::Result<()> {
-        let file = self
-            .files
-            .get_mut(&path)
-            .ok_or_else(|| anyhow!("file does not exist"))?;
-
-        if file.data.is_none() {
-            if let Some(path) = path.clone() {
-                file.read(path.clone())?;
-            } else {
-                self.files.insert(None, Default::default());
-            }
+    pub fn switch_to_file(&mut self, index: usize) -> anyhow::Result<()> {
+        let current_file = self.current_file_mut();
+        if !current_file.changed {
+            current_file.data = None;
         }
 
-        self.current = path.clone();
+        let file = self
+            .files
+            .get_mut(index)
+            .ok_or_else(|| anyhow!("file does not exist"))?;
+
+        if file.data.is_some() {
+            self.current = index;
+            return Ok(());
+        }
+
+        if let Some(path) = file.path.clone() {
+            file.read(path.clone())?;
+            self.current = index;
+        } else {
+            self.files.insert(0, Default::default());
+            self.current = 0;
+        }
 
         Ok(())
     }
@@ -157,42 +163,103 @@ impl<T> FilePickerState<T>
 where
     T: Serialize + DeserializeOwned + Default + Clone,
 {
+    fn new_file_name(index: usize) -> String {
+        format!("* untitled{index} *")
+    }
+
+    fn next_new_file_name(&self) -> String {
+        let index = self.files.iter().filter(|file| file.path.is_none()).count();
+        Self::new_file_name(index)
+    }
+
+    pub fn create_new_file(&mut self) {
+        self.files.insert(
+            0,
+            FileState {
+                name: self.next_new_file_name(),
+                path: None,
+                changed: true,
+                data: Some(T::default()),
+                modified_time: SystemTime::now(),
+            },
+        );
+        self.current = 0;
+    }
+
+    /// Returns false if the current file needs a path before it can
+    /// be saved. UI should handle this by opening the "save as" dialog.
+    pub fn save_current_file(&mut self) -> anyhow::Result<bool> {
+        let file = self.current_file_mut();
+        if file.path.is_none() {
+            return Ok(false);
+        }
+        file.write()?;
+
+        Ok(true)
+    }
+
+    pub fn save_current_file_with_name(&mut self, name: String) -> anyhow::Result<()> {
+        let path = PathBuf::from_str(&name).unwrap();
+        let path = self.directory.clone().join(path);
+        let is_new_file = self.current_file().path.is_none();
+
+        let mut file = if is_new_file {
+            let mut file = self.files.remove(self.current);
+            file.changed = false;
+
+            file
+        } else {
+            let old_file = self.current_file_mut();
+            old_file.changed = false;
+            let new_file = old_file.clone();
+            old_file.data = None;
+
+            new_file
+        };
+
+        file.path = Some(path);
+        file.name = name.clone();
+        file.write()?;
+        self.files.insert(0, file);
+        self.current = 0;
+
+        Ok(())
+    }
+
     pub fn from_directory(directory: &str) -> Self {
         // TODO move this elsewhere
         let directory = PathBuf::from_str(directory).unwrap();
-        let mut files: HashMap<Option<PathBuf>, FileState<T>> =
-            std::fs::read_dir(directory.clone())
-                .unwrap()
-                .filter_map(|f| {
-                    let f = f.unwrap();
-                    let name = f.file_name().into_string().unwrap();
-                    let modified_time = if let Ok(metadata) = f.metadata() {
-                        metadata.modified().unwrap_or(SystemTime::now())
-                    } else {
-                        SystemTime::now()
-                    };
+        let mut files: Vec<FileState<T>> = std::fs::read_dir(directory.clone())
+            .unwrap()
+            .filter_map(|f| {
+                let f = f.unwrap();
+                let name = f.file_name().into_string().unwrap();
+                let modified_time = if let Ok(metadata) = f.metadata() {
+                    metadata.modified().unwrap_or(SystemTime::now())
+                } else {
+                    SystemTime::now()
+                };
 
-                    if name.starts_with(".") {
-                        None
-                    } else {
-                        Some((
-                            Some(f.path().clone()),
-                            FileState {
-                                name,
-                                changed: false,
-                                data: None,
-                                modified_time,
-                            },
-                        ))
-                    }
-                })
-                .collect();
+                if name.starts_with(".") {
+                    None
+                } else {
+                    Some(FileState {
+                        name,
+                        path: Some(f.path().clone()),
+                        changed: false,
+                        data: None,
+                        modified_time,
+                    })
+                }
+            })
+            .collect();
 
         files.insert(
-            None,
+            0,
             FileState {
-                name: "*untitled*".into(),
-                changed: false,
+                name: Self::new_file_name(0),
+                path: None,
+                changed: true,
                 data: Some(T::default()),
                 modified_time: SystemTime::now(),
             },
@@ -202,7 +269,7 @@ where
             files,
             directory,
             filter: String::new(),
-            current: None,
+            current: 0,
         }
     }
 }
@@ -213,8 +280,9 @@ where
     T: Serialize + DeserializeOwned + Default + Clone,
 {
     pub name: String,
-    pub changed: bool,
+    pub path: Option<PathBuf>,
     pub data: Option<T>,
+    pub changed: bool,
     /// Only tracks the modified time according to the file metadata
     pub modified_time: SystemTime,
 }
@@ -226,8 +294,9 @@ where
     fn default() -> Self {
         Self {
             name: Default::default(),
-            changed: Default::default(),
+            path: Default::default(),
             data: Default::default(),
+            changed: Default::default(),
             modified_time: SystemTime::now(),
         }
     }
@@ -252,9 +321,12 @@ where
         Ok(())
     }
 
-    pub fn write(&mut self, path: PathBuf) -> anyhow::Result<()> {
+    pub fn write(&mut self) -> anyhow::Result<()> {
         let Some(ref data) = self.data else {
             return Err(anyhow!("tried to write empty file"));
+        };
+        let Some(ref path) = self.path else {
+            return Err(anyhow!("tried to save file with no path"));
         };
 
         let s = ron::to_string(&data)?;

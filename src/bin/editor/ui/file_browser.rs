@@ -30,17 +30,17 @@ pub fn file_browser(state: &mut EditorState, ui: &mut Ui) {
             return;
         };
 
-        let current = picker.current.clone();
+        let current = picker.current;
         let filter = picker.filter.trim();
-        let mut path_to_open: Option<Option<PathBuf>> = None;
+        let mut index_to_open: Option<usize> = None;
 
         // TODO This is gonna be slow. Sorry.
-        let mut sorted = picker.files.iter().collect::<Vec<_>>();
-        sorted.sort_by_key(|a| a.1.modified_time);
+        let mut sorted = picker.files.iter().enumerate().collect::<Vec<_>>();
+        sorted.sort_by_key(|(_, file)| (file.changed, file.modified_time));
         sorted.reverse();
 
-        let mut i = 0;
-        for (path, file) in sorted.into_iter() {
+        let mut row_i = 0; // For alternative bg colors
+        for (file_i, file) in sorted.into_iter() {
             if !filter.is_empty() && !file.name.contains(filter) {
                 continue;
             }
@@ -48,9 +48,9 @@ pub fn file_browser(state: &mut EditorState, ui: &mut Ui) {
             let response = ui
                 .scope_builder(UiBuilder::new().sense(Sense::click()), |ui| {
                     let response = ui.response();
-                    let is_current_file = *path == current;
+                    let is_current_file = file_i == current;
 
-                    let bg_fill = if i % 2 == 0 {
+                    let bg_fill = if row_i % 2 == 0 {
                         Color32::TRANSPARENT
                     } else {
                         Color32::from_gray(35)
@@ -87,30 +87,22 @@ pub fn file_browser(state: &mut EditorState, ui: &mut Ui) {
                 })
                 .response;
 
-            if response.double_clicked() {
-                path_to_open = Some(path.clone());
+            if response.clicked() {
+                index_to_open = Some(file_i);
             }
 
-            i += 1;
+            row_i += 1;
         }
 
-        if let Some(path) = path_to_open {
-            picker.open(path).unwrap(); // TODO handle this
+        if let Some(i) = index_to_open {
+            picker.switch_to_file(i).unwrap(); // TODO handle this
         }
     });
 }
 
-pub fn save_as_dialog(
-    state: &mut EditorState,
-    dialog: &mut SaveAsDialogState,
-    ui: &mut Ui,
-) -> (bool, bool) {
+pub fn save_as_dialog(dialog: &mut SaveAsDialogState, ui: &mut Ui) -> (bool, bool) {
     let mut close_dialog = false;
     let mut write_file = false;
-
-    let Some(picker) = state.file_picker_mut() else {
-        return (close_dialog, write_file);
-    };
 
     ui.style_mut().spacing.item_spacing.y = 8.0;
 
@@ -122,24 +114,6 @@ pub fn save_as_dialog(
     ui.with_layout(Layout::right_to_left(Align::Min), |ui| {
         let save_button = ui.add(Button::new("Save").fill(Color32::from_rgb(45, 100, 45)));
         if save_button.clicked() {
-            let path = PathBuf::from_str(&dialog.filename).unwrap();
-            let path = picker.directory.clone().join(path);
-            let new_file = picker.current.is_none();
-
-            let mut file = if new_file {
-                picker.files.remove(&None).unwrap()
-            } else {
-                let file = picker.current_file_mut().unwrap();
-                file.changed = false;
-
-                file.clone()
-            };
-
-            file.name = dialog.filename.clone();
-            dialog.filename = String::new();
-            picker.current = Some(path.clone());
-            picker.files.insert(Some(path), file);
-
             write_file = true;
             close_dialog = true;
             return;
