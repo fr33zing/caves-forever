@@ -250,16 +250,8 @@ fn top_panel(
         ui.separator();
 
         match state.mode {
-            EditorMode::Tunnels => match state.view {
-                EditorViewMode::Editor => {
-                    ui.checkbox(&mut state.tunnels_mode.mirror, "Mirror");
-                }
-                EditorViewMode::Preview => {}
-            },
-            EditorMode::Rooms => match state.view {
-                EditorViewMode::Editor => {}
-                EditorViewMode::Preview => {}
-            },
+            EditorMode::Tunnels => tunnels::topbar(state, ui),
+            EditorMode::Rooms => {}
         }
     });
 }

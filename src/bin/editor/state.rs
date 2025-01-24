@@ -132,6 +132,25 @@ where
         };
         Some(data)
     }
+
+    pub fn open(&mut self, path: Option<PathBuf>) -> anyhow::Result<()> {
+        let file = self
+            .files
+            .get_mut(&path)
+            .ok_or_else(|| anyhow!("file does not exist"))?;
+
+        if file.data.is_none() {
+            if let Some(path) = path.clone() {
+                file.read(path.clone())?;
+            } else {
+                self.files.insert(None, Default::default());
+            }
+        }
+
+        self.current = path.clone();
+
+        Ok(())
+    }
 }
 
 impl<T> FilePickerState<T>
@@ -173,7 +192,7 @@ where
             None,
             FileState {
                 name: "*untitled*".into(),
-                changed: true,
+                changed: false,
                 data: Some(T::default()),
                 modified_time: SystemTime::now(),
             },
@@ -227,7 +246,7 @@ where
         let mut s = String::new();
         file.read_to_string(&mut s)?;
 
-        self.data = ron::from_str(&s)?;
+        self.data = Some(ron::from_str(&s)?);
         self.changed = false;
 
         Ok(())

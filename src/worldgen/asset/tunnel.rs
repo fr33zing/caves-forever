@@ -80,6 +80,14 @@ impl Tunnel {
             VertexAttributeValues::Float32x3(vertices),
         )
     }
+
+    pub fn center(&mut self) {
+        let info = TunnelMeshInfo::from_mesh(&self.to_mesh());
+        for point in self.points.iter_mut() {
+            point.position.x -= info.center.x;
+            point.position.y -= info.center.y;
+        }
+    }
 }
 
 impl TunnelMeshInfo {

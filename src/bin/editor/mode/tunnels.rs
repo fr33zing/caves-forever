@@ -1,7 +1,7 @@
 use bevy::math::Vec3A;
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy_trackball::TrackballCamera;
-use egui::{Align, ComboBox, Label, Layout, RichText, ScrollArea, Ui};
+use egui::{menu, Align, ComboBox, Frame, Label, Layout, RichText, ScrollArea, Ui};
 use mines::worldgen::asset::TunnelMeshInfo;
 use nalgebra::Point2;
 use strum::IntoEnumIterator;
@@ -204,31 +204,39 @@ pub fn drag_profile_point(
     };
 
     let mirror = state.tunnels_mode.mirror;
-    let current = state.tunnels_mode.files.current_data_mut();
+    let data = state.tunnels_mode.files.current_data_mut();
 
-    let Some(current) = current else {
+    let Some(data) = data else {
         return;
     };
 
     let cursor_diff = cursor - cursor_start;
     let point_new_pos = Point2::new(point_start.x + cursor_diff.x, point_start.y + cursor_diff.y);
-    current.points[drag_point].position = point_new_pos;
 
-    let len = current.points.len();
-    if !mirror {
-        return;
+    'change: {
+        data.points[drag_point].position = point_new_pos;
+        let len = data.points.len();
+
+        if !mirror {
+            break 'change;
+        }
+
+        let mut point_new_pos = Point2::new(
+            -point_start.x - cursor_diff.x,
+            point_start.y + cursor_diff.y,
+        );
+        if drag_point == 0 || drag_point == len / 2 {
+            point_new_pos.x = 0.0;
+        }
+
+        let mirror_point = (len - drag_point) % len;
+        data.points[mirror_point].position = point_new_pos;
     }
 
-    let mut point_new_pos = Point2::new(
-        -point_start.x - cursor_diff.x,
-        point_start.y + cursor_diff.y,
-    );
-    if drag_point == 0 || drag_point == len / 2 {
-        point_new_pos.x = 0.0;
-    }
-
-    let mirror_point = (len - drag_point) % len;
-    current.points[mirror_point].position = point_new_pos;
+    let file = state.tunnels_mode.files.current_file_mut();
+    if let Some(file) = file {
+        file.changed = true;
+    };
 }
 
 // Hook: update
@@ -279,8 +287,36 @@ pub fn update_tunnel_info(
 }
 
 //
-// Sidebar
+// UI
 //
+
+pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
+    let Some(data) = state.tunnels_mode.files.current_data_mut() else {
+        return;
+    };
+
+    match state.view {
+        EditorViewMode::Editor => {
+            Frame::none().show(ui, |ui| {
+                ui.shrink_width_to_current();
+                menu::bar(ui, |ui| {
+                    ui.menu_button("Operations", |ui| {
+                        if ui
+                            .selectable_label(false, "Center on world origin")
+                            .clicked()
+                        {
+                            ui.close_menu();
+                            data.center();
+                        };
+                    });
+                });
+            });
+
+            ui.checkbox(&mut state.tunnels_mode.mirror, "Mirror");
+        }
+        EditorViewMode::Preview => {}
+    }
+}
 
 pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
     let picker = &mut state.tunnels_mode.files;

@@ -1,8 +1,8 @@
 use std::{path::PathBuf, str::FromStr};
 
 use egui::{
-    Align, Button, Color32, Frame, Label, Layout, Margin, Rounding, ScrollArea, Sense, Stroke, Ui,
-    UiBuilder,
+    Align, Button, Color32, Frame, Label, Layout, Margin, RichText, Rounding, ScrollArea, Sense,
+    Stroke, Ui, UiBuilder,
 };
 
 use crate::state::EditorState;
@@ -26,11 +26,13 @@ pub fn file_browser(state: &mut EditorState, ui: &mut Ui) {
     ScrollArea::vertical().show(ui, |ui| {
         ui.style_mut().spacing.item_spacing.y = 0.0;
 
-        let Some(picker) = state.file_picker() else {
+        let Some(picker) = state.file_picker_mut() else {
             return;
         };
 
+        let current = picker.current.clone();
         let filter = picker.filter.trim();
+        let mut path_to_open: Option<Option<PathBuf>> = None;
 
         // TODO This is gonna be slow. Sorry.
         let mut sorted = picker.files.iter().collect::<Vec<_>>();
@@ -39,9 +41,6 @@ pub fn file_browser(state: &mut EditorState, ui: &mut Ui) {
 
         let mut i = 0;
         for (path, file) in sorted.into_iter() {
-            if path.is_none() {
-                continue;
-            }
             if !filter.is_empty() && !file.name.contains(filter) {
                 continue;
             }
@@ -49,6 +48,7 @@ pub fn file_browser(state: &mut EditorState, ui: &mut Ui) {
             let response = ui
                 .scope_builder(UiBuilder::new().sense(Sense::click()), |ui| {
                     let response = ui.response();
+                    let is_current_file = *path == current;
 
                     let bg_fill = if i % 2 == 0 {
                         Color32::TRANSPARENT
@@ -72,7 +72,12 @@ pub fn file_browser(state: &mut EditorState, ui: &mut Ui) {
                         .show(ui, |ui| {
                             ui.set_width(ui.available_width());
                             ui.horizontal_wrapped(|ui| {
-                                ui.add(Label::new(file.name.clone()).selectable(false));
+                                let mut filename = RichText::new(file.name.clone());
+                                if is_current_file {
+                                    filename = filename.color(Color32::from_rgb(50, 200, 200));
+                                }
+
+                                ui.add(Label::new(filename).selectable(false));
                                 ui.add_space(ui.available_size_before_wrap().x - 8.0);
                                 if file.changed {
                                     icons::changed_default(ui);
@@ -82,11 +87,15 @@ pub fn file_browser(state: &mut EditorState, ui: &mut Ui) {
                 })
                 .response;
 
-            if response.clicked() {
-                println!("clicked {i}");
+            if response.double_clicked() {
+                path_to_open = Some(path.clone());
             }
 
             i += 1;
+        }
+
+        if let Some(path) = path_to_open {
+            picker.open(path).unwrap(); // TODO handle this
         }
     });
 }
