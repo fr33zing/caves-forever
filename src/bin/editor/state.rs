@@ -149,6 +149,7 @@ pub struct FilePickerState {
     pub directory: PathBuf,
     pub files: Vec<FileState>,
     pub filter: String,
+    pub filter_mode: Option<EditorMode>,
     pub current: Option<usize>,
 }
 
@@ -307,6 +308,7 @@ impl FilePickerState {
             files,
             directory,
             filter: String::new(),
+            filter_mode: None,
             current: None,
         }
     }

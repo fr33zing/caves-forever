@@ -1,24 +1,48 @@
 use egui::{
-    Align, Align2, Area, Button, Color32, Context, Frame, Id, Label, Layout, Margin, RichText,
-    Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui, UiBuilder, Vec2,
+    Align, Align2, Area, Button, Color32, ComboBox, Context, Frame, Id, Label, Layout, Margin,
+    RichText, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui, UiBuilder, Vec2,
 };
+use strum::IntoEnumIterator;
 
-use crate::state::EditorState;
+use crate::state::{EditorMode, EditorState};
 
 use super::{icons, SaveAsDialogState};
 
 pub fn file_browser(state: &mut EditorState, ui: &mut Ui) {
-    ui.style_mut().spacing.item_spacing.y = 0.0;
-
     Frame::none()
         .inner_margin(Margin::same(8.0))
         .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.add(Label::new("Filter:").selectable(false));
-                ui.text_edit_singleline(&mut state.files.filter);
+            ui.style_mut().spacing.item_spacing.y = 8.0;
+
+            ui.columns_const(|[left, right]| {
+                left.add(Label::new("Filter by name:").selectable(false));
+                right.text_edit_singleline(&mut state.files.filter);
+            });
+
+            ui.columns_const(|[left, right]| {
+                left.add(Label::new("Filter by mode:").selectable(false));
+                let mut filter_mode_text = "All".to_owned();
+                if let Some(mode) = state.files.filter_mode {
+                    filter_mode_text = mode.to_string();
+                }
+
+                ComboBox::from_id_salt("filter_mode")
+                    .selected_text(filter_mode_text)
+                    .show_ui(right, |ui| {
+                        ui.selectable_value(&mut state.files.filter_mode, None, "All");
+
+                        EditorMode::iter().for_each(|mode| {
+                            ui.selectable_value(
+                                &mut state.files.filter_mode,
+                                Some(mode),
+                                mode.to_string(),
+                            );
+                        });
+                    });
             });
         });
 
+    ui.style_mut().spacing.item_spacing.y = 0.0;
     ui.separator();
 
     ScrollArea::vertical().show(ui, |ui| {
@@ -26,6 +50,7 @@ pub fn file_browser(state: &mut EditorState, ui: &mut Ui) {
 
         let current = state.files.current;
         let filter = state.files.filter.trim();
+        let filter_mode = state.files.filter_mode;
         let mut index_to_open: Option<usize> = None;
 
         // TODO This is gonna be slow. Sorry.
@@ -44,6 +69,11 @@ pub fn file_browser(state: &mut EditorState, ui: &mut Ui) {
         for (file_i, file) in sorted.into_iter() {
             if !filter.is_empty() && !file.name.contains(filter) {
                 continue;
+            }
+            if let Some(filter_mode) = filter_mode {
+                if file.mode != filter_mode {
+                    continue;
+                };
             }
 
             let response = ui
