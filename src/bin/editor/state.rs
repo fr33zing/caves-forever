@@ -253,13 +253,9 @@ impl FilePickerState {
         let is_new_file = current_file.path.is_none();
 
         let mut file = if is_new_file {
-            let mut file = self.files.remove(current_file_index);
-            file.changed = false;
-
-            file
+            self.files.remove(current_file_index)
         } else {
             let old_file = self.current_file_mut().unwrap();
-            old_file.changed = false;
             let new_file = old_file.clone();
             old_file.data = None;
 
