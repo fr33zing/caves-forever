@@ -171,7 +171,7 @@ impl FilePickerState {
 
     pub fn switch_to_file(&mut self, index: usize) -> anyhow::Result<()> {
         if let Some(current_file) = self.current_file_mut() {
-            if !current_file.changed {
+            if !current_file.changed && current_file.path.is_some() {
                 current_file.data = None;
                 current_file.last_saved_data = None;
             }
@@ -182,18 +182,14 @@ impl FilePickerState {
             .get_mut(index)
             .ok_or_else(|| anyhow!("file does not exist"))?;
 
+        self.current = Some(index);
+
         if file.data.is_some() {
-            self.current = Some(index);
             return Ok(());
         }
 
         if let Some(path) = file.path.clone() {
             file.read(path.clone())?;
-            self.current = Some(index);
-        } else {
-            todo!()
-            // self.files.insert(0, Default::default());
-            // self.current = Some(0);
         }
 
         Ok(())
