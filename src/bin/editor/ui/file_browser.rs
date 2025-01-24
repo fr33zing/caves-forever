@@ -122,6 +122,10 @@ pub fn file_browser(state: &mut EditorState, ui: &mut Ui) {
                 index_to_open = Some(file_i);
             }
 
+            if response.secondary_clicked() {
+                println!("{}", "asdhjk");
+            }
+
             row_i += 1;
         }
 
@@ -152,7 +156,7 @@ pub fn save_as_dialog(dialog: &mut SaveAsDialogState, ctx: &mut Context) -> (boo
         res
     }
 
-    Area::new(Id::new("no_open_files"))
+    Area::new(Id::new("save_as"))
         .anchor(Align2::CENTER_CENTER, Vec2::ZERO)
         .show(ctx, |ui| {
             Frame::none()
