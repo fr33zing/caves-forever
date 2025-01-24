@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use bevy::{
     app::{App, Plugin, Update},
     prelude::{MouseButton, ResMut, Resource, Single, With},
@@ -10,15 +9,15 @@ use bevy_egui::{
 };
 use bevy_trackball::{TrackballCamera, TrackballController};
 use egui::{
-    vec2, Align2, Area, Frame, Id, Label, Layout, RichText, SelectableLabel, SidePanel,
-    TopBottomPanel, Visuals,
+    vec2, Align2, Area, Frame, Id, Label, Layout, RichText, Rounding, SelectableLabel, SidePanel,
+    TopBottomPanel, Vec2, Visuals,
 };
 use nalgebra::{Point3, Vector3};
 use strum::IntoEnumIterator;
 
 use crate::{
     mode::tunnels,
-    state::{EditorMode, EditorState, EditorViewMode},
+    state::{EditorMode, EditorState, EditorViewMode, FilePayload},
 };
 
 mod file_browser;
@@ -125,7 +124,7 @@ fn ui(
             .max_width(right_panel_width)
             .resizable(false)
             .show(ctx, |ui| {
-                match state.mode {
+                match state.mode() {
                     EditorMode::Tunnels => tunnels::sidebar(&mut state, ui),
                     EditorMode::Rooms => {}
                 }
@@ -169,26 +168,60 @@ fn ui(
     cursor_over_edit_selection_panel.0 =
         cursor_over_edit_selection_panel.0 || right_panel_toggle_hovered;
 
+    // No open files indicator
+    if state.files.current.is_none() {
+        Area::new(Id::new("no_open_files"))
+            .anchor(Align2::CENTER_CENTER, Vec2::ZERO)
+            .show(ctx, |ui| {
+                egui::Frame::none()
+                    .inner_margin(Margin::same(24.0))
+                    .rounding(Rounding::same(8.0))
+                    .fill(ui.style().visuals.panel_fill)
+                    .show(ui, |ui| {
+                        ui.style_mut().spacing.item_spacing.y = 12.0;
+                        ui.add(
+                            Label::new(RichText::new("No open files").heading()).selectable(false),
+                        );
+                        ui.add(Label::new("Open a file in left panel, or...").selectable(false));
+
+                        ui.horizontal(|ui| {
+                            ui.style_mut().spacing.item_spacing.x = 3.0;
+
+                            ui.add(Label::new("Create a").selectable(false));
+                            Frame::none().show(ui, |ui| {
+                                ui.shrink_width_to_current();
+
+                                menu::bar(ui, |ui| {
+                                    ui.menu_button(RichText::new("new file.").underline(), |ui| {
+                                        EditorMode::iter().for_each(|mode| {
+                                            let file_payload = FilePayload::default_for_mode(mode);
+                                            if ui
+                                                .selectable_label(false, format!("{file_payload}"))
+                                                .clicked()
+                                            {
+                                                state.files.create_new_file(mode);
+                                            };
+                                        });
+                                    });
+                                });
+                            });
+                        });
+                    });
+            });
+    }
+
     // Save as dialog
-    let save_as_result = egui::Window::new("Save as...")
-        .default_width(200.0)
-        .max_width(200.0)
-        .resizable(false)
-        .collapsible(false)
-        .open(&mut dialogs.show_save_as_dialog)
-        .show(ctx, |ui| save_as_dialog(&mut save_as_dialog_state, ui));
-    if let Some(inner) = save_as_result {
-        if let Some((close, save)) = inner.inner {
-            if close {
-                dialogs.show_save_as_dialog = false;
-            }
-            if save {
-                if let Some(picker) = state.file_picker_mut() {
-                    picker
-                        .save_current_file_with_name(save_as_dialog_state.filename.clone())
-                        .unwrap();
-                }
-            }
+    if dialogs.show_save_as_dialog {
+        let save_as_result = save_as_dialog(&mut save_as_dialog_state, ctx);
+        let (close, save) = save_as_result;
+        if close {
+            dialogs.show_save_as_dialog = false;
+        }
+        if save {
+            state
+                .files
+                .save_current_file_with_name(save_as_dialog_state.filename.clone())
+                .unwrap();
         }
     }
 }
@@ -208,7 +241,7 @@ fn top_panel(
                     file_menu(state, dialogs, ui);
                 });
                 ui.menu_button("Viewport", |ui| {
-                    let allow_orbit = !(state.mode == EditorMode::Tunnels
+                    let allow_orbit = !(state.mode() == EditorMode::Tunnels
                         && state.view == EditorViewMode::Editor);
                     viewport_menu(ui, allow_orbit, trackball);
                 });
@@ -217,8 +250,8 @@ fn top_panel(
 
         ui.separator();
 
-        if let Some(picker) = state.file_picker() {
-            let current = picker.current_file();
+        // Current file
+        if let Some(current) = state.files.current_file() {
             ui.add(Label::new(current.name.clone()).selectable(false));
             if current.changed {
                 icons::changed_default(ui);
@@ -226,17 +259,6 @@ fn top_panel(
 
             ui.separator();
         }
-
-        // Mode switcher
-        ui.label("Mode:");
-        EditorMode::iter().for_each(|mode| {
-            let button = ui.add_enabled(state.mode != mode, egui::Button::new(format!("{mode}")));
-            if button.clicked() {
-                state.mode = mode;
-            }
-        });
-
-        ui.separator();
 
         // View switcher
         ui.label("View:");
@@ -249,7 +271,8 @@ fn top_panel(
 
         ui.separator();
 
-        match state.mode {
+        // Mode-specific
+        match state.mode() {
             EditorMode::Tunnels => tunnels::topbar(state, ui),
             EditorMode::Rooms => {}
         }
@@ -257,14 +280,18 @@ fn top_panel(
 }
 
 fn file_menu(state: &mut EditorState, dialogs: &mut EditorDialogs, ui: &mut Ui) {
-    if ui.selectable_label(false, "New").clicked() {
-        ui.close_menu();
-        state.file_picker_mut().unwrap().create_new_file();
-    };
-    if ui.selectable_label(false, "Duplicate").clicked() {};
-    if ui.selectable_label(false, "Delete").clicked() {};
-
-    ui.separator();
+    ui.menu_button("New", |ui| {
+        EditorMode::iter().for_each(|mode| {
+            let file_payload = FilePayload::default_for_mode(mode);
+            if ui
+                .selectable_label(false, format!("{file_payload}"))
+                .clicked()
+            {
+                ui.close_menu();
+                state.files.create_new_file(mode);
+            };
+        });
+    });
 
     if ui.selectable_label(false, "Save").clicked() {
         ui.close_menu();
@@ -275,7 +302,6 @@ fn file_menu(state: &mut EditorState, dialogs: &mut EditorDialogs, ui: &mut Ui) 
         ui.close_menu();
         open_save_as_dialog(dialogs);
     };
-    if ui.selectable_label(false, "Save all").clicked() {};
 }
 
 fn viewport_menu(
@@ -369,11 +395,7 @@ pub fn save_current_file(
     state: &mut EditorState,
     dialogs: &mut EditorDialogs,
 ) -> anyhow::Result<()> {
-    let Some(picker) = state.file_picker_mut() else {
-        return Err(anyhow!("current mode has no file picker"));
-    };
-
-    if !picker.save_current_file()? {
+    if !state.files.save_current_file()? {
         open_save_as_dialog(dialogs);
     }
 

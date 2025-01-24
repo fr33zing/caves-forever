@@ -91,7 +91,7 @@ pub fn cleanup(
         .iter()
         .for_each(|(entity, ModeSpecific(mode, view))| {
             let mut remove = false;
-            if *mode != state.mode {
+            if *mode != state.mode() {
                 remove = true;
             } else {
                 if let Some(view) = view {
@@ -106,7 +106,7 @@ pub fn cleanup(
 
 fn switch_modes(world: &mut World) {
     let (curr_mode, curr_view) =
-        world.resource_scope(|_, state: Mut<EditorState>| (state.mode, state.view));
+        world.resource_scope(|_, state: Mut<EditorState>| (state.mode(), state.view));
 
     let systems: Vec<SystemId> = world.resource_scope(|_, mut switcher: Mut<ModeSwitcher>| {
         let mut systems = Vec::<Option<SystemId>>::new();
@@ -153,7 +153,7 @@ fn switch_modes(world: &mut World) {
 }
 
 fn update_curr_mode(world: &mut World) {
-    let curr_mode = world.resource_scope(|_, state: Mut<EditorState>| state.mode);
+    let curr_mode = world.resource_scope(|_, state: Mut<EditorState>| state.mode());
     world.resource_scope(|world, switcher: Mut<ModeSwitcher>| {
         let Some(curr_systems) = switcher.mode_systems.get(&curr_mode) else {
             return;

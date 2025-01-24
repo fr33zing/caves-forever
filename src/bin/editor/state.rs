@@ -1,8 +1,7 @@
 use std::{
-    collections::HashMap,
     fs::File,
     io::{Read, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     str::FromStr,
     time::SystemTime,
 };
@@ -11,19 +10,54 @@ use anyhow::anyhow;
 use bevy::prelude::*;
 use mines::worldgen::asset::Tunnel;
 use nalgebra::Point2;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use strum::EnumIter;
+use serde::{Deserialize, Serialize};
+use strum::{EnumIter, EnumProperty, IntoEnumIterator};
 
 //
 // Modes
 //
 
-#[derive(EnumIter, strum_macros::Display, Default, Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(
+    EnumIter, EnumProperty, strum_macros::Display, Default, Debug, PartialEq, Eq, Clone, Copy, Hash,
+)]
 #[repr(u8)]
 pub enum EditorMode {
     #[default]
+    #[strum(props(file_ext = "tunnel"))]
     Tunnels = 0,
+    #[strum(props(file_ext = "room"))]
     Rooms = 1,
+}
+
+impl EditorMode {
+    /// Determines what mode a file should use.
+    /// Doesn't support uppercase file extensions because that's gross.
+    pub fn from_path(path: &Path) -> anyhow::Result<Self> {
+        let parts = path
+            .to_str()
+            .ok_or_else(|| anyhow!("invalid path"))?
+            .split('.')
+            .collect::<Vec<_>>();
+        let len = parts.len();
+
+        if len < 3 {
+            return Err(anyhow!("filename doesn't have enough parts"));
+        }
+
+        let [mode, ext] = [parts[len - 2], parts[len - 1]];
+
+        if ext != "ron" {
+            return Err(anyhow!("not a ron file"));
+        }
+
+        for m in EditorMode::iter() {
+            if m.get_str("file_ext") == Some(mode) {
+                return Ok(m);
+            }
+        }
+
+        Err(anyhow!("file extension not recognized"))
+    }
 }
 
 #[derive(EnumIter, strum_macros::Display, Default, Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -40,7 +74,6 @@ pub enum EditorViewMode {
 
 #[derive(Debug)]
 pub struct TunnelsModeState {
-    pub files: FilePickerState<Tunnel>,
     pub mirror: bool,
     pub selected_point: Option<usize>,
     pub drag_start: Option<(Point2<f32>, Vec2)>,
@@ -55,7 +88,6 @@ impl TunnelsModeState {
 impl Default for TunnelsModeState {
     fn default() -> Self {
         Self {
-            files: FilePickerState::from_directory("assets/worldgen/tunnels"),
             mirror: true,
             selected_point: None,
             drag_start: None,
@@ -77,15 +109,11 @@ impl Default for Room {
 }
 
 #[derive(Debug)]
-pub struct RoomsModeState {
-    pub files: FilePickerState<Room>,
-}
+pub struct RoomsModeState {}
 
 impl Default for RoomsModeState {
     fn default() -> Self {
-        Self {
-            files: FilePickerState::from_directory("assets/worldgen/rooms"),
-        }
+        Self {}
     }
 }
 
@@ -93,48 +121,59 @@ impl Default for RoomsModeState {
 // File picker state
 //
 
-#[derive(Debug)]
-pub struct FilePickerState<T>
-where
-    T: Serialize + DeserializeOwned + Default + Clone,
-{
-    pub directory: PathBuf,
-    pub files: Vec<FileState<T>>,
-    pub filter: String,
-    pub current: usize,
+#[derive(Serialize, Deserialize, strum_macros::Display, Debug, Clone)]
+pub enum FilePayload {
+    Tunnel(Tunnel),
+    Room(Room),
 }
 
-impl<T> FilePickerState<T>
-where
-    T: Serialize + DeserializeOwned + Default + Clone,
-{
-    pub fn current_file(&self) -> &FileState<T> {
-        self.files
-            .get(self.current)
-            .expect("current file does not exist")
+impl FilePayload {
+    pub fn default_for_mode(mode: EditorMode) -> Self {
+        match mode {
+            EditorMode::Tunnels => Self::Tunnel(Tunnel::default()),
+            EditorMode::Rooms => Self::Room(Room::default()),
+        }
     }
 
-    pub fn current_file_mut(&mut self) -> &mut FileState<T> {
-        self.files
-            .get_mut(self.current)
-            .expect("current file does not exist")
-    }
-
-    pub fn current_data(&self) -> &Option<T> {
-        &self.current_file().data
-    }
-
-    pub fn current_data_mut(&mut self) -> Option<&mut T> {
-        let Some(ref mut data) = self.current_file_mut().data else {
-            return None;
+    pub fn from_path(path: PathBuf) -> anyhow::Result<Self> {
+        let payload = match EditorMode::from_path(&path)? {
+            EditorMode::Tunnels => Self::Tunnel(Tunnel::default()),
+            EditorMode::Rooms => Self::Room(Room::default()),
         };
-        Some(data)
+        Ok(payload)
+    }
+}
+
+#[derive(Debug)]
+pub struct FilePickerState {
+    pub directory: PathBuf,
+    pub files: Vec<FileState>,
+    pub filter: String,
+    pub current: Option<usize>,
+}
+
+impl FilePickerState {
+    pub fn current_file(&self) -> Option<&FileState> {
+        self.current.map(|i| self.files.get(i))?
+    }
+
+    pub fn current_file_mut(&mut self) -> Option<&mut FileState> {
+        self.current.map(|i| self.files.get_mut(i))?
+    }
+
+    pub fn current_data(&self) -> Option<&FilePayload> {
+        self.current_file().map(|c| c.data.as_ref())?
+    }
+
+    pub fn current_data_mut(&mut self) -> Option<&mut FilePayload> {
+        self.current_file_mut().map(|c| c.data.as_mut())?
     }
 
     pub fn switch_to_file(&mut self, index: usize) -> anyhow::Result<()> {
-        let current_file = self.current_file_mut();
-        if !current_file.changed {
-            current_file.data = None;
+        if let Some(current_file) = self.current_file_mut() {
+            if !current_file.changed {
+                current_file.data = None;
+            }
         }
 
         let file = self
@@ -143,73 +182,85 @@ where
             .ok_or_else(|| anyhow!("file does not exist"))?;
 
         if file.data.is_some() {
-            self.current = index;
+            self.current = Some(index);
             return Ok(());
         }
 
         if let Some(path) = file.path.clone() {
             file.read(path.clone())?;
-            self.current = index;
+            self.current = Some(index);
         } else {
-            self.files.insert(0, Default::default());
-            self.current = 0;
+            todo!()
+            // self.files.insert(0, Default::default());
+            // self.current = Some(0);
         }
 
         Ok(())
     }
 }
 
-impl<T> FilePickerState<T>
-where
-    T: Serialize + DeserializeOwned + Default + Clone,
-{
-    fn new_file_name(index: usize) -> String {
-        format!("* untitled{index} *")
+impl FilePickerState {
+    fn new_file_name(index: usize, mode: &EditorMode) -> String {
+        format!("*{}{index}*", mode.get_str("file_ext").unwrap())
     }
 
-    fn next_new_file_name(&self) -> String {
+    fn next_new_file_name(&self, mode: &EditorMode) -> String {
         let index = self.files.iter().filter(|file| file.path.is_none()).count();
-        Self::new_file_name(index)
+        Self::new_file_name(index, mode)
     }
 
-    pub fn create_new_file(&mut self) {
+    pub fn create_new_file(&mut self, mode: EditorMode) {
         self.files.insert(
             0,
             FileState {
-                name: self.next_new_file_name(),
+                name: self.next_new_file_name(&mode),
                 path: None,
+                mode,
                 changed: true,
-                data: Some(T::default()),
+                data: Some(FilePayload::default_for_mode(mode)),
                 modified_time: SystemTime::now(),
             },
         );
-        self.current = 0;
+        self.current = Some(0);
     }
 
     /// Returns false if the current file needs a path before it can
     /// be saved. UI should handle this by opening the "save as" dialog.
     pub fn save_current_file(&mut self) -> anyhow::Result<bool> {
-        let file = self.current_file_mut();
-        if file.path.is_none() {
+        let Some(current_file) = self.current_file_mut() else {
+            return Err(anyhow!("no current file"));
+        };
+        if current_file.path.is_none() {
             return Ok(false);
         }
-        file.write()?;
+        current_file.write()?;
 
         Ok(true)
     }
 
     pub fn save_current_file_with_name(&mut self, name: String) -> anyhow::Result<()> {
+        let Some(current_file_index) = self.current else {
+            return Err(anyhow!("no current file index"));
+        };
+        let Some(current_file) = self.current_file() else {
+            return Err(anyhow!("no current file"));
+        };
+
+        let name = format!(
+            "{name}.{}.ron",
+            current_file.mode.get_str("file_ext").unwrap()
+        );
         let path = PathBuf::from_str(&name).unwrap();
         let path = self.directory.clone().join(path);
-        let is_new_file = self.current_file().path.is_none();
+        let is_new_file = current_file.path.is_none();
 
         let mut file = if is_new_file {
-            let mut file = self.files.remove(self.current);
+            let mut file = self.files.remove(current_file_index);
             file.changed = false;
 
             file
         } else {
-            let old_file = self.current_file_mut();
+            let old_file = self.current_file_mut().unwrap();
             old_file.changed = false;
             let new_file = old_file.clone();
             old_file.data = None;
@@ -221,15 +272,16 @@ where
         file.name = name.clone();
         file.write()?;
         self.files.insert(0, file);
-        self.current = 0;
+        self.current = Some(0);
 
         Ok(())
     }
 
     pub fn from_directory(directory: &str) -> Self {
         // TODO move this elsewhere
+        // TODO handle errors
         let directory = PathBuf::from_str(directory).unwrap();
-        let mut files: Vec<FileState<T>> = std::fs::read_dir(directory.clone())
+        let files: Vec<FileState> = std::fs::read_dir(directory.clone())
             .unwrap()
             .filter_map(|f| {
                 let f = f.unwrap();
@@ -239,12 +291,14 @@ where
                 } else {
                     SystemTime::now()
                 };
+                let mode = EditorMode::from_path(&f.path());
 
-                if name.starts_with(".") {
+                if name.starts_with(".") || mode.is_err() {
                     None
                 } else {
                     Some(FileState {
                         name,
+                        mode: mode.unwrap(),
                         path: Some(f.path().clone()),
                         changed: false,
                         data: None,
@@ -254,58 +308,41 @@ where
             })
             .collect();
 
-        files.insert(
-            0,
-            FileState {
-                name: Self::new_file_name(0),
-                path: None,
-                changed: true,
-                data: Some(T::default()),
-                modified_time: SystemTime::now(),
-            },
-        );
-
         Self {
             files,
             directory,
             filter: String::new(),
-            current: 0,
+            current: None,
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct FileState<T>
-where
-    T: Serialize + DeserializeOwned + Default + Clone,
-{
+pub struct FileState {
     pub name: String,
     pub path: Option<PathBuf>,
-    pub data: Option<T>,
+    /// If data is None, it's because the file isn't loaded, not because it's empty.
+    pub data: Option<FilePayload>,
+    pub mode: EditorMode,
     pub changed: bool,
-    /// Only tracks the modified time according to the file metadata
+    /// Only tracks the modified time according to the file metadata.
     pub modified_time: SystemTime,
 }
 
-impl<T> Default for FileState<T>
-where
-    T: Serialize + DeserializeOwned + Default + Clone,
-{
-    fn default() -> Self {
+impl FileState {
+    fn default_for_mode(mode: EditorMode) -> Self {
         Self {
+            mode,
+            data: Some(FilePayload::default_for_mode(mode)),
             name: Default::default(),
             path: Default::default(),
-            data: Default::default(),
             changed: Default::default(),
             modified_time: SystemTime::now(),
         }
     }
 }
 
-impl<T> FileState<T>
-where
-    T: Serialize + DeserializeOwned + Default + Clone,
-{
+impl FileState {
     pub fn read(&mut self, path: PathBuf) -> anyhow::Result<()> {
         if self.data.is_some() {
             return Err(anyhow!("tried to reread loaded file"));
@@ -344,40 +381,30 @@ where
 // Main state
 //
 
-#[derive(Resource, Default, Debug)]
+#[derive(Resource, Debug)]
 pub struct EditorState {
-    pub mode: EditorMode,
     pub view: EditorViewMode,
+    pub files: FilePickerState,
     pub tunnels_mode: TunnelsModeState,
     pub rooms_mode: RoomsModeState,
 }
 
+impl Default for EditorState {
+    fn default() -> Self {
+        Self {
+            view: Default::default(),
+            tunnels_mode: Default::default(),
+            rooms_mode: Default::default(),
+            files: FilePickerState::from_directory("assets/worldgen"),
+        }
+    }
+}
+
 impl EditorState {
-    /// Determine if the user has selected an object
-    pub fn has_selection(&self) -> bool {
-        match self.mode {
-            EditorMode::Tunnels => {
-                self.tunnels_mode.selected_point.is_some() && !self.tunnels_mode.dragging()
-            }
-            _ => false,
-        }
-    }
-
-    pub fn file_picker(
-        &self,
-    ) -> Option<&FilePickerState<impl Serialize + DeserializeOwned + Default + Clone>> {
-        match self.mode {
-            EditorMode::Tunnels => Some(&self.tunnels_mode.files),
-            _ => None,
-        }
-    }
-
-    pub fn file_picker_mut(
-        &mut self,
-    ) -> Option<&mut FilePickerState<impl Serialize + DeserializeOwned + Default + Clone>> {
-        match self.mode {
-            EditorMode::Tunnels => Some(&mut self.tunnels_mode.files),
-            _ => None,
-        }
+    // TODO maybe make this an Option?
+    pub fn mode(&self) -> EditorMode {
+        self.files
+            .current_file()
+            .map_or_else(|| EditorMode::Tunnels, |f| f.mode)
     }
 }

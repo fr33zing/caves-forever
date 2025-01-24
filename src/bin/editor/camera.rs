@@ -30,7 +30,7 @@ pub fn on_change_mode(
 
     let mut block_orbit = false;
 
-    match state.mode {
+    match state.mode() {
         EditorMode::Tunnels => match state.view {
             EditorViewMode::Editor => {
                 camera.scope.set_ortho(true);

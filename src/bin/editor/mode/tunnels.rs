@@ -16,6 +16,7 @@ use mines::{
 };
 
 use super::{EditorHandleGizmos, ModeSpecific};
+use crate::state::FilePayload;
 use crate::{
     state::{EditorMode, EditorState, EditorViewMode},
     ui::CursorOverEditSelectionPanel,
@@ -134,11 +135,14 @@ pub fn pick_profile_point(
     let radius = 0.25;
     let mut picked: Option<usize> = None;
 
-    let Some(current) = state.tunnels_mode.files.current_data() else {
+    let Some(current) = state.files.current_data() else {
         return;
     };
+    let FilePayload::Tunnel(data) = current else {
+        panic!("pick_profile_point ran in the wrong mode");
+    };
 
-    current.points.iter().enumerate().for_each(|(i, p)| {
+    data.points.iter().enumerate().for_each(|(i, p)| {
         let isometry = Isometry3d {
             rotation: Quat::from_euler(EulerRot::XYZ, -90.0_f32.to_radians(), 0.0, 0.0),
             translation: Vec3A::new(p.position.x, 0.0, p.position.y),
@@ -176,7 +180,7 @@ pub fn pick_profile_point(
     if mouse.just_pressed(MouseButton::Left) {
         if let Some(picked) = picked {
             if let Some(cursor) = cursor {
-                state.tunnels_mode.drag_start = Some((current.points[picked].position, cursor));
+                state.tunnels_mode.drag_start = Some((data.points[picked].position, cursor));
                 state.tunnels_mode.selected_point = Some(picked);
             }
         } else if !cursor_over_edit_selection_panel.0 {
@@ -204,10 +208,13 @@ pub fn drag_profile_point(
     };
 
     let mirror = state.tunnels_mode.mirror;
-    let data = state.tunnels_mode.files.current_data_mut();
+    let data = state.files.current_data_mut();
 
     let Some(data) = data else {
         return;
+    };
+    let FilePayload::Tunnel(data) = data else {
+        todo!();
     };
 
     let cursor_diff = cursor - cursor_start;
@@ -233,7 +240,7 @@ pub fn drag_profile_point(
         data.points[mirror_point].position = point_new_pos;
     }
 
-    state.tunnels_mode.files.current_file_mut().changed = true;
+    state.files.current_file_mut().unwrap().changed = true;
 }
 
 // Hook: update
@@ -244,14 +251,17 @@ pub fn update_tunnel_info(
     state: Res<EditorState>,
     info: Option<Single<(Entity, &mut TunnelInfo)>>,
 ) {
-    let current = state.tunnels_mode.files.current_data();
+    let data = state.files.current_data();
 
-    let Some(current) = current else {
+    let Some(data) = data else {
         return;
+    };
+    let FilePayload::Tunnel(data) = data else {
+        todo!()
     };
 
     let Some(info) = info else {
-        let tunnel = current.clone();
+        let tunnel = data.clone();
         let mesh = tunnel.to_mesh();
         let mesh_info = TunnelMeshInfo::from_mesh(&mesh);
         let model = TunnelInfo(tunnel, mesh_info);
@@ -271,11 +281,11 @@ pub fn update_tunnel_info(
 
     let (entity, mut info) = info.into_inner();
 
-    if *current == info.0 {
+    if *data == info.0 {
         return;
     }
 
-    info.0 = current.clone();
+    info.0 = data.clone();
     let mesh = info.0.to_mesh();
     info.1 = TunnelMeshInfo::from_mesh(&mesh);
 
@@ -288,8 +298,11 @@ pub fn update_tunnel_info(
 //
 
 pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
-    let Some(data) = state.tunnels_mode.files.current_data_mut() else {
+    let Some(data) = state.files.current_data_mut() else {
         return;
+    };
+    let FilePayload::Tunnel(data) = data else {
+        todo!();
     };
 
     match state.view {
@@ -316,12 +329,15 @@ pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
 }
 
 pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
-    let picker = &mut state.tunnels_mode.files;
-    let Some(file) = picker.files.get_mut(picker.current) else {
+    let picker = &mut state.files;
+    let Some(file) = picker.current_file_mut() else {
         return;
     };
     let Some(ref mut data) = file.data else {
         return;
+    };
+    let FilePayload::Tunnel(data) = data else {
+        todo!();
     };
 
     ui.style_mut().spacing.item_spacing.y = 8.0;
