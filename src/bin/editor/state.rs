@@ -173,6 +173,7 @@ impl FilePickerState {
         if let Some(current_file) = self.current_file_mut() {
             if !current_file.changed {
                 current_file.data = None;
+                current_file.last_saved_data = None;
             }
         }
 
