@@ -1,14 +1,23 @@
 use egui::{
-    Align, Align2, Area, Button, Color32, ComboBox, Context, Frame, Id, Label, Layout, Margin,
-    RichText, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui, UiBuilder, Vec2,
+    menu, Align, Align2, Area, Button, Color32, ComboBox, Context, Frame, Id, Label, Layout,
+    Margin, Response, RichText, Rounding, ScrollArea, SelectableLabel, Sense, Stroke, TextEdit, Ui,
+    UiBuilder, Vec2,
 };
-use strum::IntoEnumIterator;
+use strum::{EnumProperty, IntoEnumIterator};
 
-use crate::state::{EditorMode, EditorState};
+use crate::{
+    state::{EditorMode, EditorState},
+    ui::{open_file_action_dialog, FileActionDialogMode},
+};
 
-use super::{icons, SaveAsDialogState};
+use super::{icons, EditorDialogVisibility, FileActionDialogState};
 
-pub fn file_browser(state: &mut EditorState, ui: &mut Ui) {
+pub fn file_browser(
+    state: &mut EditorState,
+    dialogs: &mut EditorDialogVisibility,
+    dialog_state: &mut FileActionDialogState,
+    ui: &mut Ui,
+) {
     Frame::none()
         .inner_margin(Margin::same(8.0))
         .show(ui, |ui| {
@@ -45,13 +54,26 @@ pub fn file_browser(state: &mut EditorState, ui: &mut Ui) {
     ui.style_mut().spacing.item_spacing.y = 0.0;
     ui.separator();
 
+    #[derive(PartialEq)]
+    enum Action {
+        None,
+        Open,
+        Revert,
+        Save,
+        SaveAs,
+        Rename,
+        Delete,
+    }
+
     ScrollArea::vertical().show(ui, |ui| {
         ui.style_mut().spacing.item_spacing.y = 0.0;
 
         let current = state.files.current;
         let filter = state.files.filter.trim();
         let filter_mode = state.files.filter_mode;
-        let mut index_to_open: Option<usize> = None;
+
+        let mut action = Action::None;
+        let mut index_to_act: Option<usize> = None;
 
         // TODO This is gonna be slow. Sorry.
         let mut sorted = state.files.files.iter().enumerate().collect::<Vec<_>>();
@@ -108,40 +130,116 @@ pub fn file_browser(state: &mut EditorState, ui: &mut Ui) {
                                     filename = filename.color(Color32::from_rgb(50, 200, 200));
                                 }
 
-                                ui.add(Label::new(filename).selectable(false));
-                                ui.add_space(ui.available_size_before_wrap().x - 8.0);
                                 if file.changed {
                                     icons::changed_default(ui);
                                 }
+
+                                ui.add(Label::new(filename).selectable(false));
+                                ui.add_space(ui.available_size_before_wrap().x - 18.0);
+
+                                Frame::none().show(ui, |ui| {
+                                    ui.shrink_width_to_current();
+
+                                    menu::bar(ui, |ui| {
+                                        ui.menu_button("...", |ui| {
+                                            ui.add(Label::new(file.name.clone()).selectable(false));
+
+                                            ui.separator();
+
+                                            let save_button = ui.add_enabled(
+                                                file.changed,
+                                                SelectableLabel::new(false, "Save"),
+                                            );
+                                            if save_button.clicked() {
+                                                action = Action::Save;
+                                            }
+
+                                            if ui.selectable_label(false, "Save as...").clicked() {
+                                                action = Action::SaveAs;
+                                            }
+
+                                            ui.separator();
+
+                                            let revert_button = ui.add_enabled(
+                                                file.changed,
+                                                SelectableLabel::new(false, "Revert"),
+                                            );
+                                            if revert_button.clicked() {
+                                                action = Action::Revert;
+                                            }
+
+                                            if ui.selectable_label(false, "Rename").clicked() {
+                                                action = Action::Rename;
+                                            }
+                                            if ui.selectable_label(false, "Delete").clicked() {
+                                                action = Action::Delete;
+                                            }
+
+                                            if action != Action::None {
+                                                ui.close_menu();
+                                                index_to_act = Some(file_i);
+                                            }
+                                        });
+                                    });
+                                });
                             });
                         });
                 })
                 .response;
 
             if response.clicked() {
-                index_to_open = Some(file_i);
-            }
-
-            if response.secondary_clicked() {
-                println!("{}", "asdhjk");
+                index_to_act = Some(file_i);
+                action = Action::Open;
             }
 
             row_i += 1;
         }
 
-        if let Some(i) = index_to_open {
-            state.files.switch_to_file(i).unwrap(); // TODO handle this
+        if let Some(file_index) = index_to_act {
+            let mut open_dialog_with_mode: Option<FileActionDialogMode> = None;
+
+            // TODO handle errors
+            match action {
+                Action::Open => state.files.switch_to_file(file_index).unwrap(),
+                Action::Save => {
+                    if !state.files.save_file(file_index).unwrap() {
+                        open_dialog_with_mode = Some(FileActionDialogMode::SaveAs)
+                    }
+                }
+                Action::SaveAs => open_dialog_with_mode = Some(FileActionDialogMode::SaveAs),
+                Action::Revert => open_dialog_with_mode = Some(FileActionDialogMode::Revert),
+                Action::Rename => open_dialog_with_mode = Some(FileActionDialogMode::Rename),
+                Action::Delete => open_dialog_with_mode = Some(FileActionDialogMode::Delete),
+                _ => {}
+            };
+
+            if let Some(mode) = open_dialog_with_mode {
+                open_file_action_dialog(state, dialogs, dialog_state, mode, file_index);
+            }
         }
     });
 }
 
-pub fn save_as_dialog(dialog: &mut SaveAsDialogState, ctx: &mut Context) -> (bool, bool) {
-    let mut close_dialog = false;
-    let mut write_file = false;
+pub fn file_action_dialog(
+    dialog_state: &mut FileActionDialogState,
+    ctx: &mut Context,
+) -> (bool, bool) {
+    const WIDTH: f32 = 200.0;
+    let input_name_with_ext = dialog_state.input_name.clone() + &dialog_state.file_extension;
+    let overwrite_warning = dialog_state
+        .all_other_file_names
+        .contains(&input_name_with_ext);
+    let overwrite_color = Color32::from_rgb(160, 70, 70);
 
-    fn filename_edit_field(ui: &mut Ui, value: &mut String) -> egui::Response {
+    let mut close_dialog = false;
+    let mut execute_action = false;
+
+    fn filename_edit_field(ui: &mut Ui, value: &mut String) -> Response {
         const ALLOWED_CHARS: &str = "-_0123456789abcdefghijklmnopqrstuvwxyz";
-        let res = ui.add_sized([200.0, 20.0], TextEdit::singleline(value));
+        let res = ui.add_sized(
+            [WIDTH, 20.0],
+            TextEdit::singleline(value).char_limit(24).clip_text(true),
+        );
         *value = value
             .chars()
             .map(|c| {
@@ -156,35 +254,74 @@ pub fn save_as_dialog(dialog: &mut SaveAsDialogState, ctx: &mut Context) -> (boo
         res
     }
 
-    Area::new(Id::new("save_as"))
+    Area::new(Id::new("file_action_dialog"))
+        .default_width(WIDTH)
         .anchor(Align2::CENTER_CENTER, Vec2::ZERO)
         .show(ctx, |ui| {
             Frame::none()
                 .inner_margin(Margin::same(16.0))
                 .rounding(Rounding::same(8.0))
+                .stroke(if overwrite_warning {
+                    Stroke::new(3.0, overwrite_color)
+                } else {
+                    Stroke::NONE
+                })
                 .fill(ui.style().visuals.panel_fill)
                 .show(ui, |ui| {
                     ui.style_mut().spacing.item_spacing.y = 12.0;
 
-                    ui.add(Label::new(RichText::new("Save as...").heading()).selectable(false));
+                    ui.add(
+                        Label::new(
+                            RichText::new(dialog_state.mode.get_str("title").unwrap()).heading(),
+                        )
+                        .selectable(false),
+                    );
+                    ui.add(
+                        Label::new(format!("File:       {}", dialog_state.current_name))
+                            .selectable(false),
+                    );
 
-                    ui.horizontal(|ui| {
-                        ui.add(Label::new("Name:").selectable(false));
-                        filename_edit_field(ui, &mut dialog.filename);
-                    });
+                    if dialog_state.mode == FileActionDialogMode::Revert {
+                        ui.add(
+                            Label::new("Are you sure you want to revert this file?")
+                                .selectable(false),
+                        );
+                    } else if dialog_state.mode == FileActionDialogMode::Delete {
+		        ui.add(
+                            Label::new("Are you sure you want to delete this file?")
+                                .selectable(false),
+                        );
+		    } else  {
+                        ui.horizontal(|ui| {
+                            ui.set_max_width(200.0);
+                            ui.add(Label::new("Name:").selectable(false));
+                            filename_edit_field(ui, &mut dialog_state.input_name);
+                        });
+                    }
+
+                    if overwrite_warning {
+                        ui.add(
+                            Label::new(RichText::new("A file with this name already exists.\nDouble click \"Overwrite\" to overwrite it.").color(overwrite_color))
+                                .selectable(false),
+                        );
+                    }
+
+                    let (confirm_text, confirm_color) = if overwrite_warning {
+                        ("Overwrite", overwrite_color)
+                    } else {
+                        (dialog_state.mode.get_str("confirm").unwrap(), Color32::from_rgb(45, 100, 45))
+                    };
 
                     ui.with_layout(Layout::right_to_left(Align::Min), |ui| {
-                        let save_button =
-                            ui.add(Button::new("Save").fill(Color32::from_rgb(45, 100, 45)));
-                        if save_button.clicked() {
-                            write_file = true;
+                        let confirm_button =
+                            ui.add(Button::new(confirm_text).fill(confirm_color));
+                        if (!overwrite_warning && confirm_button.clicked()) || confirm_button.double_clicked() {
+                            execute_action = true;
                             close_dialog = true;
                             return;
                         };
 
-                        let cancel_button =
-                            ui.add(Button::new("Cancel").fill(Color32::from_rgb(100, 45, 45)));
-                        if cancel_button.clicked() {
+                        if ui.add(Button::new("Cancel")).clicked() {
                             close_dialog = true;
                             return;
                         };
@@ -192,5 +329,39 @@ pub fn save_as_dialog(dialog: &mut SaveAsDialogState, ctx: &mut Context) -> (boo
                 });
         });
 
-    return (close_dialog, write_file);
+    return (close_dialog, execute_action);
+}
+
+pub fn execute_file_action_dialog_action(
+    state: &mut EditorState,
+    FileActionDialogState {
+        mode,
+        file_index,
+        input_name,
+        ..
+    }: &mut FileActionDialogState,
+) {
+    // TODO handle errors
+    match *mode {
+        FileActionDialogMode::SaveAs => {
+            state
+                .files
+                .save_file_with_name(*file_index, input_name.clone())
+                .unwrap();
+        }
+        FileActionDialogMode::Rename => {
+            state
+                .files
+                .rename_file(*file_index, input_name.clone())
+                .unwrap();
+        }
+        FileActionDialogMode::Revert => {
+            state.files.revert_file(*file_index).unwrap();
+        }
+        FileActionDialogMode::Delete => {
+            state.files.delete_file(*file_index).unwrap();
+        }
+    }
+
+    input_name.clear();
 }

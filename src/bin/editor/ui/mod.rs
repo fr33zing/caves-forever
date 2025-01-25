@@ -13,26 +13,44 @@ use egui::{
     TopBottomPanel, Vec2, Visuals,
 };
 use nalgebra::{Point3, Vector3};
-use strum::IntoEnumIterator;
+use strum::{EnumProperty, IntoEnumIterator};
 
 use crate::{
     mode::tunnels,
-    state::{EditorMode, EditorState, EditorViewMode, FilePayload},
+    state::{EditorMode, EditorState, EditorViewMode, FilePayload, FilePickerState},
 };
 
 mod file_browser;
 mod icons;
 
-use file_browser::{file_browser, save_as_dialog};
+use file_browser::{execute_file_action_dialog_action, file_action_dialog, file_browser};
 
 #[derive(Resource, Default)]
-pub struct EditorDialogs {
-    pub show_save_as_dialog: bool,
+pub struct EditorDialogVisibility {
+    pub show_filename_dialog: bool,
+}
+
+#[derive(Default, EnumProperty, PartialEq)]
+pub enum FileActionDialogMode {
+    #[default]
+    #[strum(props(title = "Save as...", confirm = "Save"))]
+    SaveAs,
+    #[strum(props(title = "Rename", confirm = "Rename"))]
+    Rename,
+    #[strum(props(title = "Revert", confirm = "Revert"))]
+    Revert,
+    #[strum(props(title = "Delete", confirm = "Delete"))]
+    Delete,
 }
 
 #[derive(Resource, Default)]
-pub struct SaveAsDialogState {
-    pub filename: String,
+pub struct FileActionDialogState {
+    pub mode: FileActionDialogMode,
+    pub file_index: usize,
+    pub all_other_file_names: Vec<String>,
+    pub current_name: String,
+    pub input_name: String,
+    pub file_extension: String,
 }
 
 #[derive(Resource)]
@@ -57,9 +75,9 @@ pub struct EditorUiPlugin;
 
 impl Plugin for EditorUiPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<EditorDialogs>();
+        app.init_resource::<EditorDialogVisibility>();
         app.init_resource::<SidePanelVisibility>();
-        app.init_resource::<SaveAsDialogState>();
+        app.init_resource::<FileActionDialogState>();
         app.init_resource::<CursorOverEditSelectionPanel>();
         app.add_systems(Update, ui);
     }
@@ -68,8 +86,8 @@ impl Plugin for EditorUiPlugin {
 fn ui(
     mut state: ResMut<EditorState>,
     mut side_panel_visibility: ResMut<SidePanelVisibility>,
-    mut dialogs: ResMut<EditorDialogs>,
-    mut save_as_dialog_state: ResMut<SaveAsDialogState>,
+    mut dialogs: ResMut<EditorDialogVisibility>,
+    mut file_action_dialog_state: ResMut<FileActionDialogState>,
     mut cursor_over_edit_selection_panel: ResMut<CursorOverEditSelectionPanel>,
     mut contexts: EguiContexts,
     trackball: Option<Single<(&mut TrackballController, &mut TrackballCamera)>>,
@@ -87,7 +105,13 @@ fn ui(
         .default_height(top_panel_height)
         .resizable(false)
         .show(ctx, |ui| {
-            top_panel(&mut state, &mut dialogs, ui, trackball);
+            top_panel(
+                &mut state,
+                &mut dialogs,
+                &mut file_action_dialog_state,
+                ui,
+                trackball,
+            );
         });
 
     // Left panel
@@ -104,7 +128,7 @@ fn ui(
             .default_width(left_panel_width)
             .resizable(false)
             .show(ctx, |ui| {
-                file_browser(&mut state, ui);
+                file_browser(&mut state, &mut dialogs, &mut file_action_dialog_state, ui);
                 ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
             });
     }
@@ -210,26 +234,24 @@ fn ui(
             });
     }
 
-    // Save as dialog
-    if dialogs.show_save_as_dialog {
-        let save_as_result = save_as_dialog(&mut save_as_dialog_state, ctx);
-        let (close, save) = save_as_result;
-        if close {
-            dialogs.show_save_as_dialog = false;
+    // File action dialog
+    if dialogs.show_filename_dialog {
+        let result = file_action_dialog(&mut file_action_dialog_state, ctx);
+        let (close_dialog, execute_action) = result;
+
+        if close_dialog {
+            dialogs.show_filename_dialog = false;
         }
-        if save {
-            state
-                .files
-                .save_current_file_with_name(save_as_dialog_state.filename.clone())
-                .unwrap();
-            save_as_dialog_state.filename.clear();
+        if execute_action {
+            execute_file_action_dialog_action(&mut state, &mut file_action_dialog_state);
         }
     }
 }
 
 fn top_panel(
     state: &mut EditorState,
-    dialogs: &mut EditorDialogs,
+    dialogs: &mut EditorDialogVisibility,
+    dialog_state: &mut FileActionDialogState,
     ui: &mut Ui,
     trackball: Option<Single<(&mut TrackballController, &mut TrackballCamera)>>,
 ) {
@@ -239,7 +261,7 @@ fn top_panel(
             ui.shrink_width_to_current();
             menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
-                    file_menu(state, dialogs, ui);
+                    file_menu(state, dialogs, dialog_state, ui);
                 });
                 ui.menu_button("Viewport", |ui| {
                     let allow_orbit = !(state.mode() == EditorMode::Tunnels
@@ -253,10 +275,10 @@ fn top_panel(
 
         // Current file
         if let Some(current) = state.files.current_file() {
-            ui.add(Label::new(current.name.clone()).selectable(false));
             if current.changed {
                 icons::changed_default(ui);
             }
+            ui.add(Label::new(current.name.clone()).selectable(false));
 
             ui.separator();
         }
@@ -280,7 +302,18 @@ fn top_panel(
     });
 }
 
-fn file_menu(state: &mut EditorState, dialogs: &mut EditorDialogs, ui: &mut Ui) {
+fn file_menu(
+    state: &mut EditorState,
+    dialogs: &mut EditorDialogVisibility,
+    dialog_state: &mut FileActionDialogState,
+    ui: &mut Ui,
+) {
+    let changed = if let Some(current_file) = state.files.current_file() {
+        current_file.changed
+    } else {
+        false
+    };
+
     ui.menu_button("New", |ui| {
         EditorMode::iter().for_each(|mode| {
             let file_payload = FilePayload::default_for_mode(mode);
@@ -294,14 +327,66 @@ fn file_menu(state: &mut EditorState, dialogs: &mut EditorDialogs, ui: &mut Ui) 
         });
     });
 
-    if ui.selectable_label(false, "Save").clicked() {
+    let save_button = ui.add_enabled(changed, SelectableLabel::new(false, "Save"));
+    if save_button.clicked() {
         ui.close_menu();
         // TODO handle this
-        save_current_file(state, dialogs).expect("save failed");
+        save_current_file(state, dialogs, dialog_state).expect("save failed");
     };
-    if ui.selectable_label(false, "Save as...").clicked() {
+
+    let save_as_button = ui.add_enabled(
+        state.files.current.is_some(),
+        SelectableLabel::new(false, "Save as..."),
+    );
+    if save_as_button.clicked() {
         ui.close_menu();
-        open_save_as_dialog(dialogs);
+        open_file_action_dialog_for_current_file(
+            state,
+            dialogs,
+            dialog_state,
+            FileActionDialogMode::SaveAs,
+        );
+    };
+
+    ui.separator();
+
+    let revert_button = ui.add_enabled(changed, SelectableLabel::new(false, "Revert"));
+    if revert_button.clicked() {
+        ui.close_menu();
+        open_file_action_dialog_for_current_file(
+            state,
+            dialogs,
+            dialog_state,
+            FileActionDialogMode::Revert,
+        );
+    };
+
+    let rename_button = ui.add_enabled(
+        state.files.current.is_some(),
+        SelectableLabel::new(false, "Rename"),
+    );
+    if rename_button.clicked() {
+        ui.close_menu();
+        open_file_action_dialog_for_current_file(
+            state,
+            dialogs,
+            dialog_state,
+            FileActionDialogMode::Rename,
+        );
+    };
+
+    let delete_button = ui.add_enabled(
+        state.files.current.is_some(),
+        SelectableLabel::new(false, "Delete"),
+    );
+    if delete_button.clicked() {
+        ui.close_menu();
+        open_file_action_dialog_for_current_file(
+            state,
+            dialogs,
+            dialog_state,
+            FileActionDialogMode::Delete,
+        );
     };
 }
 
@@ -394,16 +479,64 @@ fn viewport_menu(
 /// Save the current file OR open the "save as" dialog if it has no path
 pub fn save_current_file(
     state: &mut EditorState,
-    dialogs: &mut EditorDialogs,
+    dialogs: &mut EditorDialogVisibility,
+    dialog_state: &mut FileActionDialogState,
 ) -> anyhow::Result<()> {
     if !state.files.save_current_file()? {
-        open_save_as_dialog(dialogs);
+        open_file_action_dialog_for_current_file(
+            state,
+            dialogs,
+            dialog_state,
+            FileActionDialogMode::SaveAs,
+        );
     }
 
     Ok(())
 }
 
-// Open the "save as" dialog
-pub fn open_save_as_dialog(dialogs: &mut EditorDialogs) {
-    dialogs.show_save_as_dialog = true;
+pub fn open_file_action_dialog(
+    state: &mut EditorState,
+    dialogs: &mut EditorDialogVisibility,
+    dialog_state: &mut FileActionDialogState,
+    mode: FileActionDialogMode,
+    file_index: usize,
+) {
+    let Some(file) = state.files.files.get(file_index) else {
+        panic!("tried to open file action dialog for nonexistent file");
+    };
+
+    dialog_state.mode = mode;
+    dialog_state.file_index = file_index;
+    dialog_state.current_name = file.name.clone();
+    dialog_state.all_other_file_names = state
+        .files
+        .files
+        .iter()
+        .filter_map(|f| {
+            if f.name != dialog_state.current_name {
+                Some(f.name.clone())
+            } else {
+                None
+            }
+        })
+        .collect();
+    dialog_state.file_extension = FilePickerState::file_ext_for_mode(&file.mode);
+    dialog_state.input_name = String::new();
+
+    dialogs.show_filename_dialog = true;
+}
+
+pub fn open_file_action_dialog_for_current_file(
+    state: &mut EditorState,
+    dialogs: &mut EditorDialogVisibility,
+    dialog_state: &mut FileActionDialogState,
+    mode: FileActionDialogMode,
+) {
+    open_file_action_dialog(
+        state,
+        dialogs,
+        dialog_state,
+        mode,
+        state.files.current.unwrap(),
+    );
 }

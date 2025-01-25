@@ -154,6 +154,23 @@ pub struct FilePickerState {
 }
 
 impl FilePickerState {
+    pub fn file_ext_for_mode(mode: &EditorMode) -> String {
+        format!(".{}.ron", mode.get_str("file_ext").unwrap())
+    }
+
+    pub fn file_name_for_mode(name: String, mode: &EditorMode) -> String {
+        format!("{name}{}", Self::file_ext_for_mode(mode))
+    }
+
+    fn new_file_name(index: usize, mode: &EditorMode) -> String {
+        format!("*{}{index}*", mode.get_str("file_ext").unwrap())
+    }
+
+    fn next_new_file_name(&self, mode: &EditorMode) -> String {
+        let index = self.files.iter().filter(|file| file.path.is_none()).count();
+        Self::new_file_name(index, mode)
+    }
+
     pub fn current_file(&self) -> Option<&FileState> {
         self.current.map(|i| self.files.get(i))?
     }
@@ -195,16 +212,41 @@ impl FilePickerState {
 
         Ok(())
     }
-}
 
-impl FilePickerState {
-    fn new_file_name(index: usize, mode: &EditorMode) -> String {
-        format!("*{}{index}*", mode.get_str("file_ext").unwrap())
+    pub fn revert_file(&mut self, index: usize) -> anyhow::Result<()> {
+        let file = self
+            .files
+            .get_mut(index)
+            .ok_or_else(|| anyhow!("file does not exist"))?;
+
+        file.data = file.last_saved_data.clone();
+
+        Ok(())
     }
 
-    fn next_new_file_name(&self, mode: &EditorMode) -> String {
-        let index = self.files.iter().filter(|file| file.path.is_none()).count();
-        Self::new_file_name(index, mode)
+    pub fn rename_file(&mut self, index: usize, name: String) -> anyhow::Result<()> {
+        let file = self
+            .files
+            .get_mut(index)
+            .ok_or_else(|| anyhow!("file does not exist"))?;
+
+        let new_name = Self::file_name_for_mode(name, &file.mode);
+        let new_path = self.directory.clone().join(PathBuf::from_str(&new_name)?);
+        let old_name = file.name.clone();
+        let old_path = file.path.clone().ok_or_else(|| anyhow!(""))?;
+
+        let mut file = self.files.remove(index);
+        file.path = Some(new_path.clone());
+        file.name = new_name.clone();
+
+        self.files
+            .retain(|f| f.name != new_name && f.name != old_name);
+        self.files.insert(0, file);
+        self.current = Some(0);
+
+        std::fs::rename(old_path, new_path)?;
+
+        Ok(())
     }
 
     pub fn create_new_file(&mut self, mode: EditorMode) {
@@ -223,51 +265,75 @@ impl FilePickerState {
         self.current = Some(0);
     }
 
-    /// Returns false if the current file needs a path before it can
-    /// be saved. UI should handle this by opening the "save as" dialog.
-    pub fn save_current_file(&mut self) -> anyhow::Result<bool> {
-        let Some(current_file) = self.current_file_mut() else {
-            return Err(anyhow!("no current file"));
-        };
-        if current_file.path.is_none() {
+    /// Returns false if the file needs a path before it can be
+    /// saved. UI should handle this by opening the "save as" dialog.
+    pub fn save_file(&mut self, index: usize) -> anyhow::Result<bool> {
+        let file = self
+            .files
+            .get_mut(index)
+            .ok_or_else(|| anyhow!("file does not exist"))?;
+
+        if file.path.is_none() {
             return Ok(false);
         }
-        current_file.write()?;
+        file.write()?;
 
         Ok(true)
     }
 
-    pub fn save_current_file_with_name(&mut self, name: String) -> anyhow::Result<()> {
-        let Some(current_file_index) = self.current else {
-            return Err(anyhow!("no current file index"));
-        };
-        let Some(current_file) = self.current_file() else {
-            return Err(anyhow!("no current file"));
-        };
+    pub fn save_file_with_name(&mut self, index: usize, name: String) -> anyhow::Result<()> {
+        let current_file = self
+            .files
+            .get_mut(index)
+            .ok_or_else(|| anyhow!("file does not exist"))?;
 
-        let name = format!(
-            "{name}.{}.ron",
-            current_file.mode.get_str("file_ext").unwrap()
-        );
+        let name = Self::file_name_for_mode(name, &current_file.mode);
+        let old_path = current_file.path.clone();
         let path = PathBuf::from_str(&name).unwrap();
         let path = self.directory.clone().join(path);
         let is_new_file = current_file.path.is_none();
 
         let mut file = if is_new_file {
-            self.files.remove(current_file_index)
+            self.files.remove(index)
         } else {
-            let old_file = self.current_file_mut().unwrap();
-            let new_file = old_file.clone();
-            old_file.data = None;
-
-            new_file
+            if current_file.data.is_none() {
+                current_file.read(old_path.unwrap())?;
+            }
+            current_file.clone()
         };
 
         file.path = Some(path);
         file.name = name.clone();
         file.write()?;
+        self.files.retain(|f| f.name != name);
         self.files.insert(0, file);
         self.current = Some(0);
+
+        Ok(())
+    }
+
+    pub fn save_current_file(&mut self) -> anyhow::Result<bool> {
+        let Some(index) = self.current else {
+            return Err(anyhow!("no current file index"));
+        };
+
+        self.save_file(index)
+    }
+
+    pub fn delete_file(&mut self, index: usize) -> anyhow::Result<()> {
+        let file = self
+            .files
+            .get_mut(index)
+            .ok_or_else(|| anyhow!("file does not exist"))?;
+
+        if let Some(ref path) = file.path {
+            std::fs::remove_file(path)?;
+        }
+        self.files.remove(index);
+
+        if self.current == Some(index) {
+            self.current = None;
+        }
 
         Ok(())
     }
