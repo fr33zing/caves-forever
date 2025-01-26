@@ -1,9 +1,16 @@
+use std::hash::{Hash, Hasher};
+
 use bevy::math::Vec3A;
+use bevy::prelude::Sphere;
+use bevy::render::mesh::PrimitiveTopology;
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy_trackball::TrackballCamera;
+use curvo::prelude::{NurbsCurve3D, Tessellation};
 use egui::{menu, Align, ComboBox, Frame, Label, Layout, RichText, ScrollArea, Ui};
 use mines::worldgen::asset::TunnelMeshInfo;
-use nalgebra::Point2;
+use mines::worldgen::brush::curve::mesh_curve;
+use nalgebra::{Point2, Point3};
+use pathfinding::prelude::dfs;
 use strum::IntoEnumIterator;
 
 use mines::{
@@ -14,8 +21,10 @@ use mines::{
         consts::CHUNK_SIZE_F,
     },
 };
+use transform_gizmo_bevy::{enum_set, GizmoMode, GizmoOrientation};
 
 use super::{EditorHandleGizmos, ModeSpecific};
+use crate::gizmos::{ConnectedPath, ConnectionPlane, ConnectionPoint, Pickable};
 use crate::state::FilePayload;
 use crate::{
     state::{EditorMode, EditorState, EditorViewMode},
@@ -77,6 +86,126 @@ pub fn spawn_size_reference_labels(
             ..default()
         })),
     ));
+}
+
+fn spawn_doorway(
+    commands: &mut Commands,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    color: &Color,
+    transform: Transform,
+) {
+    commands
+        .spawn((
+            ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
+            ConnectionPlane,
+            RayCastBackfaces,
+            transform,
+            Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(1.0, 0.125, 1.0)))),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: color.with_alpha(0.1),
+                alpha_mode: AlphaMode::Add,
+                unlit: true,
+                ..default()
+            })),
+            Pickable(
+                Some(
+                    enum_set!(
+                        GizmoMode::RotateZ
+                            | GizmoMode::ScaleX
+                            | GizmoMode::ScaleZ
+                            | GizmoMode::ScaleXZ
+                    )
+                    .union(GizmoMode::all_translate()),
+                ),
+                Some(GizmoOrientation::Local),
+            ),
+        ))
+        .with_child((
+            ConnectionPoint,
+            Transform::from_translation(Vec3::NEG_Y * 4.0).with_scale(Vec3::new(
+                1.0 / transform.scale.x,
+                1.0,
+                1.0 / transform.scale.z,
+            )),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: color.with_alpha(0.8),
+                alpha_mode: AlphaMode::Add,
+                unlit: true,
+                ..default()
+            })),
+        ));
+
+    commands.spawn((
+        ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
+        ConnectionPoint,
+        Transform::from_translation(transform.translation * Vec3::new(0.4, 1.0, 0.0)),
+        Mesh3d(meshes.add(Sphere::new(0.5))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: color.with_alpha(0.8),
+            alpha_mode: AlphaMode::Add,
+            unlit: true,
+            ..default()
+        })),
+        Pickable(Some(GizmoMode::all_translate()), None),
+    ));
+}
+
+/// Hook: enter_view
+pub fn enter_preview(
+    mut commands: Commands,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+) {
+    let door_scale = Vec3::new(6.0, 1.0, 6.0);
+    let y = door_scale.z / 2.0 + 1.0;
+    let color = Color::srgba(0.0, 1.0, 1.0, 0.1);
+
+    commands.spawn((
+        ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
+        ConnectionPoint,
+        Transform::from_translation(Vec3::Y * y),
+        Mesh3d(meshes.add(Sphere::new(0.5))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: color.with_alpha(0.8),
+            alpha_mode: AlphaMode::Add,
+            unlit: true,
+            ..default()
+        })),
+        Pickable(Some(GizmoMode::all_translate()), None),
+    ));
+
+    spawn_doorway(
+        &mut commands,
+        &mut materials,
+        &mut meshes,
+        &color,
+        Transform::default()
+            .with_translation(Vec3::new(CHUNK_SIZE_F / 2.0, y, 0.0))
+            .with_scale(door_scale)
+            .with_rotation(Quat::from_euler(
+                EulerRot::YXZ,
+                -90.0_f32.to_radians(),
+                -90.0_f32.to_radians(),
+                0.0,
+            )),
+    );
+
+    spawn_doorway(
+        &mut commands,
+        &mut materials,
+        &mut meshes,
+        &color,
+        Transform::default()
+            .with_translation(Vec3::new(-CHUNK_SIZE_F / 2.0, y, 0.0))
+            .with_scale(door_scale)
+            .with_rotation(Quat::from_euler(
+                EulerRot::YXZ,
+                90.0_f32.to_radians(),
+                -90.0_f32.to_radians(),
+                0.0,
+            )),
+    );
 }
 
 /// Hook: update
@@ -289,6 +418,105 @@ pub fn update_tunnel_info(
 
     let mut commands = commands.entity(entity);
     commands.insert(Mesh3d(meshes.add(mesh)));
+}
+
+// Hook: update
+pub fn remesh_preview_path(
+    state: Res<EditorState>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<LineMaterial>>,
+    any_pickable_changed: Query<&Pickable, Changed<Transform>>,
+    path: Option<Single<Entity, With<ConnectedPath>>>,
+    planes: Query<&GlobalTransform, With<ConnectionPlane>>,
+    points: Query<&GlobalTransform, With<ConnectionPoint>>,
+) {
+    let dirty = !any_pickable_changed.is_empty() || path.is_none();
+    if !dirty || state.view != EditorViewMode::Preview {
+        return;
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    struct Point(i8, Vec3);
+    impl Eq for Point {}
+    impl Hash for Point {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            self.0.hash(state);
+        }
+    }
+
+    let planes = planes.iter().collect::<Vec<_>>();
+
+    let Some(start) = planes.first() else {
+        return;
+    };
+    let Some(end) = planes.last() else {
+        return;
+    };
+
+    let (start, end) = (
+        Point(i8::MIN, start.translation()),
+        Point(i8::MAX, end.translation()),
+    );
+
+    let mut points = points
+        .iter()
+        .enumerate()
+        .map(|(i, p)| Point(i as i8, p.translation()))
+        .collect::<Vec<_>>();
+    points.push(end);
+
+    let Some(result) = dfs(
+        start,
+        |p| {
+            let mut ps = points.clone();
+            ps.sort_unstable_by_key(|q| q.1.distance_squared(p.1) as u32);
+            ps
+        },
+        |p| p.0 == end.0,
+    ) else {
+        return;
+    };
+
+    let points = result.into_iter().map(|p| p.1).collect::<Vec<_>>();
+    let line_mesh = Mesh::new(PrimitiveTopology::LineStrip, Default::default())
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, points.clone());
+
+    let points = points
+        .into_iter()
+        .map(|p| Point3::from(p))
+        .collect::<Vec<_>>();
+    let Ok(curve) = NurbsCurve3D::<f32>::try_interpolate(&points, 3) else {
+        return;
+    };
+    let samples = curve.tessellate(Some(1e-8));
+    let curve_mesh = mesh_curve(&samples);
+
+    if let Some(path) = path {
+        commands.entity(*path).despawn_recursive();
+    }
+
+    commands
+        .spawn((
+            ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
+            ConnectedPath,
+            Mesh3d(meshes.add(line_mesh)),
+            MeshMaterial3d(materials.add(LineMaterial {
+                color: Color::srgba(1.0, 1.0, 1.0, 0.2),
+                opacity: 0.2,
+                alpha_mode: AlphaMode::Blend,
+            })),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
+                Mesh3d(meshes.add(curve_mesh)),
+                MeshMaterial3d(materials.add(LineMaterial {
+                    color: Color::WHITE,
+                    ..default()
+                })),
+            ));
+        });
 }
 
 //

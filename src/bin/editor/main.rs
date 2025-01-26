@@ -1,8 +1,9 @@
 use avian3d::prelude::*;
 use bevy::{asset::AssetMetaCheck, pbr::ExtendedMaterial, prelude::*, window::PresentMode};
 use bevy_egui::EguiPlugin;
-use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSettings};
+use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 use bevy_trackball::TrackballPlugin;
+use gizmos::EditorGizmosPlugin;
 use mode::EditorModesPlugin;
 use noisy_bevy::NoisyShaderPlugin;
 
@@ -12,6 +13,7 @@ use mines::{
 };
 
 mod camera;
+mod gizmos;
 mod mode;
 mod state;
 mod ui;
@@ -56,7 +58,7 @@ fn main() {
     ));
 
     app.init_resource::<EditorState>();
-    app.add_plugins((EditorUiPlugin, EditorModesPlugin));
+    app.add_plugins((EditorUiPlugin, EditorModesPlugin, EditorGizmosPlugin));
 
     app.add_systems(Startup, setup);
 

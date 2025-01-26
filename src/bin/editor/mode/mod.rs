@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use bevy::{ecs::system::SystemId, prelude::*};
+use common_macros::hash_map;
 
 use crate::{
     camera,
@@ -13,7 +14,6 @@ pub mod tunnels;
 struct ModeSystems {
     exit: Option<SystemId>,
     enter: Option<SystemId>,
-    //exit_view: HashMap<EditorViewMode, SystemId>,
     enter_view: HashMap<EditorViewMode, SystemId>,
     update: Vec<SystemId>,
 }
@@ -73,11 +73,15 @@ pub fn setup(world: &mut World) {
             EditorMode::Tunnels,
             ModeSystems {
                 enter: Some(world.register_system(tunnels::spawn_size_reference_labels)),
+                enter_view: hash_map! {
+                    EditorViewMode::Preview => world.register_system(tunnels::enter_preview)
+                },
                 update: vec![
                     world.register_system(tunnels::pick_profile_point),
                     world.register_system(tunnels::drag_profile_point),
                     world.register_system(tunnels::update_tunnel_info),
                     world.register_system(tunnels::draw_size_references),
+                    world.register_system(tunnels::remesh_preview_path),
                 ],
                 ..default()
             },
@@ -102,7 +106,7 @@ pub fn cleanup(
                 }
             }
             if remove {
-                commands.entity(entity).clear();
+                commands.entity(entity).despawn_recursive();
             }
         });
 }

@@ -6,6 +6,7 @@ use bevy_trackball::{
     TrackballCamera, TrackballController, TrackballInput, TrackballVelocity, TrackballWheelUnit,
 };
 use nalgebra::{Point3, Vector3};
+use transform_gizmo_bevy::GizmoCamera;
 
 use crate::state::{EditorMode, EditorState, EditorViewMode};
 
@@ -41,11 +42,15 @@ pub fn on_change_mode(
             EditorViewMode::Preview => {
                 camera.scope.set_ortho(false);
                 camera.frame.set_target(target);
-                camera.frame.set_eye(&(Point3::new(d, d, d) * 2.0), up);
+                camera
+                    .frame
+                    .set_eye(&(Point3::new(0.0, d / 2.0, d) * 2.0), up);
             }
         },
         EditorMode::Rooms => {}
     }
+
+    camera.reset = camera.frame;
 
     controller.input.orbit_button = if block_orbit {
         None
@@ -124,5 +129,6 @@ pub fn setup(mut commands: Commands) {
             .with_scope(scope)
             .with_blend(0.0),
         Camera3d::default(),
+        GizmoCamera,
     ));
 }
