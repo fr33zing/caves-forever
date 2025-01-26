@@ -82,6 +82,7 @@ pub fn setup(world: &mut World) {
                     world.register_system(tunnels::update_tunnel_info),
                     world.register_system(tunnels::draw_size_references),
                     world.register_system(tunnels::remesh_preview_path),
+                    world.register_system(tunnels::update_preview_brush),
                 ],
                 ..default()
             },

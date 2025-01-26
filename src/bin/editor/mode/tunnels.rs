@@ -1,39 +1,47 @@
 use std::hash::{Hash, Hasher};
 
-use bevy::math::Vec3A;
-use bevy::prelude::Sphere;
-use bevy::render::mesh::PrimitiveTopology;
-use bevy::{prelude::*, window::PrimaryWindow};
+use bevy::{
+    math::Vec3A,
+    prelude::{Sphere, *},
+    render::mesh::PrimitiveTopology,
+    window::PrimaryWindow,
+};
 use bevy_trackball::TrackballCamera;
 use curvo::prelude::{NurbsCurve3D, Tessellation};
 use egui::{menu, Align, ComboBox, Frame, Label, Layout, RichText, ScrollArea, Ui};
-use mines::worldgen::asset::TunnelMeshInfo;
-use mines::worldgen::brush::curve::mesh_curve;
 use nalgebra::{Point2, Point3};
 use pathfinding::prelude::dfs;
 use strum::IntoEnumIterator;
+use transform_gizmo_bevy::{enum_set, GizmoMode, GizmoOrientation};
 
 use mines::{
     materials::LineMaterial,
     tnua::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
     worldgen::{
-        asset::{Environment, Rarity, Tunnel},
+        asset::{Environment, Rarity, Tunnel, TunnelMeshInfo},
+        brush::{curve::mesh_curve, TerrainBrush},
         consts::CHUNK_SIZE_F,
+        voxel::VoxelMaterial,
     },
 };
-use transform_gizmo_bevy::{enum_set, GizmoMode, GizmoOrientation};
 
 use super::{EditorHandleGizmos, ModeSpecific};
-use crate::gizmos::{ConnectedPath, ConnectionPlane, ConnectionPoint, Pickable};
-use crate::state::FilePayload;
 use crate::{
-    state::{EditorMode, EditorState, EditorViewMode},
+    gizmos::{ConnectedPath, ConnectionPlane, ConnectionPoint, Pickable},
+    state::{EditorMode, EditorState, EditorViewMode, FilePayload},
     ui::CursorOverEditSelectionPanel,
     util::mesh_text,
 };
 
 #[derive(Component)]
 pub struct TunnelInfo(Tunnel, TunnelMeshInfo);
+
+#[derive(Component)]
+pub struct UpdatePreviewBrush {
+    time: f64,
+    rail: Vec<Point3<f32>>,
+    profile: Vec<Point3<f32>>,
+}
 
 /// Hook: enter
 pub fn spawn_size_reference_labels(
@@ -45,15 +53,15 @@ pub fn spawn_size_reference_labels(
     commands.spawn((
         ModeSpecific(EditorMode::Tunnels, None),
         Transform::from_rotation(Quat::from_euler(
-            EulerRot::XYZ,
-            -90.0_f32.to_radians(),
-            0.0,
+            EulerRot::ZXY,
+            180.0_f32.to_radians(),
+            90.0_f32.to_radians(),
             0.0,
         ))
         .with_translation(Vec3::new(
-            -PLAYER_RADIUS + 0.017,
+            PLAYER_RADIUS - 0.017,
             0.0,
-            -PLAYER_HEIGHT / 2.0 + 0.14,
+            PLAYER_HEIGHT / 2.0 - 0.14,
         ))
         .with_scale(Vec3::splat(0.2)),
         Mesh3d(meshes.add(mesh_text("Player", true))),
@@ -68,15 +76,15 @@ pub fn spawn_size_reference_labels(
     commands.spawn((
         ModeSpecific(EditorMode::Tunnels, None),
         Transform::from_rotation(Quat::from_euler(
-            EulerRot::XYZ,
-            -90.0_f32.to_radians(),
-            0.0,
+            EulerRot::ZXY,
+            180.0_f32.to_radians(),
+            90.0_f32.to_radians(),
             0.0,
         ))
         .with_translation(Vec3::new(
-            -CHUNK_SIZE_F / 2.0 + 0.2,
+            CHUNK_SIZE_F / 2.0 - 0.2,
             0.0,
-            -CHUNK_SIZE_F / 2.0 + 1.6,
+            CHUNK_SIZE_F / 2.0 - 1.6,
         ))
         .with_scale(Vec3::splat(2.25)),
         Mesh3d(meshes.add(mesh_text("Chunk", true))),
@@ -153,6 +161,7 @@ fn spawn_doorway(
 
 /// Hook: enter_view
 pub fn enter_preview(
+    state: Res<EditorState>,
     mut commands: Commands,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -426,6 +435,8 @@ pub fn remesh_preview_path(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<LineMaterial>>,
+    update_preview_brush: Query<(Entity, &UpdatePreviewBrush)>,
+    time: Res<Time>,
     any_pickable_changed: Query<&Pickable, Changed<Transform>>,
     path: Option<Single<Entity, With<ConnectedPath>>>,
     planes: Query<&GlobalTransform, With<ConnectionPlane>>,
@@ -517,6 +528,52 @@ pub fn remesh_preview_path(
                 })),
             ));
         });
+
+    let Some(data) = state.files.current_data() else {
+        return;
+    };
+    let FilePayload::Tunnel(tunnel) = data else {
+        return;
+    };
+    update_preview_brush.iter().for_each(|(entity, _)| {
+        commands.entity(entity).despawn();
+    });
+    commands.spawn(UpdatePreviewBrush {
+        time: time.elapsed_secs_f64(),
+        rail: points,
+        profile: tunnel.to_3d_xy(),
+    });
+}
+
+pub fn update_preview_brush(
+    mut commands: Commands,
+    time: Res<Time>,
+    update_preview_brush: Option<Single<(Entity, &UpdatePreviewBrush)>>,
+    terrain_brushes: Query<Entity, With<TerrainBrush>>,
+) {
+    const TIMER_SECS: f64 = 0.5;
+
+    let Some(brush) = update_preview_brush else {
+        return;
+    };
+    if time.elapsed_secs_f64() - brush.1.time < TIMER_SECS {
+        return;
+    }
+
+    commands.entity(brush.0).despawn();
+    terrain_brushes.iter().for_each(|entity| {
+        commands.entity(entity).despawn();
+    });
+
+    let sweep = TerrainBrush::sweep(
+        VoxelMaterial::BrownRock,
+        brush.1.rail.clone(),
+        brush.1.profile.clone(),
+    );
+    commands.spawn((
+        ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
+        sweep,
+    ));
 }
 
 //

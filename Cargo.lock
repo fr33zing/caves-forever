@@ -2158,6 +2158,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f25c0e292a7ca6d6498557ff1df68f32c99850012b6ea401cf8daf771f22ff53"
 
 [[package]]
+name = "earclip"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca0eb1a3f37fa301292302f8c9ebb7bfd33f8197c93630606335515bf02fc43b"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "ecolor"
 version = "0.29.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3407,6 +3416,7 @@ dependencies = [
  "bevy_trackball",
  "common_macros",
  "curvo",
+ "earclip",
  "egui 0.30.0",
  "fast-surface-nets",
  "meshtext",

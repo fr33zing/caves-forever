@@ -46,6 +46,7 @@ fn main() {
     app.add_plugins((
         EguiPlugin,
         PhysicsPlugins::default(),
+        PhysicsDebugPlugin::default(),
         LineMaterialPlugin,
         NoisyShaderPlugin,
         InfiniteGridPlugin,
@@ -70,6 +71,6 @@ fn setup(mut commands: Commands) {
 
     commands.insert_resource(AmbientLight {
         color: Color::srgb(1.0, 1.0, 1.0).into(),
-        brightness: 35.0,
+        brightness: 100.0,
     });
 }

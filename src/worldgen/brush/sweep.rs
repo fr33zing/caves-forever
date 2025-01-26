@@ -1,21 +1,15 @@
-use avian3d::prelude::{Collider, Position, Rotation};
+use avian3d::prelude::{Collider, FillMode, Position, Rotation, VhacdParameters};
 use bevy::{
-    prelude::*,
+    prelude::{Mesh, *},
     render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
 };
 use curvo::prelude::*;
-use nalgebra::{Const, DimName, Point3, Rotation3, Translation3, Vector3};
+use nalgebra::{Const, DimName, Isometry, Point3, Rotation3, Translation3, Vector3};
 
-use super::{
-    curve::{curve_bounding_box, mesh_curve},
-    Sampler,
-};
-use crate::{
-    materials::LineMaterial,
-    worldgen::{
-        chunk::ChunksAABB,
-        voxel::{VoxelMaterial, VoxelSample},
-    },
+use super::{curve::curve_bounding_box, Sampler, TerrainBrush};
+use crate::worldgen::{
+    chunk::ChunksAABB,
+    voxel::{VoxelMaterial, VoxelSample},
 };
 
 #[derive(Component, Clone)]
@@ -51,71 +45,57 @@ impl Sampler for SweepBrush {
     }
 }
 
-#[derive(Bundle)]
-pub struct SweepBrushBundle {
-    brush: SweepBrush,
-    chunks: ChunksAABB,
-    mesh: Mesh3d,
-    material: MeshMaterial3d<LineMaterial>,
-}
-
-impl SweepBrushBundle {
-    pub fn new(
-        meshes: &mut ResMut<Assets<Mesh>>,
-        materials: &mut ResMut<Assets<LineMaterial>>,
-        rail_points: Vec<Point3<f32>>,
-        profile_points: Vec<Point3<f32>>,
+impl TerrainBrush {
+    pub fn sweep(
+        material: VoxelMaterial,
+        rail: Vec<Point3<f32>>,
+        profile: Vec<Point3<f32>>,
     ) -> Self {
-        let rail = NurbsCurve3D::<f32>::try_interpolate(&rail_points, 3).unwrap();
+        let rail = NurbsCurve3D::<f32>::try_interpolate(&rail, 3).unwrap();
         let samples = rail.tessellate(Some(1e-8));
-        let rail_mesh = mesh_curve(&samples);
         let aabb = curve_bounding_box(&samples);
         let chunks = ChunksAABB::from_world_aabb(aabb, 1);
 
-        let profile = NurbsCurve3D::<f32>::try_periodic(&profile_points, 3).unwrap();
-        let sweep = sweep_zero_twist::<f32, Const<4>>(&profile, &rail, Some(4));
-        let boundary = BoundaryConstraints::default();
-        let tessellation =
-            sweep.constrained_tessellate(boundary, Some(AdaptiveTessellationOptions::default()));
-        let sweep_mesh = mesh_tessellation(tessellation);
+        let profile = NurbsCurve3D::<f32>::try_periodic(&profile, 3).unwrap();
+        let sweep_mesh = sweep_zero_twist_filled::<Const<4>>(&profile, &rail, Some(4));
 
-        let collider = Collider::convex_decomposition_from_mesh(&sweep_mesh).unwrap();
-
-        SweepBrushBundle {
-            brush: SweepBrush {
-                collider,
-                material: VoxelMaterial::BrownRock,
-                rail,
-                profile,
+        let config = VhacdParameters {
+            concavity: 0.01,
+            alpha: 0.025,
+            beta: 0.025,
+            resolution: 64,
+            plane_downsampling: 4,
+            convex_hull_downsampling: 4,
+            fill_mode: FillMode::FloodFill {
+                detect_cavities: false,
             },
-            chunks,
-            mesh: Mesh3d(meshes.add(rail_mesh)),
-            material: MeshMaterial3d(materials.add(LineMaterial {
-                color: Color::srgba(1.0, 1.0, 1.0, 0.1),
-                opacity: 0.1,
-                alpha_mode: AlphaMode::Blend,
-                ..Default::default()
-            })),
-        }
+            convex_hull_approximation: true,
+            max_convex_hulls: 1024,
+        };
+        let collider =
+            Collider::convex_decomposition_from_mesh_with_config(&sweep_mesh, &config).unwrap();
+        //let collider = Collider::trimesh_from_mesh(&sweep_mesh).unwrap();
+
+        Self::Collider(collider, material, chunks)
     }
 }
 
-pub fn sweep_zero_twist<T, D>(
-    profile: &NurbsCurve3D<T>,
-    rail: &NurbsCurve3D<T>,
+pub fn sweep_zero_twist_filled<D>(
+    profile: &NurbsCurve3D<f32>,
+    rail: &NurbsCurve3D<f32>,
     degree_v: Option<usize>,
-) -> NurbsSurface3D<T>
+) -> Mesh
 where
-    T: FloatingPoint,
     D: DimName,
 {
     let (start, end) = rail.knots_domain();
     let samples = rail.control_points().len() * 2;
-    let span = (end - start) / T::from_usize(samples - 1).unwrap();
+    let span = (end - start) / (samples - 1) as f32;
 
-    let parameters: Vec<_> = (0..samples)
-        .map(|i| start + T::from_usize(i).unwrap() * span)
-        .collect();
+    let parameters: Vec<_> = (0..samples).map(|i| start + i as f32 * span).collect();
+
+    let mut t0: Option<nalgebra::Isometry<f32, nalgebra::Rotation<f32, 3>, 3>> = None;
+    let mut t1: Option<nalgebra::Isometry<f32, nalgebra::Rotation<f32, 3>, 3>> = None;
 
     let frames = rail.compute_frenet_frames(&parameters);
     let curves: Vec<_> = frames
@@ -127,21 +107,66 @@ where
             let rotation = Rotation3::from_axis_angle(&Vector3::y_axis(), angle);
             let transform = translate * rotation;
 
+            if t0.is_none() {
+                t0 = Some(transform.clone());
+            }
+            t1 = Some(transform.clone());
+
             profile.transformed(&transform.into())
         })
         .collect();
 
-    NurbsSurface3D::try_loft(&curves, degree_v).unwrap()
+    let result = NurbsSurface3D::try_loft(&curves, degree_v).unwrap();
+
+    let tessellation = result.tessellate(Some(AdaptiveTessellationOptions::default()));
+    let mut sweep_mesh = mesh_tessellation(tessellation);
+
+    let samples = profile.tessellate(Some(1e-8));
+    let profile_mesh = mesh_profile_filled(&samples);
+
+    let start_mesh = profile_mesh.clone().transformed_by(
+        Transform::from_translation(t0.unwrap().translation.into())
+            .with_rotation(t0.unwrap().rotation.into()),
+    );
+    let end_mesh = profile_mesh.transformed_by(
+        Transform::from_translation(t1.unwrap().translation.into())
+            .with_rotation(t1.unwrap().rotation.into()),
+    );
+
+    sweep_mesh.merge(&start_mesh);
+    sweep_mesh.merge(&end_mesh);
+
+    sweep_mesh
+}
+
+pub fn mesh_profile_filled(samples: &[Point3<f32>]) -> Mesh {
+    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, default());
+    let vertices: Vec<Vec3> = samples.iter().map(|pt| (*pt).into()).collect();
+
+    let points = vertices
+        .iter()
+        .map(|v| vec![v.x, v.y, v.z])
+        .collect::<Vec<_>>();
+    let points = vec![points];
+    let result = earclip::earclip::<f32, u32>(&points, None, None);
+    let positions = result
+        .0
+        .chunks(3)
+        .map(|w| [w[0], w[1], w[2]])
+        .collect::<Vec<[f32; 3]>>();
+
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    mesh.insert_indices(Indices::U32(result.1));
+
+    mesh
 }
 
 #[allow(unused)]
 pub fn mesh_tessellation(tess: SurfaceTessellation<f32, Const<4>>) -> Mesh {
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, default());
 
-    let vertices = tess.points().iter().map(|pt| (*pt).into()).collect();
-    let normals = tess.normals().iter().map(|n| (*n).into()).collect();
-    let uvs = tess.uvs().iter().map(|uv| (*uv).into()).collect();
-    let indices = tess
+    let mut vertices = tess.points().iter().map(|pt| (*pt).into()).collect();
+    let mut indices = tess
         .faces()
         .iter()
         .flat_map(|f| f.iter().map(|i| *i as u32))
@@ -151,11 +176,6 @@ pub fn mesh_tessellation(tess: SurfaceTessellation<f32, Const<4>>) -> Mesh {
         Mesh::ATTRIBUTE_POSITION,
         VertexAttributeValues::Float32x3(vertices),
     );
-    mesh.insert_attribute(
-        Mesh::ATTRIBUTE_NORMAL,
-        VertexAttributeValues::Float32x3(normals),
-    );
-    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, VertexAttributeValues::Float32x2(uvs));
     mesh.insert_indices(Indices::U32(indices));
 
     mesh

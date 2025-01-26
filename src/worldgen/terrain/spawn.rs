@@ -10,17 +10,14 @@ use bevy::{
 };
 use rayon::iter::ParallelIterator;
 
-use crate::{
-    materials::CaveMaterialExtension,
-    physics::GameLayer,
-    tnua::IsPlayer,
-    worldgen::brush::{collider::ColliderBrush, curve::CurveBrush, sweep::SweepBrush, Sampler},
-};
-
 use super::{
-    boundary::LoadingBoundary, utility::*, Chunk, ChunkData, ChunkRemeshRequest, DestroyTerrain,
-    TerrainState, TerrainStateResource, CHUNK_SAMPLE_RESOLUTION, CHUNK_SIZE_F,
+    boundary::LoadingBoundary,
+    change_detection::{TerrainSource, TerrainSourceArc},
+    utility::*,
+    Chunk, ChunkData, ChunkRemeshRequest, DestroyTerrain, TerrainState, TerrainStateMutex,
+    CHUNK_SAMPLE_RESOLUTION, CHUNK_SIZE_F,
 };
+use crate::{materials::CaveMaterialExtension, physics::GameLayer, tnua::IsPlayer};
 
 #[derive(Default, Clone)]
 pub struct ChunkSpawnRequest {
@@ -33,9 +30,7 @@ pub struct ChunkSpawnRequest {
 struct ChunkSpawnParams {
     state: Arc<Mutex<TerrainState>>,
     request: ChunkSpawnRequest,
-    curves: Vec<CurveBrush>,
-    sweeps: Vec<SweepBrush>,
-    colliders: Vec<ColliderBrush>,
+    source: Arc<TerrainSource>,
 }
 
 impl ChunkSpawnParams {
@@ -58,33 +53,25 @@ struct ChunkSpawnResult {
 }
 
 #[derive(Component)]
-pub struct ChunkSpawnTask(Task<Option<ChunkSpawnResult>>, Entity);
+pub struct ChunkSpawnTask {
+    task: Task<Option<ChunkSpawnResult>>,
+    chunk_pos: IVec3,
+    boundary: Entity,
+}
 
 pub fn begin_spawn_chunks(
     mut commands: Commands,
-    state: Res<TerrainStateResource>,
-    curve_brush_query: Query<&CurveBrush>,
-    sweep_brush_query: Query<&SweepBrush>,
-    collider_brush_query: Query<&ColliderBrush>,
+    state: Res<TerrainStateMutex>,
+    source: Res<TerrainSourceArc>,
     player: Option<Single<&Transform, With<IsPlayer>>>,
     spawn_tasks: Query<&ChunkSpawnTask>,
 ) {
-    let mut params = ChunkSpawnParams::new(state.clone());
+    let params = ChunkSpawnParams::new(state.clone());
     let mut state = state.lock().unwrap();
 
     if state.spawn_requests.is_empty() {
         return;
     }
-
-    curve_brush_query.iter().for_each(|brush| {
-        params.curves.push(brush.clone());
-    });
-    sweep_brush_query.iter().for_each(|brush| {
-        params.sweeps.push(brush.clone());
-    });
-    collider_brush_query.iter().for_each(|brush| {
-        params.colliders.push(brush.clone());
-    });
 
     let mut max_tasks: usize = 128;
     if let Some(player) = player {
@@ -109,26 +96,38 @@ pub fn begin_spawn_chunks(
 
     let task_pool = AsyncComputeTaskPool::get();
     requests.for_each(|request| {
-        let params = params.with_request(&request);
+        let mut params = params.with_request(&request);
+        params.source = source.0.clone();
+
         let task = task_pool.spawn(async move { spawn_chunks(params) });
         let boundary = commands.spawn(LoadingBoundary::new(request.chunk_pos)).id();
-        commands.spawn(ChunkSpawnTask(task, boundary));
+        commands.spawn(ChunkSpawnTask {
+            task,
+            chunk_pos: request.chunk_pos,
+            boundary,
+        });
     });
 }
 
 pub fn receive_spawn_chunks(
     mut commands: Commands,
-    state: Res<TerrainStateResource>,
+    state: Res<TerrainStateMutex>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, CaveMaterialExtension>>>,
     mut spawn_tasks: Query<(Entity, &mut ChunkSpawnTask)>,
 ) {
     for (task_entity, mut task) in spawn_tasks.iter_mut() {
-        let status = block_on(future::poll_once(&mut task.0));
+        let status = block_on(future::poll_once(&mut task.task));
 
         let Some(result) = status else {
             continue;
         };
+
+        let mut state = state.lock().unwrap();
+
+        if let Some((_, entity)) = state.chunk_data.get(&task.chunk_pos) {
+            commands.entity(*entity).clear();
+        }
 
         if let Some(generated) = result {
             let scale = Vec3::splat(1.0 / CHUNK_SAMPLE_RESOLUTION);
@@ -158,13 +157,12 @@ pub fn receive_spawn_chunks(
             ));
             let entity = commands.id();
 
-            let mut state = state.lock().unwrap();
             state
                 .chunk_data
                 .insert(generated.data.chunk_pos, (generated.data, entity));
         }
 
-        commands.entity(task.1).clear();
+        commands.entity(task.boundary).clear();
         commands.entity(task_entity).clear();
     }
 }
@@ -184,26 +182,8 @@ fn spawn_chunks(params: ChunkSpawnParams) -> Option<ChunkSpawnResult> {
         }
     }
 
-    // Sample curve brushes
-    for brush in params.curves {
-        merge_chunk(&mut data, || {
-            chunk_samples(&world_pos)
-                .map(|point| brush.sample(point))
-                .collect()
-        });
-    }
-
-    // Sample sweep brushes
-    for brush in params.sweeps {
-        merge_chunk(&mut data, || {
-            chunk_samples(&world_pos)
-                .map(|point| brush.sample(point))
-                .collect()
-        });
-    }
-
-    // Sample mesh brushes
-    for brush in params.colliders {
+    // Sample brushes
+    for brush in params.source.brushes.values() {
         merge_chunk(&mut data, || {
             chunk_samples(&world_pos)
                 .map(|point| brush.sample(point))

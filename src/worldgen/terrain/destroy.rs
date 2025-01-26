@@ -7,7 +7,7 @@ use crate::worldgen::chunk::ChunksAABB;
 
 use super::{
     chunk_samples, merge_sdf_with_hardness, ChunkRemeshRequest, ChunkRemeshTask, ChunkSpawnRequest,
-    ChunkSpawnTask, TerrainState, TerrainStateResource, VOXEL_REAL_SIZE,
+    ChunkSpawnTask, TerrainState, TerrainStateMutex, VOXEL_REAL_SIZE,
 };
 
 #[derive(Event, Clone, Copy)]
@@ -54,7 +54,7 @@ pub fn begin_destroy_terrain(
     mut event: EventReader<DestroyTerrainEvent>,
     spawn_tasks: Query<&ChunkSpawnTask>,
     remesh_tasks: Query<&ChunkRemeshTask>,
-    state: Res<TerrainStateResource>,
+    state: Res<TerrainStateMutex>,
 ) {
     // Wait until all other spawn/remesh tasks are finished
     {

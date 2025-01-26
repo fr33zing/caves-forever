@@ -20,7 +20,7 @@ pub mod consts {
     pub const CHUNK_SAMPLE_SIZE_F: f32 = CHUNK_SAMPLE_SIZE as f32;
 
     // For debugging only
-    pub const CHUNK_RENDER_BORDERS: bool = false;
+    pub const CHUNK_RENDER_BORDERS: bool = true;
     pub const CHUNK_INTERNAL_GEOMETRY: bool = true;
     pub const WORLD_RENDER_ORIGIN: bool = false;
 }

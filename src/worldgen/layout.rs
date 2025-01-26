@@ -4,9 +4,7 @@ use nalgebra::{Point2, Point3};
 
 use crate::materials::LineMaterial;
 
-use super::brush::{
-    collider::ColliderBrushBundle, curve::CurveBrushBundle, sweep::SweepBrushBundle,
-};
+use super::brush::{collider::ColliderBrushBundle, curve::CurveBrushBundle};
 
 pub fn setup_debug_layout(
     mut commands: Commands,
@@ -39,12 +37,12 @@ pub fn setup_debug_layout(
     .map(|p| Point3::new(p.x / 2.0, p.y - 8.0, 0.0))
     .collect::<Vec<_>>();
 
-    commands.spawn(SweepBrushBundle::new(
-        &mut meshes,
-        &mut materials,
-        rail_points,
-        profile_points,
-    ));
+    // commands.spawn(SweepBrushBundle::new(
+    //     &mut meshes,
+    //     &mut materials,
+    //     rail_points,
+    //     profile_points,
+    // ));
 
     let points = vec![
         Point3::new(-32.0, 32.0, -32.0),

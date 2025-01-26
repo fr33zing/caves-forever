@@ -36,7 +36,7 @@ pub fn on_change_mode(
             EditorViewMode::Editor => {
                 camera.scope.set_ortho(true);
                 camera.frame.set_target(target);
-                camera.frame.set_eye(&Point3::new(0.0, d, eps), up);
+                camera.frame.set_eye(&Point3::new(0.0, d, -eps), up);
                 block_orbit = true;
             }
             EditorViewMode::Preview => {
@@ -44,7 +44,7 @@ pub fn on_change_mode(
                 camera.frame.set_target(target);
                 camera
                     .frame
-                    .set_eye(&(Point3::new(0.0, d / 2.0, d) * 2.0), up);
+                    .set_eye(&(Point3::new(0.0, d / 2.0, -d) * 2.0), up);
             }
         },
         EditorMode::Rooms => {}
@@ -130,5 +130,11 @@ pub fn setup(mut commands: Commands) {
             .with_blend(0.0),
         Camera3d::default(),
         GizmoCamera,
+        PointLight {
+            intensity: 300_000_000.0,
+            range: 2048.0,
+            color: Color::WHITE.into(),
+            ..default()
+        },
     ));
 }

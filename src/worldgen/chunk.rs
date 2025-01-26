@@ -2,7 +2,7 @@ use bevy::{prelude::*, utils::HashSet};
 
 use super::consts::CHUNK_SIZE_F;
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub struct ChunksAABB {
     pub chunks: HashSet<IVec3>,
     pub min: IVec3,

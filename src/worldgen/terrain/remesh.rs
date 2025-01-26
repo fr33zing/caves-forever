@@ -6,7 +6,7 @@ use bevy::{
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
 };
 
-use super::{utility::*, TerrainState, TerrainStateResource};
+use super::{utility::*, TerrainState, TerrainStateMutex};
 
 pub struct ChunkRemeshRequest {
     pub chunk_pos: IVec3,
@@ -36,7 +36,7 @@ struct ChunkRemeshResult(Mesh, Collider);
 #[derive(Component)]
 pub struct ChunkRemeshTask(Task<Option<ChunkRemeshResult>>, Entity);
 
-pub fn begin_remesh_chunks(mut commands: Commands, state: Res<TerrainStateResource>) {
+pub fn begin_remesh_chunks(mut commands: Commands, state: Res<TerrainStateMutex>) {
     let task_pool = AsyncComputeTaskPool::get();
     let params = ChunkRemeshParams::new(state.clone());
     let mut state = state.lock().unwrap();

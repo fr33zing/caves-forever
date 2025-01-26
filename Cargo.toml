@@ -42,6 +42,7 @@ bevy_infinite_grid = "0.14.1"
 bevy_trackball = { version = "0.9.0", features = ["bevy_egui"] }
 common_macros = "0.1.1"
 curvo  = "0.1.46"
+earclip = "1.1.0"
 egui = "0.30.0"
 fast-surface-nets = "0.2.0"
 meshtext = "0.3.1"

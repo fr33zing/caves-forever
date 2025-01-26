@@ -10,16 +10,19 @@ use fast_surface_nets::ndshape::{ConstShape, ConstShape3u32};
 use super::{chunk::ChunksAABB, consts::*, layout, voxel::VoxelMaterial};
 
 mod boundary;
+mod change_detection;
 mod destroy;
 mod remesh;
 mod spawn;
 mod utility;
 
-pub use destroy::DestroyTerrainEvent;
+use change_detection::TerrainChangeDetectionPlugin;
 use destroy::*;
 use remesh::*;
 use spawn::*;
 use utility::*;
+
+pub use destroy::DestroyTerrainEvent;
 
 //
 // Types & consts
@@ -58,7 +61,7 @@ impl ChunkData {
 }
 
 #[derive(Resource, Default, Deref)]
-struct TerrainStateResource(pub Arc<Mutex<TerrainState>>);
+struct TerrainStateMutex(pub Arc<Mutex<TerrainState>>);
 
 #[derive(Default)]
 struct TerrainState {
@@ -101,8 +104,9 @@ pub struct TerrainPlugin;
 
 impl Plugin for TerrainPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<TerrainStateResource>()
+        app.init_resource::<TerrainStateMutex>()
             .add_event::<DestroyTerrainEvent>()
+            .add_plugins(TerrainChangeDetectionPlugin)
             .add_systems(Startup, (setup, layout::setup_debug_layout.before(setup)))
             .add_systems(Update, draw_debug)
             .add_systems(Update, enforce_loading_chunk_boundaries)
@@ -120,7 +124,7 @@ impl Plugin for TerrainPlugin {
     }
 }
 
-fn setup(state: Res<TerrainStateResource>, aabb_query: Query<&ChunksAABB>) {
+fn setup(state: Res<TerrainStateMutex>, aabb_query: Query<&ChunksAABB>) {
     let mut chunks = HashSet::<IVec3>::new();
 
     for aabb in aabb_query.iter() {
