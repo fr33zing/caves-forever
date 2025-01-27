@@ -165,8 +165,8 @@ pub fn enter_preview(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    let door_scale = Vec3::new(6.0, 1.0, 6.0);
-    let y = door_scale.z / 2.0 + 1.0;
+    let door_scale = Vec3::new(10.0, 1.0, 10.0);
+    let y = door_scale.z / 2.0 + 2.0;
     let color = Color::srgba(0.0, 1.0, 1.0, 0.1);
 
     commands.spawn((
