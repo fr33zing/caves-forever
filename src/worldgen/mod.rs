@@ -6,6 +6,8 @@ pub mod terrain;
 pub mod voxel;
 
 pub mod consts {
+    use avian3d::prelude::{FillMode, VhacdParameters};
+
     pub const CHUNK_SIZE: u32 = 32;
 
     #[cfg(not(feature = "webgl2"))]
@@ -23,4 +25,20 @@ pub mod consts {
     pub const CHUNK_RENDER_BORDERS: bool = true;
     pub const CHUNK_INTERNAL_GEOMETRY: bool = true;
     pub const WORLD_RENDER_ORIGIN: bool = false;
+
+    pub const VHACD_PARAMETERS: VhacdParameters = VhacdParameters {
+        // Changed
+        alpha: 0.025,
+        beta: 0.025,
+        // Default
+        resolution: 64,
+        concavity: 0.01,
+        plane_downsampling: 4,
+        convex_hull_downsampling: 4,
+        convex_hull_approximation: true,
+        max_convex_hulls: 1024,
+        fill_mode: FillMode::FloodFill {
+            detect_cavities: false,
+        },
+    };
 }

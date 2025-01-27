@@ -7,7 +7,9 @@ use bevy::{
 use boundary::enforce_loading_chunk_boundaries;
 use fast_surface_nets::ndshape::{ConstShape, ConstShape3u32};
 
-use super::{chunk::ChunksAABB, consts::*, layout, voxel::VoxelMaterial};
+use super::{
+    brush::TerrainBrushPlugin, chunk::ChunksAABB, consts::*, layout, voxel::VoxelMaterial,
+};
 
 mod boundary;
 mod change_detection;
@@ -106,7 +108,7 @@ impl Plugin for TerrainPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<TerrainStateMutex>()
             .add_event::<DestroyTerrainEvent>()
-            .add_plugins(TerrainChangeDetectionPlugin)
+            .add_plugins((TerrainChangeDetectionPlugin, TerrainBrushPlugin))
             .add_systems(Startup, (setup, layout::setup_debug_layout.before(setup)))
             .add_systems(Update, draw_debug)
             .add_systems(Update, enforce_loading_chunk_boundaries)

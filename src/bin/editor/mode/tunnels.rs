@@ -19,7 +19,7 @@ use mines::{
     tnua::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
     worldgen::{
         asset::{Environment, Rarity, Tunnel, TunnelMeshInfo},
-        brush::{curve::mesh_curve, sweep::ProfileRamp, TerrainBrush},
+        brush::{curve::mesh_curve, sweep::ProfileRamp, TerrainBrush, TerrainBrushRequest},
         consts::CHUNK_SIZE_F,
         voxel::VoxelMaterial,
     },
@@ -576,15 +576,11 @@ pub fn update_preview_brush(
         commands.entity(entity).despawn();
     });
 
-    let sweep = TerrainBrush::sweep(
-        VoxelMaterial::BrownRock,
-        brush.1.rail.clone(),
-        brush.1.profile.clone(),
-    );
-    commands.spawn((
-        ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
-        sweep,
-    ));
+    commands.spawn(TerrainBrushRequest::Sweep {
+        material: VoxelMaterial::BrownRock,
+        rail: brush.1.rail.clone(),
+        profile: brush.1.profile.clone(),
+    });
 }
 
 //

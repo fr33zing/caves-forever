@@ -1,4 +1,3 @@
-use avian3d::prelude::{Collider, VhacdParameters};
 use bevy::{
     prelude::{Mesh, *},
     render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
@@ -7,9 +6,7 @@ use curvo::prelude::*;
 use earclip::earclip;
 use nalgebra::{Const, DimName, Point3, Rotation3, Translation3, Vector3};
 
-use super::{curve::curve_bounding_box, TerrainBrush};
-use crate::worldgen::{chunk::ChunksAABB, voxel::VoxelMaterial};
-
+/// Facilitates interpolating between multiple sweep profiles.
 #[derive(Clone)]
 pub struct ProfileRamp(Vec<(f32, Vec<Point3<f32>>)>);
 
@@ -65,28 +62,6 @@ impl ProfileRamp {
         a.iter_mut().zip(b).for_each(|(a, b)| {
             *a = a.lerp(&b, fac);
         });
-    }
-}
-
-impl TerrainBrush {
-    pub fn sweep(material: VoxelMaterial, rail: Vec<Point3<f32>>, profile: ProfileRamp) -> Self {
-        let rail = NurbsCurve3D::<f32>::try_interpolate(&rail, 3).unwrap();
-        let samples = rail.tessellate(Some(1e-8));
-        let aabb = curve_bounding_box(&samples);
-        let chunks = ChunksAABB::from_world_aabb(aabb, 1);
-
-        let sweep_mesh = sweep_zero_twist_filled::<Const<4>>(&profile, &rail, Some(4));
-
-        let config = VhacdParameters {
-            alpha: 0.025,
-            beta: 0.025,
-            resolution: 64,
-            ..default()
-        };
-        let collider =
-            Collider::convex_decomposition_from_mesh_with_config(&sweep_mesh, &config).unwrap();
-
-        Self::Collider(collider, material, chunks)
     }
 }
 
@@ -186,15 +161,18 @@ pub fn mesh_profile_filled(profile: &NurbsCurve3D<f32>) -> Mesh {
     mesh
 }
 
-#[allow(unused)]
-pub fn mesh_tessellation(tess: SurfaceTessellation<f32, Const<4>>) -> Mesh {
+pub fn mesh_tessellation(tessellation: SurfaceTessellation<f32, Const<4>>) -> Mesh {
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, default());
 
-    let mut vertices = tess.points().iter().map(|pt| (*pt).into()).collect();
-    let mut indices = tess
+    let vertices = tessellation
+        .points()
+        .into_iter()
+        .map(|pt| (*pt).into())
+        .collect();
+    let indices = tessellation
         .faces()
-        .iter()
-        .flat_map(|f| f.iter().map(|i| *i as u32))
+        .into_iter()
+        .flat_map(|f| f.into_iter().map(|i| *i as u32))
         .collect();
 
     mesh.insert_attribute(
