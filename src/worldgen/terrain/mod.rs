@@ -1,11 +1,14 @@
 use std::sync::{Arc, Mutex};
 
 use bevy::{
+    pbr::{ExtendedMaterial, OpaqueRendererMethod},
     prelude::*,
     utils::{HashMap, HashSet},
 };
 use boundary::enforce_loading_chunk_boundaries;
 use fast_surface_nets::ndshape::{ConstShape, ConstShape3u32};
+
+use crate::materials::{CaveMaterial, CaveMaterialExtension};
 
 use super::{
     brush::TerrainBrushPlugin, chunk::ChunksAABB, consts::*, layout, voxel::VoxelMaterial,
@@ -98,6 +101,9 @@ impl TerrainState {
     }
 }
 
+#[derive(Resource, Default)]
+pub struct CaveMaterialHandle(Handle<CaveMaterial>);
+
 //
 // Plugin
 //
@@ -109,7 +115,14 @@ impl Plugin for TerrainPlugin {
         app.init_resource::<TerrainStateMutex>()
             .add_event::<DestroyTerrainEvent>()
             .add_plugins((TerrainChangeDetectionPlugin, TerrainBrushPlugin))
-            .add_systems(Startup, (setup, layout::setup_debug_layout.before(setup)))
+            .add_systems(
+                Startup,
+                (
+                    setup,
+                    setup_material,
+                    layout::setup_debug_layout.before(setup),
+                ),
+            )
             .add_systems(Update, draw_debug)
             .add_systems(Update, enforce_loading_chunk_boundaries)
             .add_systems(
@@ -143,6 +156,18 @@ fn setup(state: Res<TerrainStateMutex>, aabb_query: Query<&ChunksAABB>) {
             ..default()
         });
     }
+}
+
+fn setup_material(mut commands: Commands, mut materials: ResMut<Assets<CaveMaterial>>) {
+    let material = materials.add(ExtendedMaterial {
+        base: StandardMaterial {
+            base_color: Color::srgb(0.5, 0.5, 0.5),
+            opaque_render_method: OpaqueRendererMethod::Auto,
+            ..Default::default()
+        },
+        extension: CaveMaterialExtension::new(7.0, 5.0),
+    });
+    commands.insert_resource(CaveMaterialHandle(material));
 }
 
 fn draw_debug(mut gizmos: Gizmos, chunk_query: Query<&Transform, With<Chunk>>) {

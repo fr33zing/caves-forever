@@ -3,7 +3,6 @@ use std::sync::{Arc, Mutex};
 use avian3d::prelude::*;
 use bevy::{
     math::Vec3A,
-    pbr::{ExtendedMaterial, OpaqueRendererMethod},
     prelude::*,
     render::primitives::Aabb,
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
@@ -14,13 +13,10 @@ use super::{
     boundary::LoadingBoundary,
     change_detection::{TerrainSource, TerrainSourceArc},
     utility::*,
-    Chunk, ChunkData, ChunkRemeshRequest, DestroyTerrain, TerrainState, TerrainStateMutex,
-    CHUNK_SAMPLE_RESOLUTION, CHUNK_SIZE_F,
+    CaveMaterialHandle, Chunk, ChunkData, ChunkRemeshRequest, DestroyTerrain, TerrainState,
+    TerrainStateMutex, CHUNK_SAMPLE_RESOLUTION, CHUNK_SIZE_F,
 };
-use crate::{
-    materials::CaveMaterialExtension, physics::GameLayer, tnua::IsPlayer,
-    worldgen::voxel::VoxelMaterial,
-};
+use crate::{physics::GameLayer, tnua::IsPlayer, worldgen::voxel::VoxelMaterial};
 
 #[derive(Default, Clone)]
 pub struct ChunkSpawnRequest {
@@ -116,7 +112,7 @@ pub fn receive_spawn_chunks(
     mut commands: Commands,
     state: Res<TerrainStateMutex>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, CaveMaterialExtension>>>,
+    material: Res<CaveMaterialHandle>,
     mut spawn_tasks: Query<(Entity, &mut ChunkSpawnTask)>,
 ) {
     for (task_entity, mut task) in spawn_tasks.iter_mut() {
@@ -149,14 +145,7 @@ pub fn receive_spawn_chunks(
                 CollisionLayers::new(GameLayer::World, LayerMask::ALL),
                 DebugRender::default().without_collider().without_axes(),
                 Mesh3d(meshes.add(generated.mesh)),
-                MeshMaterial3d(materials.add(ExtendedMaterial {
-                    base: StandardMaterial {
-                        base_color: Color::srgb(0.5, 0.5, 0.5),
-                        opaque_render_method: OpaqueRendererMethod::Auto,
-                        ..Default::default()
-                    },
-                    extension: CaveMaterialExtension::new(7.0, 5.0),
-                })),
+                MeshMaterial3d(material.0.clone()),
             ));
             let entity = commands.id();
 

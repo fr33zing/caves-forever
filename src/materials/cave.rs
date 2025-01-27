@@ -1,5 +1,5 @@
 use bevy::{
-    pbr::{MaterialExtension, MaterialExtensionKey, MaterialExtensionPipeline},
+    pbr::{ExtendedMaterial, MaterialExtension, MaterialExtensionKey, MaterialExtensionPipeline},
     prelude::*,
     reflect::TypePath,
     render::{
@@ -18,6 +18,8 @@ pub const ATTRIBUTE_VOXEL_RATIO: MeshVertexAttribute =
 
 const SHADER_VERTEX_PATH: &str = "shaders/CaveMaterialExtension/vertex.wgsl";
 const SHADER_FRAGMENT_PATH: &str = "shaders/CaveMaterialExtension/fragment.wgsl";
+
+pub type CaveMaterial = ExtendedMaterial<StandardMaterial, CaveMaterialExtension>;
 
 #[derive(Asset, AsBindGroup, TypePath, Debug, Clone)]
 pub struct CaveMaterialExtension {
