@@ -134,14 +134,6 @@ impl FilePayload {
             EditorMode::Rooms => Self::Room(Room::default()),
         }
     }
-
-    pub fn from_path(path: PathBuf) -> anyhow::Result<Self> {
-        let payload = match EditorMode::from_path(&path)? {
-            EditorMode::Tunnels => Self::Tunnel(Tunnel::default()),
-            EditorMode::Rooms => Self::Room(Room::default()),
-        };
-        Ok(payload)
-    }
 }
 
 #[derive(Debug)]
@@ -438,6 +430,7 @@ pub struct EditorState {
     pub view: EditorViewMode,
     pub files: FilePickerState,
     pub tunnels_mode: TunnelsModeState,
+    #[allow(unused)]
     pub rooms_mode: RoomsModeState,
 }
 

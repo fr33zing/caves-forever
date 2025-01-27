@@ -1,6 +1,6 @@
 use avian3d::prelude::*;
 use bevy::prelude::*;
-use nalgebra::{Point2, Point3};
+use nalgebra::Point3;
 
 use crate::materials::LineMaterial;
 
@@ -14,35 +14,6 @@ pub fn setup_debug_layout(
     if !cfg!(feature = "demo-layout") {
         return;
     }
-
-    let rail_points = vec![
-        Point3::new(200.0, -64.0, 32.0),
-        Point3::new(32.0, -32.0, 32.0),
-        Point3::new(-32.0, -16.0, 32.0),
-        Point3::new(-32.0, 16.0, -32.0),
-        Point3::new(32.0, 32.0, -32.0),
-    ];
-    let profile_points = vec![
-        Point2::new(0.0, 0.0),
-        Point2::new(-3.0, 0.0),
-        Point2::new(-4.0, 1.0),
-        Point2::new(-4.0, 12.0),
-        Point2::new(0.0, 16.0),
-        Point2::new(4.0, 12.0),
-        Point2::new(4.0, 1.0),
-        Point2::new(3.0, 0.0),
-        Point2::new(0.0, 0.0),
-    ]
-    .into_iter()
-    .map(|p| Point3::new(p.x / 2.0, p.y - 8.0, 0.0))
-    .collect::<Vec<_>>();
-
-    // commands.spawn(SweepBrushBundle::new(
-    //     &mut meshes,
-    //     &mut materials,
-    //     rail_points,
-    //     profile_points,
-    // ));
 
     let points = vec![
         Point3::new(-32.0, 32.0, -32.0),

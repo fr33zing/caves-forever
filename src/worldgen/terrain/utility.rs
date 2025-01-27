@@ -130,7 +130,11 @@ where
 
 // TODO ensure this can't result in non-manifold geometry
 // TODO consider hardness of the hit material to prevent destroying soft materials behind hard materials
-pub fn merge_sdf_with_hardness<F>(data: &mut ChunkData, force: f32, sampler: F) -> bool
+pub fn merge_sdf_with_hardness<F>(
+    data: &mut ChunkData,
+    #[allow(unused)] force: f32,
+    sampler: F,
+) -> bool
 where
     F: Fn() -> Vec<f32>,
 {

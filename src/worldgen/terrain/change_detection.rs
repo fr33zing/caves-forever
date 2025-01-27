@@ -4,7 +4,7 @@ use bevy::{prelude::*, utils::HashMap};
 
 use crate::worldgen::{brush::TerrainBrush, chunk::ChunksAABB};
 
-use super::{ChunkRemeshRequest, ChunkSpawnRequest, TerrainStateMutex};
+use super::{ChunkSpawnRequest, TerrainStateMutex};
 
 #[derive(Default, Clone)]
 pub struct TerrainSource {
