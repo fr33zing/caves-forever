@@ -171,17 +171,6 @@ fn spawn_chunks(params: ChunkSpawnParams) -> Option<ChunkSpawnResult> {
     let mut data = ChunkData::new(params.request.chunk_pos);
     let world_pos = data.world_pos();
 
-    // Don't spawn chunks where they already exist
-    if cfg!(debug_assertions) {
-        let mut state = params.state.lock().unwrap();
-
-        for (_, (other, _)) in state.chunk_data.iter_mut() {
-            if other.chunk_pos == params.request.chunk_pos {
-                panic!("tried to spawn chunk where one already exists");
-            }
-        }
-    }
-
     // Sample brushes
     for brush in params.source.brushes.values() {
         merge_chunk(&mut data, || {
