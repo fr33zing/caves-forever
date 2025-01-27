@@ -8,14 +8,15 @@ use bevy::{
     render::primitives::Aabb,
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
 };
-use rayon::iter::ParallelIterator;
+use fast_surface_nets::ndshape::ConstShape;
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
 use super::{
     boundary::LoadingBoundary,
     change_detection::{TerrainSource, TerrainSourceArc},
     utility::*,
-    Chunk, ChunkData, ChunkRemeshRequest, DestroyTerrain, TerrainState, TerrainStateMutex,
-    CHUNK_SAMPLE_RESOLUTION, CHUNK_SIZE_F,
+    Chunk, ChunkData, ChunkRemeshRequest, ChunkShape, DestroyTerrain, TerrainState,
+    TerrainStateMutex, CHUNK_SAMPLE_RESOLUTION, CHUNK_SIZE_F,
 };
 use crate::{materials::CaveMaterialExtension, physics::GameLayer, tnua::IsPlayer};
 
@@ -171,21 +172,25 @@ fn spawn_chunks(params: ChunkSpawnParams) -> Option<ChunkSpawnResult> {
     let mut data = ChunkData::new(params.request.chunk_pos);
     let world_pos = data.world_pos();
 
-    // Sample brushes
-    for brush in params.source.brushes.values() {
-        merge_chunk(&mut data, || {
-            chunk_samples(&world_pos)
-                .map(|point| brush.sample(point))
-                .collect()
-        });
-    }
+    data.sdf
+        .par_iter_mut()
+        .zip(&mut data.materials)
+        .enumerate()
+        .for_each(|(i, (distance, material))| {
+            let pos = delinearize_to_world_pos(world_pos, i as u32);
 
-    // Apply material-specific noise
-    merge_sdf_additive(&mut data, |data| {
-        chunk_samples_enumerated(&world_pos)
-            .map(|(i, point)| data.materials[i].sdf_noise(&point, &data.sdf[i]))
-            .collect()
-    });
+            // Sample brushes
+            for brush in params.source.brushes.values() {
+                let sample = brush.sample(pos);
+                if sample.distance < *distance {
+                    *distance = sample.distance;
+                    *material = sample.material;
+                }
+            }
+
+            // Apply material-specific noise
+            *distance += material.sdf_noise(&pos, distance);
+        });
 
     // Apply destruction
     if let Some(destruction) = params.request.destruction {
