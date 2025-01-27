@@ -19,7 +19,7 @@ use mines::{
     tnua::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
     worldgen::{
         asset::{Environment, Rarity, Tunnel, TunnelMeshInfo},
-        brush::{curve::mesh_curve, TerrainBrush},
+        brush::{curve::mesh_curve, sweep::ProfileRamp, TerrainBrush},
         consts::CHUNK_SIZE_F,
         voxel::VoxelMaterial,
     },
@@ -40,7 +40,7 @@ pub struct TunnelInfo(Tunnel, TunnelMeshInfo);
 pub struct UpdatePreviewBrush {
     time: f64,
     rail: Vec<Point3<f32>>,
-    profile: Vec<Point3<f32>>,
+    profile: ProfileRamp,
 }
 
 /// Hook: enter
@@ -161,7 +161,6 @@ fn spawn_doorway(
 
 /// Hook: enter_view
 pub fn enter_preview(
-    state: Res<EditorState>,
     mut commands: Commands,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -441,11 +440,16 @@ pub fn remesh_preview_path(
     path: Option<Single<Entity, With<ConnectedPath>>>,
     planes: Query<&GlobalTransform, With<ConnectionPlane>>,
     points: Query<&GlobalTransform, With<ConnectionPoint>>,
+    info: Option<Single<&mut TunnelInfo>>,
 ) {
     let dirty = !any_pickable_changed.is_empty() || path.is_none();
     if !dirty || state.view != EditorViewMode::Preview {
         return;
     }
+
+    let Some(info) = info else {
+        return;
+    };
 
     #[derive(Clone, Copy, Debug, PartialEq)]
     struct Point(i8, Vec3);
@@ -458,16 +462,16 @@ pub fn remesh_preview_path(
 
     let planes = planes.iter().collect::<Vec<_>>();
 
-    let Some(start) = planes.first() else {
+    let Some(start_plane) = planes.first() else {
         return;
     };
-    let Some(end) = planes.last() else {
+    let Some(end_plane) = planes.last() else {
         return;
     };
 
-    let (start, end) = (
-        Point(i8::MIN, start.translation()),
-        Point(i8::MAX, end.translation()),
+    let (start_point, end_point) = (
+        Point(i8::MIN, start_plane.translation()),
+        Point(i8::MAX, end_plane.translation()),
     );
 
     let mut points = points
@@ -475,16 +479,16 @@ pub fn remesh_preview_path(
         .enumerate()
         .map(|(i, p)| Point(i as i8, p.translation()))
         .collect::<Vec<_>>();
-    points.push(end);
+    points.push(end_point);
 
     let Some(result) = dfs(
-        start,
+        start_point,
         |p| {
             let mut ps = points.clone();
             ps.sort_unstable_by_key(|q| q.1.distance_squared(p.1) as u32);
             ps
         },
-        |p| p.0 == end.0,
+        |p| p.0 == end_point.0,
     ) else {
         return;
     };
@@ -493,11 +497,11 @@ pub fn remesh_preview_path(
     let line_mesh = Mesh::new(PrimitiveTopology::LineStrip, Default::default())
         .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, points.clone());
 
-    let points = points
+    let rail = points
         .into_iter()
         .map(|p| Point3::from(p))
         .collect::<Vec<_>>();
-    let Ok(curve) = NurbsCurve3D::<f32>::try_interpolate(&points, 3) else {
+    let Ok(curve) = NurbsCurve3D::<f32>::try_interpolate(&rail, 3) else {
         return;
     };
     let samples = curve.tessellate(Some(1e-8));
@@ -538,10 +542,17 @@ pub fn remesh_preview_path(
     update_preview_brush.iter().for_each(|(entity, _)| {
         commands.entity(entity).despawn();
     });
+
+    let size = info.1.size;
+    let start_scale = start_plane.scale().xz() / size * 1.01;
+    let end_scale = end_plane.scale().xz() / size * 1.01;
+    let profile = ProfileRamp::start(tunnel.to_3d_xy_scaled(start_scale))
+        .end(tunnel.to_3d_xy_scaled(end_scale));
+
     commands.spawn(UpdatePreviewBrush {
         time: time.elapsed_secs_f64(),
-        rail: points,
-        profile: tunnel.to_3d_xy(),
+        rail,
+        profile,
     });
 }
 

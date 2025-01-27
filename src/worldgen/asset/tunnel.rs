@@ -68,6 +68,13 @@ impl Tunnel {
             .collect()
     }
 
+    pub fn to_3d_xy_scaled(&self, scale: Vec2) -> Vec<OPoint<f32, Const<3>>> {
+        self.points
+            .iter()
+            .map(|p| Point3::new(p.position.x * scale.x, p.position.y * scale.y, 0.0))
+            .collect()
+    }
+
     pub fn to_curve_3d(&self) -> NurbsCurve<f32, Const<4>> {
         let points = self.to_3d_xz();
         NurbsCurve3D::<f32>::try_periodic_interpolate(&points, 3, KnotStyle::Centripetal).unwrap()

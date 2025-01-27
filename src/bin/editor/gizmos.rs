@@ -56,7 +56,7 @@ fn pick(
     pickables: Query<(Entity, &Pickable)>,
     gizmo_targets: Query<(Entity, &GizmoTarget)>,
 ) {
-    if !mouse.just_pressed(MouseButton::Left) {
+    if !mouse.just_released(MouseButton::Left) {
         return;
     }
     if gizmo_targets.iter().any(|(_, target)| target.is_focused()) {
