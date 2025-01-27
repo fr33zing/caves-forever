@@ -8,17 +8,19 @@ use bevy::{
     render::primitives::Aabb,
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
 };
-use fast_surface_nets::ndshape::ConstShape;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
 use super::{
     boundary::LoadingBoundary,
     change_detection::{TerrainSource, TerrainSourceArc},
     utility::*,
-    Chunk, ChunkData, ChunkRemeshRequest, ChunkShape, DestroyTerrain, TerrainState,
-    TerrainStateMutex, CHUNK_SAMPLE_RESOLUTION, CHUNK_SIZE_F,
+    Chunk, ChunkData, ChunkRemeshRequest, DestroyTerrain, TerrainState, TerrainStateMutex,
+    CHUNK_SAMPLE_RESOLUTION, CHUNK_SIZE_F,
 };
-use crate::{materials::CaveMaterialExtension, physics::GameLayer, tnua::IsPlayer};
+use crate::{
+    materials::CaveMaterialExtension, physics::GameLayer, tnua::IsPlayer,
+    worldgen::voxel::VoxelMaterial,
+};
 
 #[derive(Default, Clone)]
 pub struct ChunkSpawnRequest {
@@ -181,9 +183,13 @@ fn spawn_chunks(params: ChunkSpawnParams) -> Option<ChunkSpawnResult> {
 
             // Sample brushes
             for brush in params.source.brushes.values() {
-                let sample = brush.sample(pos);
+                let mut sample = brush.sample(pos);
                 if sample.distance < *distance {
+                    postprocess_sample(&mut sample);
                     *distance = sample.distance;
+                    *material = sample.material;
+                } else if material == &VoxelMaterial::Unset {
+                    postprocess_sample(&mut sample);
                     *material = sample.material;
                 }
             }
