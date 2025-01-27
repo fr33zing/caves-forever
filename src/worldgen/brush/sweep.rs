@@ -1,49 +1,14 @@
-use avian3d::prelude::{Collider, FillMode, Position, Rotation, VhacdParameters};
+use avian3d::prelude::{Collider, VhacdParameters};
 use bevy::{
     prelude::{Mesh, *},
     render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
 };
 use curvo::prelude::*;
+use earclip::earclip;
 use nalgebra::{Const, DimName, Point3, Rotation3, Translation3, Vector3};
 
-use super::{curve::curve_bounding_box, Sampler, TerrainBrush};
-use crate::worldgen::{
-    chunk::ChunksAABB,
-    voxel::{VoxelMaterial, VoxelSample},
-};
-
-#[derive(Component, Clone)]
-pub struct SweepBrush {
-    pub collider: Collider,
-    pub material: VoxelMaterial,
-    pub rail: NurbsCurve3D<f32>,
-    pub profile: NurbsCurve3D<f32>,
-}
-
-impl Sampler for SweepBrush {
-    fn sample(&self, point: Vec3) -> VoxelSample {
-        let (closest, _) =
-            self.collider
-                .project_point(Position::default(), Rotation::default(), point, false);
-        let (closest_solid, _) =
-            self.collider
-                .project_point(Position::default(), Rotation::default(), point, true);
-
-        let mut distance = point.distance(closest);
-
-        // is_inside from project_point is unreliable
-        let is_inside = closest_solid.distance(point) <= 0.01;
-
-        if is_inside {
-            distance *= -1.0;
-            distance = distance.min(-0.001);
-        }
-
-        let material = self.material;
-
-        VoxelSample { material, distance }
-    }
-}
+use super::{curve::curve_bounding_box, TerrainBrush};
+use crate::worldgen::{chunk::ChunksAABB, voxel::VoxelMaterial};
 
 #[derive(Clone)]
 pub struct ProfileRamp(Vec<(f32, Vec<Point3<f32>>)>);
@@ -64,15 +29,17 @@ impl ProfileRamp {
             if self.0[i].0 > parameter {
                 break;
             }
-
             i += 1;
         }
         self.0.insert(i, (parameter, profile));
-
         self
     }
 
     pub fn sample(&self, parameter: f32) -> Vec<Point3<f32>> {
+        if self.0.len() == 2 {
+            Self::lerp_profile(&mut self.0[0].1.clone(), &self.0[1].1, parameter);
+        }
+
         self.0
             .windows(2)
             .find_map(|w| {
@@ -84,9 +51,7 @@ impl ProfileRamp {
                     let diff = w[1].0 - w[0].0;
                     let fac = (parameter - w[0].0) / diff;
                     let mut profile = w[0].1.clone();
-                    profile.iter_mut().enumerate().for_each(|(i, p)| {
-                        *p = p.lerp(&w[1].1[i], fac);
-                    });
+                    Self::lerp_profile(&mut profile, &w[1].1, fac);
 
                     return Some(profile);
                 }
@@ -94,6 +59,12 @@ impl ProfileRamp {
                 None
             })
             .unwrap_or_else(|| self.0.last().unwrap().1.clone())
+    }
+
+    fn lerp_profile(a: &mut [Point3<f32>], b: &[Point3<f32>], fac: f32) {
+        a.iter_mut().zip(b).for_each(|(a, b)| {
+            *a = a.lerp(&b, fac);
+        });
     }
 }
 
@@ -109,6 +80,7 @@ impl TerrainBrush {
         let config = VhacdParameters {
             alpha: 0.025,
             beta: 0.025,
+            resolution: 64,
             ..default()
         };
         let collider =
@@ -132,29 +104,40 @@ where
 
     let parameters: Vec<_> = (0..samples).map(|i| start + i as f32 * span).collect();
 
-    let mut t0: Option<nalgebra::Isometry<f32, nalgebra::Rotation<f32, 3>, 3>> = None;
-    let mut t1: Option<nalgebra::Isometry<f32, nalgebra::Rotation<f32, 3>, 3>> = None;
+    let mut start_cap: Option<(
+        NurbsCurve3D<f32>,
+        nalgebra::Isometry<f32, nalgebra::Rotation<f32, 3>, 3>,
+    )> = None;
+    let mut end_cap: Option<(
+        NurbsCurve3D<f32>,
+        nalgebra::Isometry<f32, nalgebra::Rotation<f32, 3>, 3>,
+    )> = None;
 
     let frames = rail.compute_frenet_frames(&parameters);
+    let len = frames.len() - 1;
     let curves: Vec<_> = frames
-        .iter()
+        .into_iter()
         .enumerate()
         .map(|(i, frame)| {
-            let translate = Translation3::from(frame.position().clone());
-            let tangent = frame.tangent().clone();
+            let translate = Translation3::from(*frame.position());
+            let tangent = frame.tangent();
             let angle = tangent.x.atan2(tangent.z);
             let rotation = Rotation3::from_axis_angle(&Vector3::y_axis(), angle);
             let transform = translate * rotation;
 
-            if t0.is_none() {
-                t0 = Some(transform.clone());
-            }
-            t1 = Some(transform.clone());
-
             let sample = profile.sample(parameters[i]);
             let profile =
                 NurbsCurve3D::try_periodic_interpolate(&sample, 3, KnotStyle::Centripetal).unwrap();
-            profile.transformed(&transform.into())
+
+            let result = profile.transformed(&transform.into());
+
+            if i == 0 {
+                start_cap = Some((profile, transform));
+            } else if i == len {
+                end_cap = Some((profile, transform));
+            }
+
+            result
         })
         .collect();
 
@@ -163,13 +146,14 @@ where
     let tessellation = result.tessellate(Some(AdaptiveTessellationOptions::default()));
     let mut sweep_mesh = mesh_tessellation(tessellation);
 
-    let start_mesh = mesh_profile_filled(&profile.sample(0.0)).transformed_by(
-        Transform::from_translation(t0.unwrap().translation.into())
-            .with_rotation(t0.unwrap().rotation.into()),
+    let (start_cap, end_cap) = (start_cap.unwrap(), end_cap.unwrap());
+    let start_mesh = mesh_profile_filled(&start_cap.0).transformed_by(
+        Transform::from_translation(start_cap.1.translation.into())
+            .with_rotation(start_cap.1.rotation.into()),
     );
-    let end_mesh = mesh_profile_filled(&profile.sample(1.0)).transformed_by(
-        Transform::from_translation(t1.unwrap().translation.into())
-            .with_rotation(t1.unwrap().rotation.into()),
+    let end_mesh = mesh_profile_filled(&end_cap.0).transformed_by(
+        Transform::from_translation(end_cap.1.translation.into())
+            .with_rotation(end_cap.1.rotation.into()),
     );
 
     sweep_mesh.merge(&start_mesh);
@@ -178,20 +162,18 @@ where
     sweep_mesh
 }
 
-pub fn mesh_profile_filled(profile: &[Point3<f32>]) -> Mesh {
-    let profile =
-        NurbsCurve3D::try_periodic_interpolate(&profile, 3, KnotStyle::Centripetal).unwrap();
+pub fn mesh_profile_filled(profile: &NurbsCurve3D<f32>) -> Mesh {
     let samples = profile.tessellate(Some(1e-8));
 
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, default());
     let vertices: Vec<Vec3> = samples.iter().map(|pt| (*pt).into()).collect();
 
     let points = vertices
-        .iter()
+        .into_iter()
         .map(|v| vec![v.x, v.y, v.z])
         .collect::<Vec<_>>();
     let points = vec![points];
-    let result = earclip::earclip::<f32, u32>(&points, None, None);
+    let result = earclip::<f32, u32>(&points, None, None);
     let positions = result
         .0
         .chunks(3)
