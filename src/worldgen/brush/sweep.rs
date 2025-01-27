@@ -69,7 +69,7 @@ pub fn sweep_zero_twist_filled<D>(
     profile: &ProfileRamp,
     rail: &NurbsCurve3D<f32>,
     degree_v: Option<usize>,
-) -> Mesh
+) -> anyhow::Result<Mesh>
 where
     D: DimName,
 {
@@ -102,7 +102,8 @@ where
 
             let sample = profile.sample(parameters[i]);
             let profile =
-                NurbsCurve3D::try_periodic_interpolate(&sample, 3, KnotStyle::Centripetal).unwrap();
+                NurbsCurve3D::try_periodic_interpolate(&sample, 3, KnotStyle::Centripetal)
+                    .expect("periodic interpolation failed");
 
             let result = profile.transformed(&transform.into());
 
@@ -116,7 +117,7 @@ where
         })
         .collect();
 
-    let result = NurbsSurface3D::try_loft(&curves, degree_v).unwrap();
+    let result = NurbsSurface3D::try_loft(&curves, degree_v)?;
 
     let tessellation = result.tessellate(Some(AdaptiveTessellationOptions::default()));
     let mut sweep_mesh = mesh_tessellation(tessellation);
@@ -134,7 +135,7 @@ where
     sweep_mesh.merge(&start_mesh);
     sweep_mesh.merge(&end_mesh);
 
-    sweep_mesh
+    Ok(sweep_mesh)
 }
 
 pub fn mesh_profile_filled(profile: &NurbsCurve3D<f32>) -> Mesh {

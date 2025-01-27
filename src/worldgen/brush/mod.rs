@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use avian3d::prelude::*;
 use bevy::{
     prelude::*,
@@ -17,7 +18,7 @@ pub mod collider;
 pub mod curve;
 pub mod sweep;
 
-use curve::{curve_bounding_box, CurveBrush};
+use curve::curve_bounding_box;
 
 pub trait Sampler {
     fn sample(&self, point: Vec3) -> VoxelSample;
@@ -61,6 +62,11 @@ struct TerrainBrushTask(Task<TerrainBrush>);
 
 #[derive(Component, Clone)]
 pub enum TerrainBrushRequest {
+    Curve {
+        material: VoxelMaterial,
+        points: Vec<Point3<f32>>,
+        radius: f32,
+    },
     Sweep {
         material: VoxelMaterial,
         rail: Vec<Point3<f32>>,
@@ -71,32 +77,40 @@ pub enum TerrainBrushRequest {
 impl TerrainBrushRequest {
     pub fn process(self) -> TerrainBrush {
         match self {
+            TerrainBrushRequest::Curve {
+                material,
+                points,
+                radius,
+            } => TerrainBrush::curve(material, points, radius),
             TerrainBrushRequest::Sweep {
                 material,
                 rail,
                 profile,
-            } => TerrainBrush::sweep(material, rail, profile),
+            } => TerrainBrush::sweep(material, rail.clone(), profile).unwrap_or_else(|_| {
+                // TODO dynamic fallback curve radius
+                TerrainBrush::curve(VoxelMaterial::Invalid, rail, 4.0)
+            }),
         }
     }
 }
 
 #[derive(Component, Clone)]
 pub enum TerrainBrush {
-    Curve(CurveBrush, VoxelMaterial, ChunksAABB),
+    Curve(NurbsCurve3D<f32>, f32, VoxelMaterial, ChunksAABB),
     Collider(Collider, VoxelMaterial, ChunksAABB),
 }
 
 impl TerrainBrush {
     pub fn chunks(&self) -> &ChunksAABB {
         match self {
-            TerrainBrush::Curve(_, _, chunks_aabb) => chunks_aabb,
+            TerrainBrush::Curve(_, _, _, chunks_aabb) => chunks_aabb,
             TerrainBrush::Collider(_, _, chunks_aabb) => chunks_aabb,
         }
     }
 
     pub fn sample(&self, point: Vec3) -> VoxelSample {
         match self {
-            TerrainBrush::Curve(_, _, _) => todo!(),
+            TerrainBrush::Curve(_, _, _, _) => self.sample_curve(point),
             TerrainBrush::Collider(_, _, _) => self.sample_collider(point),
         }
     }
@@ -105,26 +119,53 @@ impl TerrainBrush {
     // Spawning
     //
 
-    pub fn sweep(material: VoxelMaterial, rail: Vec<Point3<f32>>, profile: ProfileRamp) -> Self {
-        let rail = NurbsCurve3D::<f32>::try_interpolate(&rail, 3).unwrap();
+    pub fn curve(material: VoxelMaterial, points: Vec<Point3<f32>>, radius: f32) -> Self {
+        let curve = NurbsCurve3D::<f32>::try_interpolate(&points, 3).unwrap();
+        let samples = curve.tessellate(Some(1e-8));
+        let aabb = curve_bounding_box(&samples);
+        let chunks = ChunksAABB::from_world_aabb(aabb, 1);
+
+        Self::Curve(curve, radius, material, chunks)
+    }
+
+    pub fn sweep(
+        material: VoxelMaterial,
+        rail: Vec<Point3<f32>>,
+        profile: ProfileRamp,
+    ) -> anyhow::Result<Self> {
+        let rail = NurbsCurve3D::<f32>::try_interpolate(&rail, 3)?;
         let samples = rail.tessellate(Some(1e-8));
         let aabb = curve_bounding_box(&samples);
         let chunks = ChunksAABB::from_world_aabb(aabb, 1);
-        let sweep_mesh = sweep_zero_twist_filled::<Const<4>>(&profile, &rail, Some(4));
+        let sweep_mesh = sweep_zero_twist_filled::<Const<4>>(&profile, &rail, Some(4))?;
         let collider =
             Collider::convex_decomposition_from_mesh_with_config(&sweep_mesh, &VHACD_PARAMETERS)
-                .unwrap();
+                .ok_or_else(|| anyhow!("convex decomposition failed"))?;
 
-        Self::Collider(collider, material, chunks)
+        Ok(Self::Collider(collider, material, chunks))
     }
 
     //
     // Sampling
     //
 
+    fn sample_curve(&self, point: Vec3) -> VoxelSample {
+        let TerrainBrush::Curve(curve, radius, material, _) = self else {
+            panic!("wrong sample function");
+        };
+
+        let closest: Vec3 = curve.find_closest_point(&point.into()).unwrap().into();
+        let distance = point.distance(closest) - radius;
+
+        VoxelSample {
+            material: *material,
+            distance,
+        }
+    }
+
     fn sample_collider(&self, point: Vec3) -> VoxelSample {
         let TerrainBrush::Collider(collider, material, _) = self else {
-            panic!();
+            panic!("wrong sample function");
         };
 
         let (closest, _) =
