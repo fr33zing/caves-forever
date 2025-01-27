@@ -45,7 +45,6 @@ fn detect_brush_additions(
 
     changed_brushes.iter().for_each(|(entity, brush)| {
         if brush.is_added() {
-            println!("added brush: {entity}");
             additions.push((entity, brush.clone()));
         }
     });
@@ -73,7 +72,6 @@ fn detect_brush_removals(
     let mut removals: Vec<Entity> = Vec::new();
 
     removed_brushes.read().for_each(|entity| {
-        println!("removed brush: {entity}");
         removals.push(entity);
     });
 
