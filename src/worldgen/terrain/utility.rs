@@ -4,7 +4,6 @@ use bevy::{
     prelude::*,
     render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
 };
-use fast_surface_nets::{ndshape::ConstShape, surface_nets, SurfaceNetsBuffer};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
@@ -13,6 +12,7 @@ use crate::{
 };
 
 use super::{
+    fast_surface_nets::{ndshape::ConstShape, surface_nets, SurfaceNetsBuffer},
     ChunkData, ChunkShape, CHUNK_INTERNAL_GEOMETRY, CHUNK_SAMPLE_RESOLUTION, CHUNK_SAMPLE_SIZE,
 };
 

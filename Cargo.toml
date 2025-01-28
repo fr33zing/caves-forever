@@ -44,7 +44,6 @@ common_macros = "0.1.1"
 curvo  = "0.1.46"
 earclip = "1.1.0"
 egui = "0.30.0"
-fast-surface-nets = "0.2.0"
 meshtext = "0.3.1"
 nalgebra = "0.33.2"
 noisy_bevy = "0.8.0"
@@ -54,6 +53,10 @@ ron = "0.8.1"
 serde = { version = "1.0.217", features = ["derive"] }
 strum = { version = "0.26.3", features = ["derive", "strum_macros"] }
 strum_macros = "0.26.4"
+
+# fast-surface-nets
+glam = "0.29"
+ndshape = "0.3"
 
 # TODO change this when https://github.com/urholaukkarinen/transform-gizmo/pull/86 merges
 transform-gizmo-bevy = { git = "https://github.com/ethereumdegen/transform-gizmo.git" }

@@ -17,6 +17,7 @@ use super::{
 mod boundary;
 mod change_detection;
 mod destroy;
+mod fast_surface_nets;
 mod remesh;
 mod spawn;
 mod utility;
