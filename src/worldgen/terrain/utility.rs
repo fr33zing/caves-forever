@@ -148,18 +148,18 @@ pub fn mesh_chunk(data: &ChunkData) -> Option<(Mesh, Collider)> {
         return None;
     }
 
-    let mut physics_mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all());
+    let mut physics_mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::MAIN_WORLD,
+    );
     physics_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, buffer.positions);
     physics_mesh.insert_indices(Indices::U32(buffer.indices));
 
-    let collider = Collider::trimesh_from_mesh_with_config(
-        &physics_mesh,
-        TrimeshFlags::MERGE_DUPLICATE_VERTICES,
-    )
-    .unwrap();
+    let collider = Collider::trimesh_from_mesh(&physics_mesh).unwrap();
 
     // Unconnected triangles are required to blend voxel types
     let mut render_mesh = physics_mesh.clone();
+    render_mesh.asset_usage = RenderAssetUsages::all();
     render_mesh.duplicate_vertices();
     render_mesh.compute_flat_normals();
 
