@@ -15,6 +15,7 @@ use crate::{
     state::{EditorMode, EditorState, EditorViewMode, SpawnPickerMode},
 };
 
+pub mod rooms;
 pub mod tunnels;
 
 #[derive(Default, Clone)]
@@ -93,6 +94,18 @@ pub fn setup(world: &mut World) {
                     world.register_system(tunnels::draw_size_references),
                     world.register_system(tunnels::remesh_preview_path),
                     world.register_system(tunnels::update_preview_brush),
+                ],
+                ..default()
+            },
+        );
+
+        switcher.mode_systems.insert(
+            EditorMode::Rooms,
+            ModeSystems {
+                update: vec![
+                    world.register_system(rooms::detect_file_changes),
+                    world.register_system(rooms::detect_world_changes),
+                    world.register_system(rooms::detect_additions),
                 ],
                 ..default()
             },

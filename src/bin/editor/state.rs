@@ -8,7 +8,7 @@ use std::{
 
 use anyhow::anyhow;
 use bevy::prelude::*;
-use mines::worldgen::asset::Tunnel;
+use mines::worldgen::asset::{Room, Tunnel};
 use nalgebra::Point2;
 use serde::{Deserialize, Serialize};
 use strum::{EnumIter, EnumProperty, IntoEnumIterator};
@@ -98,15 +98,6 @@ impl Default for TunnelsModeState {
 //
 // Rooms mode
 //
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct Room {}
-
-impl Default for Room {
-    fn default() -> Self {
-        Self {}
-    }
-}
 
 #[derive(Debug)]
 pub struct RoomsModeState {}

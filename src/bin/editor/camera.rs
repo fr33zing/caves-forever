@@ -27,7 +27,7 @@ pub fn on_change_mode(
         return;
     };
     let (mut controller, mut camera, mut allow_orbit) = trackball.into_inner();
-    let (d, target, up, eps) = (16.0, Point3::origin(), &Vector3::y_axis(), f32::EPSILON);
+    let (d, mut target, up, eps) = (16.0, Point3::origin(), &Vector3::y_axis(), f32::EPSILON);
 
     let mut block_orbit = false;
 
@@ -40,14 +40,17 @@ pub fn on_change_mode(
                 block_orbit = true;
             }
             EditorViewMode::Preview => {
+                target.y += 8.0;
                 camera.scope.set_ortho(false);
                 camera.frame.set_target(target);
-                camera
-                    .frame
-                    .set_eye(&(Point3::new(0.0, d / 2.0, -d) * 2.0), up);
+                camera.frame.set_eye(&Point3::new(0.0, d, -d / 2.0), up);
             }
         },
-        EditorMode::Rooms => {}
+        EditorMode::Rooms => {
+            camera.scope.set_ortho(false);
+            camera.frame.set_target(target);
+            camera.frame.set_eye(&Point3::new(-d, d / 2.0, -d), up);
+        }
     }
 
     camera.reset = camera.frame;

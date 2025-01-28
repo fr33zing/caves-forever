@@ -10,9 +10,7 @@ use fast_surface_nets::ndshape::{ConstShape, ConstShape3u32};
 
 use crate::materials::{CaveMaterial, CaveMaterialExtension};
 
-use super::{
-    brush::TerrainBrushPlugin, chunk::ChunksAABB, consts::*, layout, voxel::VoxelMaterial,
-};
+use super::{brush::TerrainBrushPlugin, chunk::ChunksAABB, consts::*, voxel::VoxelMaterial};
 
 mod boundary;
 mod change_detection;
@@ -116,14 +114,7 @@ impl Plugin for TerrainPlugin {
         app.init_resource::<TerrainStateMutex>()
             .add_event::<DestroyTerrainEvent>()
             .add_plugins((TerrainChangeDetectionPlugin, TerrainBrushPlugin))
-            .add_systems(
-                Startup,
-                (
-                    setup,
-                    setup_material,
-                    layout::setup_debug_layout.before(setup),
-                ),
-            )
+            .add_systems(Startup, (setup, setup_material))
             .add_systems(Update, draw_debug)
             .add_systems(Update, enforce_loading_chunk_boundaries)
             .add_systems(

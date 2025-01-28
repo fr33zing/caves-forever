@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use noisy_bevy::simplex_noise_3d;
+use serde::{Deserialize, Serialize};
 use strum::EnumProperty;
 use strum_macros::FromRepr;
 
@@ -26,7 +27,7 @@ impl VoxelHardness {
     }
 }
 
-#[derive(FromRepr, EnumProperty, Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(FromRepr, EnumProperty, Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum VoxelMaterial {
     #[strum(props(Name = "Unset"))]

@@ -1,5 +1,14 @@
 use avian3d::prelude::*;
-use bevy::{asset::AssetMetaCheck, pbr::ExtendedMaterial, prelude::*, window::PresentMode};
+use bevy::{
+    asset::AssetMetaCheck,
+    pbr::{wireframe::WireframePlugin, ExtendedMaterial},
+    prelude::*,
+    render::{
+        settings::{RenderCreation, WgpuFeatures, WgpuSettings},
+        RenderPlugin,
+    },
+    window::PresentMode,
+};
 use bevy_egui::EguiPlugin;
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 use bevy_trackball::TrackballPlugin;
@@ -41,10 +50,19 @@ fn main() {
             .set(AssetPlugin {
                 meta_check: AssetMetaCheck::Never,
                 ..default()
+            })
+            .set(RenderPlugin {
+                render_creation: RenderCreation::Automatic(WgpuSettings {
+                    // WARN this is a native only feature. It will not work with webgl or webgpu
+                    features: WgpuFeatures::POLYGON_MODE_LINE,
+                    ..default()
+                }),
+                ..default()
             }),
     );
 
     app.add_plugins((
+        WireframePlugin,
         EguiPlugin,
         PhysicsPlugins::default(),
         LineMaterialPlugin,

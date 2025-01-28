@@ -1,7 +1,6 @@
 pub mod asset;
 pub mod brush;
 pub mod chunk;
-pub mod layout;
 pub mod terrain;
 pub mod voxel;
 
@@ -31,7 +30,7 @@ pub mod consts {
         alpha: 0.025,
         beta: 0.025,
         // Default
-        resolution: 64,
+        resolution: 48,
         concavity: 0.01,
         plane_downsampling: 4,
         convex_hull_downsampling: 4,

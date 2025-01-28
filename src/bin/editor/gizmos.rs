@@ -1,4 +1,9 @@
-use bevy::{math::Vec3A, picking::backend::ray::RayMap, prelude::*};
+use bevy::{
+    math::Vec3A,
+    pbr::wireframe::{Wireframe, WireframeColor},
+    picking::backend::ray::RayMap,
+    prelude::*,
+};
 use mines::{
     tnua::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
     worldgen::terrain::Chunk,
@@ -74,6 +79,7 @@ fn pick(
     mut gizmo_options: ResMut<GizmoOptions>,
     pickables: Query<(Entity, &Pickable)>,
     gizmo_targets: Query<(Entity, &GizmoTarget)>,
+    wireframes: Query<Entity, With<Wireframe>>,
 ) {
     if state.spawn.mode != SpawnPickerMode::Inactive {
         return;
@@ -101,9 +107,22 @@ fn pick(
         };
 
         gizmo_targets.iter().for_each(|(entity, _)| {
-            commands.entity(entity).remove::<GizmoTarget>();
+            let mut commands = commands.entity(entity);
+            commands.remove::<GizmoTarget>();
+            if wireframes.get(entity).is_ok() {
+                commands.insert(WireframeColor {
+                    color: Color::WHITE,
+                });
+            }
         });
-        commands.entity(*entity).insert(GizmoTarget::default());
+
+        let mut commands = commands.entity(*entity);
+        commands.insert(GizmoTarget::default());
+        if wireframes.get(*entity).is_ok() {
+            commands.insert(WireframeColor {
+                color: Color::srgb(0.0, 1.0, 1.0),
+            });
+        }
 
         gizmo_options.gizmo_modes = pickable.0.unwrap_or_else(|| GizmoMode::all());
         gizmo_options.gizmo_orientation = pickable.1.unwrap_or_else(|| GizmoOrientation::default());
@@ -114,7 +133,13 @@ fn pick(
 
     if miss {
         gizmo_targets.iter().for_each(|(entity, _)| {
-            commands.entity(entity).remove::<GizmoTarget>();
+            let mut commands = commands.entity(entity);
+            commands.remove::<GizmoTarget>();
+            if wireframes.get(entity).is_ok() {
+                commands.insert(WireframeColor {
+                    color: Color::WHITE,
+                });
+            }
         });
     }
 }

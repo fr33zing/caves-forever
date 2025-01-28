@@ -10,7 +10,7 @@ use sweep::{sweep_zero_twist_filled, ProfileRamp};
 
 use super::{
     chunk::ChunksAABB,
-    consts::VHACD_PARAMETERS,
+    consts::{VHACD_PARAMETERS, VOXEL_REAL_SIZE},
     voxel::{VoxelMaterial, VoxelSample},
 };
 
@@ -72,6 +72,11 @@ pub enum TerrainBrushRequest {
         rail: Vec<Point3<f32>>,
         profile: ProfileRamp,
     },
+    Mesh {
+        material: VoxelMaterial,
+        mesh: Mesh,
+        transform: Transform,
+    },
 }
 
 impl TerrainBrushRequest {
@@ -89,6 +94,14 @@ impl TerrainBrushRequest {
             } => TerrainBrush::sweep(material, rail.clone(), profile).unwrap_or_else(|_| {
                 // TODO dynamic fallback curve radius
                 TerrainBrush::curve(VoxelMaterial::Invalid, rail, 4.0)
+            }),
+            TerrainBrushRequest::Mesh {
+                material,
+                mesh,
+                transform,
+            } => TerrainBrush::mesh(material, &mesh, Some(transform)).unwrap_or_else(|_| {
+                // TODO dynamic fallback sphere radius
+                TerrainBrush::collider(VoxelMaterial::Invalid, Collider::sphere(4.0))
             }),
         }
     }
@@ -134,15 +147,35 @@ impl TerrainBrush {
         profile: ProfileRamp,
     ) -> anyhow::Result<Self> {
         let rail = NurbsCurve3D::<f32>::try_interpolate(&rail, 3)?;
-        let samples = rail.tessellate(Some(1e-8));
-        let aabb = curve_bounding_box(&samples);
-        let chunks = ChunksAABB::from_world_aabb(aabb, 1);
-        let sweep_mesh = sweep_zero_twist_filled::<Const<4>>(&profile, &rail, Some(4))?;
+        let mesh = sweep_zero_twist_filled::<Const<4>>(&profile, &rail, Some(4))?;
+
+        Self::mesh(material, &mesh, None)
+    }
+
+    pub fn mesh(
+        material: VoxelMaterial,
+        mesh: &Mesh,
+        transform: Option<Transform>,
+    ) -> anyhow::Result<Self> {
+        let mesh = if let Some(transform) = transform {
+            &mesh.clone().transformed_by(transform)
+        } else {
+            mesh
+        };
         let collider =
-            Collider::convex_decomposition_from_mesh_with_config(&sweep_mesh, &VHACD_PARAMETERS)
+            Collider::convex_decomposition_from_mesh_with_config(mesh, &VHACD_PARAMETERS)
                 .ok_or_else(|| anyhow!("convex decomposition failed"))?;
 
-        Ok(Self::Collider(collider, material, chunks))
+        Ok(Self::collider(material, collider))
+    }
+
+    pub fn collider(material: VoxelMaterial, collider: Collider) -> Self {
+        let aabb = collider
+            .aabb(Vec3::ZERO, Rotation::default())
+            .grow(Vec3::splat(VOXEL_REAL_SIZE));
+        let chunks = ChunksAABB::from_world_aabb((aabb.min, aabb.max), 0);
+
+        Self::Collider(collider, material, chunks)
     }
 
     //

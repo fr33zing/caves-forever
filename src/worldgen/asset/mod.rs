@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use strum::EnumIter;
 
+mod room;
 mod tunnel;
+pub use room::*;
 pub use tunnel::*;
 
 #[repr(u8)]

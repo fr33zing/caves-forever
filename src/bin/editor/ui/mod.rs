@@ -16,7 +16,7 @@ use nalgebra::{Point3, Vector3};
 use strum::{EnumProperty, IntoEnumIterator};
 
 use crate::{
-    mode::tunnels,
+    mode::{rooms, tunnels},
     state::{
         EditorMode, EditorState, EditorViewMode, FilePayload, FilePickerState, SpawnPickerMode,
     },
@@ -296,6 +296,7 @@ fn top_panel(
 
         ui.separator();
 
+        // Playtest
         if state.view == EditorViewMode::Preview {
             if state.spawn.mode != SpawnPickerMode::Playing {
                 if ui.button("Play").clicked() {
@@ -315,11 +316,11 @@ fn top_panel(
                 );
             }
         }
-        // Mode-specific
 
+        // Mode-specific
         match state.mode() {
             EditorMode::Tunnels => tunnels::topbar(state, ui),
-            EditorMode::Rooms => {}
+            EditorMode::Rooms => rooms::topbar(state, ui),
         }
     });
 }
