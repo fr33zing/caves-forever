@@ -1,13 +1,22 @@
 use bevy::{math::Vec3A, picking::backend::ray::RayMap, prelude::*};
+use mines::{
+    tnua::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
+    worldgen::terrain::Chunk,
+};
 use transform_gizmo_bevy::{
     Color32, EnumSet, GizmoHotkeys, GizmoMode, GizmoOptions, GizmoOrientation, GizmoTarget,
     GizmoVisuals, TransformGizmoPlugin,
 };
 
+use crate::state::{EditorState, SpawnPickerMode};
+
 pub struct EditorGizmosPlugin;
 
 #[derive(Component)]
 pub struct Pickable(pub Option<EnumSet<GizmoMode>>, pub Option<GizmoOrientation>);
+
+#[derive(Component)]
+pub struct SpawnPositionIndicator;
 
 #[derive(Component)]
 pub struct ConnectionPlane;
@@ -42,7 +51,13 @@ impl Plugin for EditorGizmosPlugin {
 
         app.add_systems(
             Update,
-            (pick, draw_connection_planes, draw_connection_points),
+            (
+                pick,
+                pick_spawn_position,
+                draw_spawn_position,
+                draw_connection_planes,
+                draw_connection_points,
+            ),
         );
     }
 }
@@ -51,11 +66,15 @@ fn pick(
     mut commands: Commands,
     mut ray_cast: MeshRayCast,
     ray_map: Res<RayMap>,
+    state: Res<EditorState>,
     mouse: Res<ButtonInput<MouseButton>>,
     mut gizmo_options: ResMut<GizmoOptions>,
     pickables: Query<(Entity, &Pickable)>,
     gizmo_targets: Query<(Entity, &GizmoTarget)>,
 ) {
+    if state.spawn.mode != SpawnPickerMode::Inactive {
+        return;
+    }
     if !mouse.just_released(MouseButton::Left) {
         return;
     }
@@ -66,17 +85,22 @@ fn pick(
     let mut miss = true;
 
     for (_, ray) in ray_map.iter() {
-        let Some((entity, _)) = ray_cast.cast_ray(*ray, &RayCastSettings::default()).first() else {
+        let settings = RayCastSettings {
+            filter: &|entity| pickables.get(entity).is_ok(),
+            ..default()
+        };
+
+        let Some((entity, _)) = ray_cast.cast_ray(*ray, &settings).first() else {
             continue;
         };
-        let Ok((entity, pickable)) = pickables.get(*entity) else {
+        let Ok((_, pickable)) = pickables.get(*entity) else {
             continue;
         };
 
         gizmo_targets.iter().for_each(|(entity, _)| {
             commands.entity(entity).remove::<GizmoTarget>();
         });
-        commands.entity(entity).insert(GizmoTarget::default());
+        commands.entity(*entity).insert(GizmoTarget::default());
 
         gizmo_options.gizmo_modes = pickable.0.unwrap_or_else(|| GizmoMode::all());
         gizmo_options.gizmo_orientation = pickable.1.unwrap_or_else(|| GizmoOrientation::default());
@@ -89,6 +113,73 @@ fn pick(
         gizmo_targets.iter().for_each(|(entity, _)| {
             commands.entity(entity).remove::<GizmoTarget>();
         });
+    }
+}
+
+fn pick_spawn_position(
+    mut ray_cast: MeshRayCast,
+    ray_map: Res<RayMap>,
+    mut state: ResMut<EditorState>,
+    mouse: Res<ButtonInput<MouseButton>>,
+    chunks: Query<Entity, With<Chunk>>,
+) {
+    if state.spawn.mode != SpawnPickerMode::Picking {
+        return;
+    }
+
+    let mut spawn_pos: Option<Vec3> = None;
+
+    for (_, ray) in ray_map.iter() {
+        let settings = RayCastSettings {
+            filter: &|entity| chunks.get(entity).is_ok(),
+            ..default()
+        };
+
+        let Some((_, hit)) = ray_cast.cast_ray(*ray, &settings).first() else {
+            continue;
+        };
+
+        spawn_pos = Some(hit.point + hit.normal * 0.1);
+        break;
+    }
+
+    state.spawn.position = spawn_pos;
+
+    if mouse.just_released(MouseButton::Left) {
+        state.spawn.mode = SpawnPickerMode::Spawning;
+    }
+}
+
+fn draw_spawn_position(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    state: Res<EditorState>,
+    spawn_pos_indicator: Option<Single<Entity, With<SpawnPositionIndicator>>>,
+) {
+    if let Some(spawn_pos) = state.spawn.position {
+        let mut commands = if let Some(spawn_pos_indicator) = spawn_pos_indicator {
+            commands.entity(*spawn_pos_indicator)
+        } else {
+            commands.spawn((
+                SpawnPositionIndicator,
+                Mesh3d(meshes.add(Capsule3d::new(
+                    PLAYER_RADIUS,
+                    (PLAYER_HEIGHT - PLAYER_RADIUS * 2.0) / 2.0,
+                ))),
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    base_color: Color::srgb(0.0, 1.0, 0.0),
+                    ..default()
+                })),
+            ))
+        };
+
+        let transform = Transform::from_translation(spawn_pos + (Vec3::Y * PLAYER_HEIGHT / 2.0));
+        commands.insert(transform);
+    } else {
+        if let Some(spawn_pos_indicator) = spawn_pos_indicator {
+            commands.entity(*spawn_pos_indicator).clear();
+        }
     }
 }
 

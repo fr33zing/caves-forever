@@ -422,6 +422,27 @@ impl FileState {
 }
 
 //
+// Miscellaneous
+//
+
+#[derive(Default, Debug, PartialEq)]
+#[repr(u8)]
+pub enum SpawnPickerMode {
+    #[default]
+    Inactive = 0,
+    Picking = 1,
+    Spawning = 2,
+    Playing = 3,
+    Despawning = 4,
+}
+
+#[derive(Default, Debug)]
+pub struct SpawnPickerState {
+    pub mode: SpawnPickerMode,
+    pub position: Option<Vec3>,
+}
+
+//
 // Main state
 //
 
@@ -429,6 +450,7 @@ impl FileState {
 pub struct EditorState {
     pub view: EditorViewMode,
     pub files: FilePickerState,
+    pub spawn: SpawnPickerState,
     pub tunnels_mode: TunnelsModeState,
     #[allow(unused)]
     pub rooms_mode: RoomsModeState,
@@ -438,9 +460,10 @@ impl Default for EditorState {
     fn default() -> Self {
         Self {
             view: Default::default(),
+            files: FilePickerState::from_directory("assets/worldgen"),
+            spawn: Default::default(),
             tunnels_mode: Default::default(),
             rooms_mode: Default::default(),
-            files: FilePickerState::from_directory("assets/worldgen"),
         }
     }
 }

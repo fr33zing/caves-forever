@@ -9,6 +9,7 @@ use noisy_bevy::NoisyShaderPlugin;
 
 use mines::{
     materials::{CaveMaterialExtension, LineMaterialPlugin},
+    tnua::PlayerPlugin,
     worldgen::terrain::TerrainPlugin,
 };
 
@@ -46,7 +47,6 @@ fn main() {
     app.add_plugins((
         EguiPlugin,
         PhysicsPlugins::default(),
-        PhysicsDebugPlugin::default(),
         LineMaterialPlugin,
         NoisyShaderPlugin,
         InfiniteGridPlugin,
@@ -55,6 +55,7 @@ fn main() {
 
     app.add_plugins((
         TerrainPlugin,
+        PlayerPlugin,
         MaterialPlugin::<ExtendedMaterial<StandardMaterial, CaveMaterialExtension>>::default(),
     ));
 

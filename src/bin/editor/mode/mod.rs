@@ -1,11 +1,18 @@
+use core::f32;
 use std::collections::HashMap;
 
-use bevy::{ecs::system::SystemId, prelude::*};
+use bevy::{
+    ecs::{system::SystemId, world::CommandQueue},
+    prelude::*,
+};
+use bevy_trackball::TrackballCamera;
 use common_macros::hash_map;
+use mines::tnua::{consts::PLAYER_HEIGHT, DespawnPlayerCommand, SpawnPlayerCommand};
+use nalgebra::Vector3;
 
 use crate::{
     camera,
-    state::{EditorMode, EditorState, EditorViewMode},
+    state::{EditorMode, EditorState, EditorViewMode, SpawnPickerMode},
 };
 
 pub mod tunnels;
@@ -26,6 +33,7 @@ struct ModeSwitcher {
     pub cleanup_system: SystemId,
     pub camera_on_change_mode_system: SystemId,
     pub update_files_changed_status_system: SystemId,
+    pub playtest_system: SystemId,
 }
 
 #[derive(Component)]
@@ -45,6 +53,7 @@ impl Plugin for EditorModesPlugin {
         let camera_on_change_mode_system = world.register_system(camera::on_change_mode);
         let cleanup_system = world.register_system(cleanup);
         let update_files_changed_status_system = world.register_system(update_files_changed_status);
+        let playtest_system = world.register_system(playtest);
 
         app.insert_resource(ModeSwitcher {
             prev_mode: default(),
@@ -53,6 +62,7 @@ impl Plugin for EditorModesPlugin {
             cleanup_system,
             camera_on_change_mode_system,
             update_files_changed_status_system,
+            playtest_system,
         });
 
         app.add_systems(Startup, (camera::setup, setup).chain());
@@ -150,6 +160,7 @@ fn switch_modes(world: &mut World) {
         }
 
         systems.push(Some(switcher.update_files_changed_status_system));
+        systems.push(Some(switcher.playtest_system));
 
         systems
             .into_iter()
@@ -185,3 +196,93 @@ fn update_files_changed_status(world: &mut World) {
             .for_each(|f| f.changed = f.data != f.last_saved_data);
     });
 }
+
+fn playtest(
+    mut commands: Commands,
+    mut state: ResMut<EditorState>,
+    mut camera: Query<(&mut Camera, &mut TrackballCamera, &mut PointLight), With<TrackballCamera>>,
+) {
+    let next_mode: Option<SpawnPickerMode> = match state.spawn.mode {
+        SpawnPickerMode::Spawning => Some(SpawnPickerMode::Playing),
+        SpawnPickerMode::Despawning => Some(SpawnPickerMode::Inactive),
+        _ => None,
+    };
+
+    let Some(next_mode) = next_mode else {
+        return;
+    };
+
+    let Ok(single) = camera.get_single_mut() else {
+        return;
+    };
+
+    let (mut camera, mut trackball, mut light) = single;
+    let mut queue = CommandQueue::default();
+
+    match next_mode {
+        SpawnPickerMode::Inactive => {
+            camera.is_active = true;
+            light.range = 2048.0;
+            queue.push(DespawnPlayerCommand);
+            // Camera doesn't switch properly unless we change the frame.
+            trackball
+                .frame
+                .local_slide(&Vector3::new(0.0, f32::EPSILON, 0.0));
+        }
+        SpawnPickerMode::Playing => {
+            camera.is_active = false;
+            light.range = 0.0;
+            queue.push(SpawnPlayerCommand {
+                position: state.spawn.position.unwrap() + Vec3::Y * PLAYER_HEIGHT / 2.0,
+            });
+        }
+        _ => {}
+    };
+
+    state.spawn.mode = next_mode;
+    commands.append(&mut queue);
+}
+
+// fn playtest(world: &mut World) {
+//     world.resource_scope(|world, mut state: Mut<EditorState>| {
+//         let next_mode: Option<SpawnPickerMode> = match state.spawn.mode {
+//             SpawnPickerMode::Spawning => Some(SpawnPickerMode::Playing),
+//             SpawnPickerMode::Despawning => Some(SpawnPickerMode::Inactive),
+//             _ => None,
+//         };
+
+//         let Some(next_mode) = next_mode else {
+//             return;
+//         };
+
+//         let mut camera =
+//             world.query_filtered::<(&mut Camera, &mut TrackballCamera, &mut PointLight), With<TrackballCamera>>();
+// 	let Ok(single) = camera.get_single_mut(world) else {
+// 	    return;
+// 	};
+
+//         let (mut camera, mut trackball, mut light) = single;
+//         let mut queue = CommandQueue::default();
+
+//         match next_mode {
+//             SpawnPickerMode::Inactive => {
+//                 camera.is_active = true;
+//                 light.range = 2048.0;
+//                 queue.push(DespawnPlayerCommand);
+// 		// Camera doesn't switch properly unless we change the frame.
+// 		trackball.frame.local_slide(&Vector3::new(0.0, f32::EPSILON, 0.0));
+//             }
+//             SpawnPickerMode::Playing => {
+//                 camera.is_active = false;
+//                 light.range = 0.0;
+//                 queue.push(SpawnPlayerCommand {
+//                     position: state.spawn.position.unwrap() + Vec3::Y * PLAYER_HEIGHT / 2.0,
+//                 });
+//             }
+//             _ => {}
+//         };
+
+//         state.spawn.mode = next_mode;
+//         world.commands().append(&mut queue);
+//     });
+// }

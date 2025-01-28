@@ -17,7 +17,9 @@ use strum::{EnumProperty, IntoEnumIterator};
 
 use crate::{
     mode::tunnels,
-    state::{EditorMode, EditorState, EditorViewMode, FilePayload, FilePickerState},
+    state::{
+        EditorMode, EditorState, EditorViewMode, FilePayload, FilePickerState, SpawnPickerMode,
+    },
 };
 
 mod file_browser;
@@ -294,7 +296,27 @@ fn top_panel(
 
         ui.separator();
 
+        if state.view == EditorViewMode::Preview {
+            if state.spawn.mode != SpawnPickerMode::Playing {
+                if ui.button("Play").clicked() {
+                    state.spawn.mode = match state.spawn.mode {
+                        SpawnPickerMode::Inactive => SpawnPickerMode::Picking,
+                        _ => SpawnPickerMode::Inactive,
+                    }
+                }
+            } else {
+                if ui.button("Stop playing").clicked() {
+                    state.spawn.mode = SpawnPickerMode::Despawning;
+                }
+            }
+            if state.spawn.mode == SpawnPickerMode::Picking {
+                ui.add(
+                    Label::new("Click on terrain to choose a spawn position.").selectable(false),
+                );
+            }
+        }
         // Mode-specific
+
         match state.mode() {
             EditorMode::Tunnels => tunnels::topbar(state, ui),
             EditorMode::Rooms => {}

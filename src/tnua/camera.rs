@@ -47,17 +47,17 @@ impl Default for UiState {
 #[derive(Component)]
 pub struct Flashlight(pub f32);
 
+#[derive(Component)]
+pub struct PlayerCamera;
+
 pub struct PlayerCameraPlugin;
 
 impl Plugin for PlayerCameraPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<UiState>();
-        app.add_systems(Update, ui);
-
-        app.add_systems(Startup, setup);
         app.add_systems(
             Update,
-            (grab_ungrab_mouse, toggle_fullscreen_and_flashlight),
+            (ui, grab_ungrab_mouse, toggle_fullscreen_and_flashlight),
         );
         app.add_systems(PostUpdate, {
             apply_camera_controls.before(bevy::transform::TransformSystem::TransformPropagate)
@@ -78,8 +78,16 @@ fn ui(
     window: Single<&Window, With<PrimaryWindow>>,
     mut ui_state: ResMut<UiState>,
     mut contexts: EguiContexts,
+    player: Option<Single<&Camera, With<PlayerCamera>>>,
 ) {
     if !window.cursor_options.visible {
+        return;
+    }
+    if let Some(camera) = player {
+        if !camera.is_active {
+            return;
+        }
+    } else {
         return;
     }
 
@@ -104,27 +112,6 @@ fn ui(
                 });
             });
         });
-}
-
-fn setup(mut commands: Commands) {
-    commands.spawn((
-        Camera3d::default(),
-        Projection::Perspective(PerspectiveProjection {
-            fov: 45.0_f32.to_radians(),
-            ..default()
-        }),
-        Flashlight(10_000_000.0),
-        SpotLight {
-            intensity: 10_000_000.0,
-            color: Color::WHITE.into(),
-            shadows_enabled: true,
-            inner_angle: 0.35,
-            outer_angle: 0.45,
-            range: 4000.0,
-            radius: 4000.0,
-            ..default()
-        },
-    ));
 }
 
 fn toggle_fullscreen_and_flashlight(
