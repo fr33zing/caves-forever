@@ -16,7 +16,6 @@ use super::{Environment, Rarity};
 pub const TUNNEL_POINTS: usize = 16;
 
 const TUNNEL_DEFAULT_RADIUS: f32 = 5.0;
-const TUNNEL_DEFAULT_VARIANCE: f32 = 1.0;
 
 pub struct TunnelMeshInfo {
     pub center: Vec2,
@@ -26,7 +25,6 @@ pub struct TunnelMeshInfo {
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Default)]
 pub struct TunnelPoint {
     pub position: Point2<f32>,
-    pub variance: Point2<f32>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -42,7 +40,6 @@ impl Default for Tunnel {
         for i in 0..TUNNEL_POINTS {
             let radians = (i as f32 / TUNNEL_POINTS as f32) * PI * 2.0;
             points[i].position = Point2::new(radians.sin(), -radians.cos()) * TUNNEL_DEFAULT_RADIUS;
-            points[i].variance = Point2::new(TUNNEL_DEFAULT_VARIANCE, TUNNEL_DEFAULT_VARIANCE);
         }
 
         Self {
