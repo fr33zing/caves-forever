@@ -49,25 +49,6 @@ struct CaveMaterialExtension {
 @group(2) @binding(100)
 var<uniform> cave_material: CaveMaterialExtension;
 
-fn easeInOutSine(x: f32) -> f32 {
-    return -(cos(3.14 * x) - 1.0) / 2.0;
-}
-
-fn easeInOutCubic(x: f32) -> f32 {
-    if x < 0.5 {
-        return 4.0 * x * x * x;
-    } else {
-        return 1.0 - pow(-2.0 * x + 2.0, 3.0) / 2.0;
-    }
-}
-
-fn easeInOutCirc(x: f32) -> f32 {
-    if x < 0.5 {
-        return (1.0 - sqrt(1.0 - pow(2.0 * x, 2.0))) / 2.0;
-    }
-    return (sqrt(1.0 - pow(-2.0 * x + 2.0, 2.0)) + 1.0) / 2.0;
-}
-
 @fragment
 fn fragment(
     in: CaveVertexOutput,
