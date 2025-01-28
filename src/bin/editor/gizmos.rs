@@ -8,7 +8,10 @@ use transform_gizmo_bevy::{
     GizmoVisuals, TransformGizmoPlugin,
 };
 
-use crate::state::{EditorState, SpawnPickerMode};
+use crate::{
+    mode::ModeSpecific,
+    state::{EditorState, EditorViewMode, SpawnPickerMode},
+};
 
 pub struct EditorGizmosPlugin;
 
@@ -162,6 +165,7 @@ fn draw_spawn_position(
             commands.entity(*spawn_pos_indicator)
         } else {
             commands.spawn((
+                ModeSpecific(state.mode(), Some(EditorViewMode::Preview)),
                 SpawnPositionIndicator,
                 Mesh3d(meshes.add(Capsule3d::new(
                     PLAYER_RADIUS,
@@ -185,8 +189,13 @@ fn draw_spawn_position(
 
 fn draw_connection_planes(
     mut gizmos: Gizmos,
+    state: Res<EditorState>,
     planes: Query<(&Transform, Option<&GizmoTarget>), With<ConnectionPlane>>,
 ) {
+    if state.spawn.mode == SpawnPickerMode::Playing {
+        return;
+    };
+
     planes.iter().for_each(
         |(
             Transform {
@@ -218,9 +227,14 @@ fn draw_connection_planes(
 
 fn draw_connection_points(
     mut gizmos: Gizmos,
+    state: Res<EditorState>,
     camera: Single<&Transform, With<Camera3d>>,
     points: Query<(&GlobalTransform, Option<&Pickable>), With<ConnectionPoint>>,
 ) {
+    if state.spawn.mode == SpawnPickerMode::Playing {
+        return;
+    };
+
     points.iter().for_each(|(transform, pickable)| {
         if pickable.is_some() {
             return;

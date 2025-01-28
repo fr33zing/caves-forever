@@ -93,7 +93,7 @@ fn ui(
 
     let w = 256.0;
     egui::Window::new("Info")
-        .fixed_pos(egui::pos2(window.width() / 2.0 - w / 2.0, 16.0))
+        .fixed_pos(egui::pos2(window.width() / 2.0 - w / 2.0, 48.0))
         .default_width(w)
         .title_bar(false)
         .resizable(false)
@@ -117,8 +117,12 @@ fn ui(
 fn toggle_fullscreen_and_flashlight(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut window: Single<&mut Window, With<PrimaryWindow>>,
-    light: Single<(&mut SpotLight, &Flashlight)>,
+    light: Option<Single<(&mut SpotLight, &Flashlight)>>,
 ) {
+    let Some(light) = light else {
+        return;
+    };
+
     if keyboard.just_pressed(KeyCode::KeyF) {
         window.mode = match window.mode {
             WindowMode::Windowed => WindowMode::BorderlessFullscreen(MonitorSelection::Current),

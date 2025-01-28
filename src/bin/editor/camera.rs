@@ -1,6 +1,6 @@
 use core::f32;
 
-use bevy::prelude::*;
+use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_trackball::{
     prelude::{Bound, Clamp, Scope},
     TrackballCamera, TrackballController, TrackballInput, TrackballVelocity, TrackballWheelUnit,
@@ -123,6 +123,7 @@ pub fn setup(mut commands: Commands) {
     };
 
     commands.spawn((
+        RenderLayers::from_layers(&[0, 1]),
         AllowOrbit(false),
         controller,
         TrackballCamera::look_at(Vec3::ZERO, Vec3::new(0.00, 16.0, f32::EPSILON), Vec3::Y)

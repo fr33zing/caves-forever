@@ -3,7 +3,7 @@ use std::hash::{Hash, Hasher};
 use bevy::{
     math::Vec3A,
     prelude::{Sphere, *},
-    render::mesh::PrimitiveTopology,
+    render::{mesh::PrimitiveTopology, view::RenderLayers},
     window::PrimaryWindow,
 };
 use bevy_trackball::TrackballCamera;
@@ -51,6 +51,7 @@ pub fn spawn_size_reference_labels(
 ) {
     // "Player"
     commands.spawn((
+        RenderLayers::from_layers(&[1]),
         ModeSpecific(EditorMode::Tunnels, None),
         Transform::from_rotation(Quat::from_euler(
             EulerRot::ZXY,
@@ -74,6 +75,7 @@ pub fn spawn_size_reference_labels(
 
     // "Chunk"
     commands.spawn((
+        RenderLayers::from_layers(&[1]),
         ModeSpecific(EditorMode::Tunnels, None),
         Transform::from_rotation(Quat::from_euler(
             EulerRot::ZXY,
@@ -105,6 +107,7 @@ fn spawn_doorway(
 ) {
     commands
         .spawn((
+            RenderLayers::from_layers(&[1]),
             ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
             ConnectionPlane,
             RayCastBackfaces,
@@ -145,6 +148,7 @@ fn spawn_doorway(
         ));
 
     commands.spawn((
+        RenderLayers::from_layers(&[1]),
         ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
         ConnectionPoint,
         Transform::from_translation(transform.translation * Vec3::new(0.4, 1.0, 0.0)),
@@ -170,6 +174,7 @@ pub fn enter_preview(
     let color = Color::srgba(0.0, 1.0, 1.0, 0.1);
 
     commands.spawn((
+        RenderLayers::from_layers(&[1]),
         ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
         ConnectionPoint,
         Transform::from_translation(Vec3::Y * y),
