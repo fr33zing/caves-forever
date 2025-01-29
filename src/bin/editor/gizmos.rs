@@ -67,8 +67,8 @@ impl Plugin for EditorGizmosPlugin {
                 x_color: Color32::from_rgb(250, 70, 70),
                 y_color: Color32::from_rgb(70, 250, 70),
                 z_color: Color32::from_rgb(70, 70, 250),
-                inactive_alpha: 0.2,
-                highlight_alpha: 0.6,
+                inactive_alpha: 0.7,
+                highlight_alpha: 1.0,
                 stroke_width: 3.0,
                 gizmo_size: 70.0,
                 ..default()

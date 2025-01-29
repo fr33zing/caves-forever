@@ -56,8 +56,8 @@ strum_macros = "0.26.4"
 uuid = { version = "1.12.1", features = ["fast-rng", "serde", "v4"] }
 stl_io = "0.8.3"
 
-# TODO change this when https://github.com/urholaukkarinen/transform-gizmo/pull/86 merges
-transform-gizmo-bevy = { git = "https://github.com/ethereumdegen/transform-gizmo.git" }
+# TODO change this when main crate supports bevy 0.15
+transform-gizmo-bevy = { git = "https://github.com/UnderbudgetGames/transform-gizmo.git" }
 
 # fast-surface-nets
 glam = "0.29"

@@ -2331,7 +2331,6 @@ dependencies = [
  "bytemuck",
  "ecolor 0.29.1",
  "emath 0.29.1",
- "epaint_default_fonts 0.29.1",
  "nohash-hasher",
  "parking_lot",
 ]
@@ -2347,17 +2346,11 @@ dependencies = [
  "bytemuck",
  "ecolor 0.30.0",
  "emath 0.30.0",
- "epaint_default_fonts 0.30.0",
+ "epaint_default_fonts",
  "nohash-hasher",
  "parking_lot",
  "profiling",
 ]
-
-[[package]]
-name = "epaint_default_fonts"
-version = "0.29.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "483440db0b7993cf77a20314f08311dbe95675092405518c0677aa08c151a3ea"
 
 [[package]]
 name = "epaint_default_fonts"
@@ -5223,25 +5216,24 @@ dependencies = [
 
 [[package]]
 name = "transform-gizmo"
-version = "0.5.1"
-source = "git+https://github.com/ethereumdegen/transform-gizmo.git#2e22bc02a80abbcdd945e70d0e71155c30835995"
+version = "0.5.0"
+source = "git+https://github.com/UnderbudgetGames/transform-gizmo.git#454aa835e643f70be3c2ce8894ea2c68616f23f2"
 dependencies = [
  "ahash",
- "ecolor 0.29.1",
- "emath 0.29.1",
+ "ecolor 0.30.0",
+ "emath 0.30.0",
  "enum_dispatch",
  "enumset",
- "epaint 0.29.1",
+ "epaint 0.30.0",
  "glam",
  "mint",
 ]
 
 [[package]]
 name = "transform-gizmo-bevy"
-version = "0.5.1"
-source = "git+https://github.com/ethereumdegen/transform-gizmo.git#2e22bc02a80abbcdd945e70d0e71155c30835995"
+version = "0.5.0"
+source = "git+https://github.com/UnderbudgetGames/transform-gizmo.git#454aa835e643f70be3c2ce8894ea2c68616f23f2"
 dependencies = [
- "bevy",
  "bevy_app",
  "bevy_asset",
  "bevy_core",
@@ -5253,6 +5245,7 @@ dependencies = [
  "bevy_log",
  "bevy_math",
  "bevy_pbr",
+ "bevy_picking",
  "bevy_reflect",
  "bevy_render",
  "bevy_transform",
