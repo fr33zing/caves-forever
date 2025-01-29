@@ -4,10 +4,16 @@ use bevy::{
     asset::RenderAssetUsages,
     pbr::wireframe::{Wireframe, WireframeColor},
     prelude::*,
-    render::mesh::{Indices, PrimitiveTopology},
+    render::{
+        mesh::{Indices, PrimitiveTopology},
+        view::RenderLayers,
+    },
 };
 use egui::{menu, Frame, Ui};
-use mines::worldgen::asset::{RoomPart, RoomPartPayload, RoomPartUuid};
+use mines::worldgen::{
+    asset::{RoomPart, RoomPartPayload, RoomPartUuid},
+    brush::TerrainBrush,
+};
 use uuid::Uuid;
 
 use crate::{
@@ -16,6 +22,12 @@ use crate::{
 };
 
 use super::ModeSpecific;
+
+#[derive(Component)]
+pub struct UpdatePreviewBrush {
+    time: f64,
+    uuid: Uuid,
+}
 
 //
 // Systems
@@ -49,8 +61,11 @@ pub fn detect_additions(
 
 // Hook: update
 pub fn detect_world_changes(
+    time: Res<Time>,
+    mut commands: Commands,
     mut state: ResMut<EditorState>,
     parts: Query<(&Transform, &RoomPartUuid), Changed<Transform>>,
+    update_preview_brushes: Query<(Entity, &UpdatePreviewBrush)>,
 ) {
     let Some(data) = state.files.current_data_mut() else {
         return;
@@ -59,13 +74,69 @@ pub fn detect_world_changes(
         return;
     };
 
+    let mut update_uuids = Vec::<Uuid>::new();
+
     parts.iter().for_each(|(transform, uuid)| {
         let Some(part) = data.parts.get_mut(&uuid.0) else {
             return;
         };
 
         part.transform = *transform;
+        update_uuids.push(uuid.0);
     });
+
+    for (entity, update_preview_brush) in update_preview_brushes.into_iter() {
+        if update_uuids.contains(&update_preview_brush.uuid) {
+            commands.entity(entity).clear();
+        }
+    }
+
+    for uuid in update_uuids {
+        commands.spawn(UpdatePreviewBrush {
+            time: time.elapsed_secs_f64(),
+            uuid,
+        });
+    }
+}
+
+// Hook: update
+pub fn update_preview_brushes(
+    mut commands: Commands,
+    time: Res<Time>,
+    state: Res<EditorState>,
+    update_preview_brushes: Query<(Entity, &UpdatePreviewBrush)>,
+    terrain_brushes: Query<Entity, With<TerrainBrush>>,
+) {
+    let Some(data) = state.files.current_data() else {
+        return;
+    };
+    let FilePayload::Room(data) = data else {
+        return;
+    };
+
+    const TIMER_SECS: f64 = 0.5;
+
+    let mut clear_brushes = false;
+
+    update_preview_brushes.iter().for_each(|(upb_entity, upb)| {
+        if time.elapsed_secs_f64() - upb.time < TIMER_SECS {
+            return;
+        }
+
+        let Some(part) = data.parts.get(&upb.uuid) else {
+            todo!();
+        };
+
+        clear_brushes = true;
+        commands.entity(upb_entity).clear();
+        commands.spawn(part.to_brush_request());
+    });
+
+    if clear_brushes {
+        terrain_brushes.iter().for_each(|entity| {
+            commands.entity(entity).despawn();
+        });
+    }
 }
 
 //
@@ -119,6 +190,7 @@ pub fn room_part_to_editor_bundle(
 
             (
                 ModeSpecific(EditorMode::Rooms, None),
+                RenderLayers::from_layers(&[1]),
                 RoomPartUuid(uuid),
                 Pickable(None, None),
                 Wireframe,

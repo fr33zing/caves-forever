@@ -148,6 +148,7 @@ pub fn setup(world: &mut World) {
                 update: vec![
                     world.register_system(rooms::detect_world_changes),
                     world.register_system(rooms::detect_additions),
+                    world.register_system(rooms::update_preview_brushes),
                 ],
                 ..default()
             },
