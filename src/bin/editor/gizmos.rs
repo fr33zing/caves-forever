@@ -1,16 +1,13 @@
 use bevy::{
-    math::Vec3A,
-    pbr::wireframe::{Wireframe, WireframeColor},
-    picking::backend::ray::RayMap,
-    prelude::*,
+    math::Vec3A, pbr::wireframe::WireframeColor, picking::backend::ray::RayMap, prelude::*,
 };
 use mines::{
     tnua::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
     worldgen::terrain::Chunk,
 };
 use transform_gizmo_bevy::{
-    Color32, EnumSet, GizmoHotkeys, GizmoMode, GizmoOptions, GizmoOrientation, GizmoTarget,
-    GizmoVisuals, TransformGizmoPlugin,
+    Color32, GizmoHotkeys, GizmoMode, GizmoOptions, GizmoOrientation, GizmoTarget, GizmoVisuals,
+    TransformGizmoPlugin,
 };
 
 use crate::{
@@ -19,9 +16,6 @@ use crate::{
 };
 
 pub struct EditorGizmosPlugin;
-
-#[derive(Component)]
-pub struct Pickable(pub Option<EnumSet<GizmoMode>>, pub Option<GizmoOrientation>);
 
 #[derive(Component)]
 pub struct SpawnPositionIndicator;
@@ -34,6 +28,32 @@ pub struct ConnectionPoint;
 
 #[derive(Component)]
 pub struct ConnectedPath;
+
+#[derive(Component)]
+pub struct MaterialIndicatesSelection;
+
+#[derive(Component)]
+pub struct WireframeIndicatesSelection;
+
+#[derive(Component)]
+pub struct Selectable;
+
+#[derive(Component)]
+pub struct PrimarySelection;
+
+#[derive(Resource)]
+pub struct SelectionMaterials {
+    pub unselected: Handle<StandardMaterial>,
+    pub selected: Handle<StandardMaterial>,
+    pub multiselected: Handle<StandardMaterial>,
+}
+
+#[derive(Resource)]
+pub struct SelectionWireframeColors {
+    pub unselected: WireframeColor,
+    pub selected: WireframeColor,
+    pub multiselected: WireframeColor,
+}
 
 impl Plugin for EditorGizmosPlugin {
     fn build(&self, app: &mut App) {
@@ -57,11 +77,15 @@ impl Plugin for EditorGizmosPlugin {
             ..default()
         });
 
+        app.add_systems(Startup, setup_selection_indications);
         app.add_systems(
             Update,
             (
                 pick,
                 pick_spawn_position,
+                update_selection_indications
+                    .after(pick)
+                    .after(pick_spawn_position),
                 draw_spawn_position,
                 draw_connection_planes,
                 draw_connection_points,
@@ -70,16 +94,53 @@ impl Plugin for EditorGizmosPlugin {
     }
 }
 
+fn setup_selection_indications(
+    mut commands: Commands,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let unselected = Color::srgba(1.0, 1.0, 1.0, 0.8);
+    let selected = Color::srgba(0.0, 1.0, 1.0, 0.8);
+    let multiselected = Color::srgba(0.0, 0.4, 1.0, 0.8);
+
+    commands.insert_resource(SelectionMaterials {
+        unselected: materials.add(StandardMaterial {
+            base_color: unselected,
+            alpha_mode: AlphaMode::Add,
+            unlit: true,
+            ..default()
+        }),
+        selected: materials.add(StandardMaterial {
+            base_color: selected,
+            alpha_mode: AlphaMode::Add,
+            unlit: true,
+            ..default()
+        }),
+        multiselected: materials.add(StandardMaterial {
+            base_color: multiselected,
+            alpha_mode: AlphaMode::Add,
+            unlit: true,
+            ..default()
+        }),
+    });
+    commands.insert_resource(SelectionWireframeColors {
+        unselected: WireframeColor { color: unselected },
+        selected: WireframeColor { color: selected },
+        multiselected: WireframeColor {
+            color: multiselected,
+        },
+    });
+}
+
 fn pick(
     mut commands: Commands,
     mut ray_cast: MeshRayCast,
     ray_map: Res<RayMap>,
     state: Res<EditorState>,
     mouse: Res<ButtonInput<MouseButton>>,
-    mut gizmo_options: ResMut<GizmoOptions>,
-    pickables: Query<(Entity, &Pickable)>,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    selectable: Query<Entity, With<Selectable>>,
     gizmo_targets: Query<(Entity, &GizmoTarget)>,
-    wireframes: Query<Entity, With<Wireframe>>,
+    primary_selection: Query<Entity, With<PrimarySelection>>,
 ) {
     if state.spawn.mode != SpawnPickerMode::Inactive {
         return;
@@ -91,57 +152,99 @@ fn pick(
         return;
     }
 
+    let multiselect = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
     let mut miss = true;
+
+    let deselect_all = |commands: &mut Commands| {
+        if multiselect {
+            return;
+        };
+        gizmo_targets.iter().for_each(|(entity, _)| {
+            commands.entity(entity).remove::<GizmoTarget>();
+        });
+    };
 
     for (_, ray) in ray_map.iter() {
         let settings = RayCastSettings {
-            filter: &|entity| pickables.get(entity).is_ok(),
+            filter: &|entity| selectable.get(entity).is_ok(),
             ..default()
         };
 
         let Some((entity, _)) = ray_cast.cast_ray(*ray, &settings).first() else {
             continue;
         };
-        let Ok((_, pickable)) = pickables.get(*entity) else {
+        if selectable.get(*entity).is_err() {
             continue;
         };
 
-        gizmo_targets.iter().for_each(|(entity, _)| {
-            let mut commands = commands.entity(entity);
-            commands.remove::<GizmoTarget>();
-            if wireframes.get(entity).is_ok() {
-                commands.insert(WireframeColor {
-                    color: Color::WHITE,
-                });
-            }
+        deselect_all(&mut commands);
+
+        primary_selection.iter().for_each(|not_primary| {
+            commands.entity(not_primary).remove::<PrimarySelection>();
         });
 
         let mut commands = commands.entity(*entity);
         commands.insert(GizmoTarget::default());
-        if wireframes.get(*entity).is_ok() {
-            commands.insert(WireframeColor {
-                color: Color::srgb(0.0, 1.0, 1.0),
-            });
-        }
-
-        gizmo_options.gizmo_modes = pickable.0.unwrap_or_else(|| GizmoMode::all());
-        gizmo_options.gizmo_orientation = pickable.1.unwrap_or_else(|| GizmoOrientation::default());
+        commands.insert(PrimarySelection);
 
         miss = false;
         break;
     }
 
     if miss {
-        gizmo_targets.iter().for_each(|(entity, _)| {
-            let mut commands = commands.entity(entity);
-            commands.remove::<GizmoTarget>();
-            if wireframes.get(entity).is_ok() {
-                commands.insert(WireframeColor {
-                    color: Color::WHITE,
-                });
-            }
-        });
+        deselect_all(&mut commands);
     }
+}
+
+fn update_selection_indications(
+    mut commands: Commands,
+    materials: Res<SelectionMaterials>,
+    wireframes: Res<SelectionWireframeColors>,
+    material_indicators: Query<Entity, With<MaterialIndicatesSelection>>,
+    wireframe_indicators: Query<Entity, With<WireframeIndicatesSelection>>,
+    selected: Query<Entity, With<GizmoTarget>>,
+    primary_selection: Option<Single<Entity, With<PrimarySelection>>>,
+) {
+    fn is_primary_selection(
+        entity: &Entity,
+        primary_selection: &Option<Single<Entity, With<PrimarySelection>>>,
+    ) -> bool {
+        if let Some(primary_selection) = primary_selection {
+            return *entity == **primary_selection;
+        }
+        false
+    }
+
+    wireframe_indicators.iter().for_each(|entity| {
+        if selected.get(entity).is_ok() {
+            if is_primary_selection(&entity, &primary_selection) {
+                commands.entity(entity).insert(wireframes.selected.clone());
+            } else {
+                commands
+                    .entity(entity)
+                    .insert(wireframes.multiselected.clone());
+            }
+        } else {
+            commands
+                .entity(entity)
+                .insert(wireframes.unselected.clone());
+        }
+    });
+
+    material_indicators.iter().for_each(|entity| {
+        let mut commands = commands.entity(entity);
+        // commands.remove::<MeshMaterial3d<StandardMaterial>>();
+
+        if selected.get(entity).is_ok() {
+            if is_primary_selection(&entity, &primary_selection) {
+                commands.insert(MeshMaterial3d(materials.selected.clone()));
+            } else {
+                commands.insert(MeshMaterial3d(materials.multiselected.clone()));
+            }
+        } else {
+            commands.insert(MeshMaterial3d(materials.unselected.clone()));
+        }
+    });
 }
 
 fn pick_spawn_position(
@@ -254,7 +357,7 @@ fn draw_connection_points(
     mut gizmos: Gizmos,
     state: Res<EditorState>,
     camera: Option<Single<&Transform, With<Camera3d>>>,
-    points: Query<(&GlobalTransform, Option<&Pickable>), With<ConnectionPoint>>,
+    points: Query<(&GlobalTransform, Option<&Selectable>), With<ConnectionPoint>>,
 ) {
     let Some(camera) = camera else {
         return;

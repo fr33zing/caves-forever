@@ -19,7 +19,7 @@ use uuid::Uuid;
 
 use super::ModeSpecific;
 use crate::{
-    gizmos::Pickable,
+    gizmos::{Selectable, WireframeIndicatesSelection},
     state::{EditorMode, EditorState, EditorViewMode, FilePayload},
 };
 use mines::worldgen::{
@@ -222,19 +222,8 @@ pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
 
     ui.separator();
 
-    // Point
-    ScrollArea::vertical().show(ui, |ui| {
-        if let Some(selection_index) = state.tunnels_mode.selected_point {
-            ui.add(
-                Label::new(RichText::new(format!("Point {selection_index}")).heading())
-                    .selectable(false),
-            );
-
-        } else {
-            ui.add(Label::new(RichText::new("Point").heading()).selectable(false));
-            ui.add(Label::new("No point selected.").selectable(false));
-        }
-    });
+    // Selection
+    ScrollArea::vertical().show(ui, |ui| {});
 }
 
 //
@@ -263,7 +252,8 @@ pub fn room_part_to_editor_bundle(
                 ModeSpecific(EditorMode::Rooms, None),
                 RenderLayers::from_layers(&[1]),
                 RoomPartUuid(*uuid),
-                Pickable(None, None),
+                Selectable,
+                WireframeIndicatesSelection,
                 Wireframe,
                 WireframeColor {
                     color: Color::WHITE,

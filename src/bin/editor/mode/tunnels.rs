@@ -28,7 +28,10 @@ use uuid::Uuid;
 
 use super::{EditorHandleGizmos, ModeSpecific};
 use crate::{
-    gizmos::{ConnectedPath, ConnectionPlane, ConnectionPoint, Pickable},
+    gizmos::{
+        ConnectedPath, ConnectionPlane, ConnectionPoint, MaterialIndicatesSelection, Selectable,
+        SelectionMaterials,
+    },
     state::{EditorMode, EditorState, EditorViewMode, FilePayload},
     ui::CursorOverEditSelectionPanel,
     util::mesh_text,
@@ -101,9 +104,8 @@ pub fn spawn_size_reference_labels(
 
 fn spawn_doorway(
     commands: &mut Commands,
-    materials: &mut ResMut<Assets<StandardMaterial>>,
+    materials: &SelectionMaterials,
     meshes: &mut ResMut<Assets<Mesh>>,
-    color: &Color,
     transform: Transform,
 ) {
     commands
@@ -114,24 +116,9 @@ fn spawn_doorway(
             RayCastBackfaces,
             transform,
             Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(1.0, 0.125, 1.0)))),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: color.with_alpha(0.1),
-                alpha_mode: AlphaMode::Add,
-                unlit: true,
-                ..default()
-            })),
-            Pickable(
-                Some(
-                    enum_set!(
-                        GizmoMode::RotateZ
-                            | GizmoMode::ScaleX
-                            | GizmoMode::ScaleZ
-                            | GizmoMode::ScaleXZ
-                    )
-                    .union(GizmoMode::all_translate()),
-                ),
-                Some(GizmoOrientation::Local),
-            ),
+            MeshMaterial3d(materials.unselected.clone()),
+            MaterialIndicatesSelection,
+            Selectable,
         ))
         .with_child((
             ConnectionPoint,
@@ -140,12 +127,7 @@ fn spawn_doorway(
                 1.0,
                 1.0 / transform.scale.z,
             )),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: color.with_alpha(0.8),
-                alpha_mode: AlphaMode::Add,
-                unlit: true,
-                ..default()
-            })),
+            MeshMaterial3d(materials.unselected.clone()),
         ));
 
     commands.spawn((
@@ -154,25 +136,20 @@ fn spawn_doorway(
         ConnectionPoint,
         Transform::from_translation(transform.translation * Vec3::new(0.4, 1.0, 0.0)),
         Mesh3d(meshes.add(Sphere::new(0.5))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: color.with_alpha(0.8),
-            alpha_mode: AlphaMode::Add,
-            unlit: true,
-            ..default()
-        })),
-        Pickable(Some(GizmoMode::all_translate()), None),
+        MeshMaterial3d(materials.unselected.clone()),
+        MaterialIndicatesSelection,
+        Selectable,
     ));
 }
 
 /// Hook: enter_view
 pub fn enter_preview(
     mut commands: Commands,
-    mut materials: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
+    materials: Res<SelectionMaterials>,
 ) {
     let door_scale = Vec3::new(10.0, 1.0, 10.0);
     let y = door_scale.z / 2.0 + 2.0;
-    let color = Color::srgba(0.0, 1.0, 1.0, 0.1);
 
     commands.spawn((
         RenderLayers::from_layers(&[1]),
@@ -180,20 +157,15 @@ pub fn enter_preview(
         ConnectionPoint,
         Transform::from_translation(Vec3::Y * y),
         Mesh3d(meshes.add(Sphere::new(0.5))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: color.with_alpha(0.8),
-            alpha_mode: AlphaMode::Add,
-            unlit: true,
-            ..default()
-        })),
-        Pickable(Some(GizmoMode::all_translate()), None),
+        MeshMaterial3d(materials.unselected.clone()),
+        MaterialIndicatesSelection,
+        Selectable,
     ));
 
     spawn_doorway(
         &mut commands,
-        &mut materials,
+        &materials,
         &mut meshes,
-        &color,
         Transform::default()
             .with_translation(Vec3::new(CHUNK_SIZE_F / 2.0, y, 0.0))
             .with_scale(door_scale)
@@ -207,9 +179,8 @@ pub fn enter_preview(
 
     spawn_doorway(
         &mut commands,
-        &mut materials,
+        &materials,
         &mut meshes,
-        &color,
         Transform::default()
             .with_translation(Vec3::new(-CHUNK_SIZE_F / 2.0, y, 0.0))
             .with_scale(door_scale)
@@ -442,7 +413,7 @@ pub fn remesh_preview_path(
     mut materials: ResMut<Assets<LineMaterial>>,
     update_preview_brush: Query<(Entity, &UpdatePreviewBrush)>,
     time: Res<Time>,
-    any_pickable_changed: Query<&Pickable, Changed<Transform>>,
+    any_pickable_changed: Query<&Selectable, Changed<Transform>>,
     path: Option<Single<Entity, With<ConnectedPath>>>,
     planes: Query<&GlobalTransform, With<ConnectionPlane>>,
     points: Query<&GlobalTransform, With<ConnectionPoint>>,
