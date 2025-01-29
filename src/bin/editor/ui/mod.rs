@@ -16,7 +16,7 @@ use nalgebra::{Point3, Vector3};
 use strum::{EnumProperty, IntoEnumIterator};
 
 use crate::{
-    mode::{rooms, tunnels},
+    mode::{room, tunnel},
     state::{
         EditorMode, EditorState, EditorViewMode, FilePayload, FilePickerState, SpawnPickerMode,
     },
@@ -155,8 +155,8 @@ fn ui(
             .resizable(false)
             .show(ctx, |ui| {
                 match state.mode() {
-                    EditorMode::Tunnels => tunnels::sidebar(&mut state, ui),
-                    EditorMode::Rooms => rooms::sidebar(&mut state, ui),
+                    EditorMode::Tunnels => tunnel::sidebar(&mut state, ui),
+                    EditorMode::Rooms => room::sidebar(&mut state, ui),
                 };
                 ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
             });
@@ -331,8 +331,8 @@ fn top_panel(
 
         // Mode-specific
         match state.mode() {
-            EditorMode::Tunnels => tunnels::topbar(state, ui),
-            EditorMode::Rooms => rooms::topbar(state, ui),
+            EditorMode::Tunnels => tunnel::topbar(state, ui),
+            EditorMode::Rooms => room::topbar(state, ui),
         }
     });
 }

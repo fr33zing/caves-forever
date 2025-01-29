@@ -22,8 +22,8 @@ use crate::{
     state::{EditorMode, EditorState, EditorViewMode, SpawnPickerMode},
 };
 
-pub mod rooms;
-pub mod tunnels;
+pub mod room;
+pub mod tunnel;
 
 /// This command must be executed after a file is reverted.
 /// It ensures that the visual representation of the file is reset.
@@ -135,17 +135,17 @@ pub fn setup(world: &mut World) {
         switcher.mode_systems.insert(
             EditorMode::Tunnels,
             ModeSystems {
-                enter: Some(world.register_system(tunnels::spawn_size_reference_labels)),
+                enter: Some(world.register_system(tunnel::spawn_size_reference_labels)),
                 enter_view: hash_map! {
-                    EditorViewMode::Preview => world.register_system(tunnels::enter_preview)
+                    EditorViewMode::Preview => world.register_system(tunnel::enter_preview)
                 },
                 update: vec![
-                    world.register_system(tunnels::pick_profile_point),
-                    world.register_system(tunnels::drag_profile_point),
-                    world.register_system(tunnels::update_tunnel_info),
-                    world.register_system(tunnels::draw_size_references),
-                    world.register_system(tunnels::remesh_preview_path),
-                    world.register_system(tunnels::update_preview_brush),
+                    world.register_system(tunnel::pick_profile_point),
+                    world.register_system(tunnel::drag_profile_point),
+                    world.register_system(tunnel::update_tunnel_info),
+                    world.register_system(tunnel::draw_size_references),
+                    world.register_system(tunnel::remesh_preview_path),
+                    world.register_system(tunnel::update_preview_brush),
                 ],
                 ..default()
             },
@@ -155,9 +155,9 @@ pub fn setup(world: &mut World) {
             EditorMode::Rooms,
             ModeSystems {
                 update: vec![
-                    world.register_system(rooms::detect_world_changes),
-                    world.register_system(rooms::detect_additions),
-                    world.register_system(rooms::update_preview_brushes),
+                    world.register_system(room::detect_world_changes),
+                    world.register_system(room::detect_additions),
+                    world.register_system(room::update_preview_brushes),
                 ],
                 ..default()
             },
