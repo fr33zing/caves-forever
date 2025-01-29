@@ -8,22 +8,21 @@ use bevy::{
 };
 use bevy_trackball::TrackballCamera;
 use curvo::prelude::{NurbsCurve3D, Tessellation};
-use egui::{menu, Align, ComboBox, Frame, Label, Layout, RichText, ScrollArea, Ui};
 use nalgebra::{Point2, Point3};
 use pathfinding::prelude::dfs;
-use strum::IntoEnumIterator;
 
 use mines::{
     materials::LineMaterial,
     render_layer,
     tnua::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
     worldgen::{
-        asset::{Environment, Rarity, Tunnel, TunnelMeshInfo},
+        asset::{Tunnel, TunnelMeshInfo},
         brush::{curve::mesh_curve, sweep::ProfileRamp, TerrainBrush, TerrainBrushRequest},
         consts::CHUNK_SIZE_F,
         voxel::VoxelMaterial,
     },
 };
+use utility::{cursor_to_ground_plane, spawn_connection_plane};
 use uuid::Uuid;
 
 use super::{EditorGizmos, ModeSpecific};
@@ -36,6 +35,9 @@ use crate::{
     ui::CursorOverEguiPanel,
     util::mesh_text,
 };
+
+pub mod ui;
+mod utility;
 
 #[derive(Component)]
 pub struct TunnelInfo(Tunnel, TunnelMeshInfo);
@@ -102,46 +104,6 @@ pub fn spawn_size_reference_labels(
     ));
 }
 
-fn spawn_doorway(
-    commands: &mut Commands,
-    materials: &SelectionMaterials,
-    meshes: &mut ResMut<Assets<Mesh>>,
-    transform: Transform,
-) {
-    commands
-        .spawn((
-            RenderLayers::from_layers(&[render_layer::EDITOR_PREVIEW]),
-            ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
-            ConnectionPlane,
-            RayCastBackfaces,
-            transform,
-            Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(1.0, 0.125, 1.0)))),
-            MeshMaterial3d(materials.unselected.clone()),
-            MaterialIndicatesSelection,
-            Selectable,
-        ))
-        .with_child((
-            ConnectionPoint,
-            Transform::from_translation(Vec3::NEG_Y * 4.0).with_scale(Vec3::new(
-                1.0 / transform.scale.x,
-                1.0,
-                1.0 / transform.scale.z,
-            )),
-            MeshMaterial3d(materials.unselected.clone()),
-        ));
-
-    commands.spawn((
-        RenderLayers::from_layers(&[render_layer::EDITOR_PREVIEW]),
-        ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
-        ConnectionPoint,
-        Transform::from_translation(transform.translation * Vec3::new(0.4, 1.0, 0.0)),
-        Mesh3d(meshes.add(Sphere::new(0.5))),
-        MeshMaterial3d(materials.unselected.clone()),
-        MaterialIndicatesSelection,
-        Selectable,
-    ));
-}
-
 /// Hook: enter_view
 pub fn enter_preview(
     mut commands: Commands,
@@ -162,7 +124,7 @@ pub fn enter_preview(
         Selectable,
     ));
 
-    spawn_doorway(
+    spawn_connection_plane(
         &mut commands,
         &materials,
         &mut meshes,
@@ -177,7 +139,7 @@ pub fn enter_preview(
             )),
     );
 
-    spawn_doorway(
+    spawn_connection_plane(
         &mut commands,
         &materials,
         &mut meshes,
@@ -564,133 +526,4 @@ pub fn update_preview_brush(
         rail: upb.rail.clone(),
         profile: upb.profile.clone(),
     });
-}
-
-//
-// UI
-//
-
-pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
-    let Some(data) = state.files.current_data_mut() else {
-        return;
-    };
-    let FilePayload::Tunnel(data) = data else {
-        todo!();
-    };
-
-    match state.view {
-        EditorViewMode::Editor => {
-            Frame::none().show(ui, |ui| {
-                ui.shrink_width_to_current();
-                menu::bar(ui, |ui| {
-                    ui.menu_button("Operations", |ui| {
-                        if ui
-                            .selectable_label(false, "Center on world origin")
-                            .clicked()
-                        {
-                            ui.close_menu();
-                            data.center();
-                        };
-                    });
-                });
-            });
-
-            ui.checkbox(&mut state.tunnels_mode.mirror, "Mirror");
-        }
-        EditorViewMode::Preview => {}
-    }
-}
-
-pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
-    let picker = &mut state.files;
-    let Some(file) = picker.current_file_mut() else {
-        return;
-    };
-    let Some(ref mut data) = file.data else {
-        return;
-    };
-    let FilePayload::Tunnel(data) = data else {
-        todo!();
-    };
-
-    ui.style_mut().spacing.item_spacing.y = 8.0;
-
-    ui.add(Label::new(RichText::new("Tunnel").heading()).selectable(false));
-
-    // Environment
-    ui.columns_const(|[left, right]| {
-        left.add(Label::new("Environment").selectable(false));
-        right.with_layout(Layout::right_to_left(Align::Min), |right| {
-            ComboBox::from_id_salt("tunnel_environment")
-                .selected_text(format!("{}", data.environment))
-                .show_ui(right, |ui| {
-                    Environment::iter().for_each(|env| {
-                        ui.selectable_value(&mut data.environment, env, format!("{env}"));
-                    });
-                });
-        });
-    });
-
-    // Rarity
-    ui.columns_const(|[left, right]| {
-        left.add(Label::new("Rarity").selectable(false));
-        right.with_layout(Layout::right_to_left(Align::Min), |right| {
-            ComboBox::from_id_salt("tunnel_rarity")
-                .selected_text(format!("{}", data.rarity))
-                .show_ui(right, |ui| {
-                    Rarity::iter().for_each(|rarity| {
-                        ui.selectable_value(&mut data.rarity, rarity, format!("{rarity}"));
-                    });
-                });
-        });
-    });
-
-    ui.separator();
-
-    // Point
-    ScrollArea::vertical().show(ui, |ui| {
-        if let Some(selection_index) = state.tunnels_mode.selected_point {
-            ui.add(
-                Label::new(RichText::new(format!("Point {selection_index}")).heading())
-                    .selectable(false),
-            );
-
-            let selection = &data.points[selection_index];
-            ui.add(
-                Label::new(format!(
-                    "{selection_index}: ({}, {})",
-                    selection.position.x, selection.position.y
-                ))
-                .selectable(false),
-            );
-        } else {
-            ui.add(Label::new(RichText::new("Point").heading()).selectable(false));
-            ui.add(Label::new("No point selected.").selectable(false));
-        }
-    });
-}
-
-//
-// Utility
-//
-
-/// Adapted from: https://bevy-cheatbook.github.io/cookbook/cursor2world.html
-pub fn cursor_to_ground_plane(
-    window: &Window,
-    (camera, camera_transform): (&Camera, &GlobalTransform),
-) -> Option<Vec2> {
-    let Some(cursor_position) = window.cursor_position() else {
-        return None;
-    };
-    let plane_origin = Vec3::ZERO;
-    let plane = InfinitePlane3d::new(Vec3::Y);
-    let Ok(ray) = camera.viewport_to_world(camera_transform, cursor_position) else {
-        return None;
-    };
-    let Some(distance) = ray.intersect_plane(plane_origin, plane) else {
-        return None;
-    };
-    let global_cursor = ray.get_point(distance);
-
-    Some(global_cursor.xz())
 }

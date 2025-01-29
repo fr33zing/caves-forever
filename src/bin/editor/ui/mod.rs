@@ -155,8 +155,8 @@ fn ui(
             .resizable(false)
             .show(ctx, |ui| {
                 match state.mode() {
-                    EditorMode::Tunnels => tunnel::sidebar(&mut state, ui),
-                    EditorMode::Rooms => room::sidebar(&mut state, ui),
+                    EditorMode::Tunnels => tunnel::ui::sidebar(&mut state, ui),
+                    EditorMode::Rooms => room::ui::sidebar(&mut state, ui),
                 };
                 ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
             });
@@ -331,8 +331,8 @@ fn top_panel(
 
         // Mode-specific
         match state.mode() {
-            EditorMode::Tunnels => tunnel::topbar(state, ui),
-            EditorMode::Rooms => room::topbar(state, ui),
+            EditorMode::Tunnels => tunnel::ui::topbar(state, ui),
+            EditorMode::Rooms => room::ui::topbar(state, ui),
         }
     });
 }

@@ -1,34 +1,19 @@
 use std::collections::HashSet;
 
 use bevy::{
-    asset::{Assets, RenderAssetUsages},
-    color::Color,
-    pbr::wireframe::{Wireframe, WireframeColor},
-    prelude::{
-        Bundle, Changed, Commands, Component, Entity, Mesh, Mesh3d, Query, Res, ResMut, Transform,
-    },
-    render::{
-        mesh::{Indices, PrimitiveTopology},
-        view::RenderLayers,
-    },
+    asset::Assets,
+    prelude::{Changed, Commands, Component, Entity, Mesh, Query, Res, ResMut, Transform},
     time::Time,
 };
-use egui::{menu, Align, ComboBox, Frame, Label, Layout, RichText, ScrollArea, Ui};
-use strum::IntoEnumIterator;
 use uuid::Uuid;
 
-use super::ModeSpecific;
-use crate::{
-    gizmos::{Selectable, WireframeIndicatesSelection},
-    state::{EditorMode, EditorState, EditorViewMode, FilePayload},
-};
-use mines::{
-    render_layer,
-    worldgen::{
-        asset::{Environment, Rarity, RoomPart, RoomPartPayload, RoomPartUuid},
-        brush::TerrainBrush,
-    },
-};
+use crate::state::{EditorState, FilePayload};
+use mines::worldgen::{asset::RoomPartUuid, brush::TerrainBrush};
+
+pub mod ui;
+mod utility;
+
+use utility::room_part_to_editor_bundle;
 
 #[derive(Component)]
 pub struct UpdatePreviewBrush {
@@ -147,123 +132,4 @@ pub fn update_preview_brushes(
             }
         });
     });
-}
-
-//
-// UI
-//
-
-pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
-    let Some(data) = state.files.current_data_mut() else {
-        return;
-    };
-    let FilePayload::Room(data) = data else {
-        todo!();
-    };
-
-    match state.view {
-        EditorViewMode::Editor => {
-            Frame::none().show(ui, |ui| {
-                ui.shrink_width_to_current();
-                menu::bar(ui, |ui| {
-                    ui.menu_button("Add", |ui| {
-                        if ui.selectable_label(false, "STL Import").clicked() {
-                            ui.close_menu();
-                            data.push(RoomPart::default_stl(Transform::default()).unwrap());
-                        };
-                    });
-                });
-            });
-        }
-        EditorViewMode::Preview => {}
-    }
-}
-
-pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
-    let picker = &mut state.files;
-    let Some(file) = picker.current_file_mut() else {
-        return;
-    };
-    let Some(ref mut data) = file.data else {
-        return;
-    };
-    let FilePayload::Room(data) = data else {
-        todo!();
-    };
-
-    ui.style_mut().spacing.item_spacing.y = 8.0;
-
-    ui.add(Label::new(RichText::new("Room").heading()).selectable(false));
-
-    // Environment
-    ui.columns_const(|[left, right]| {
-        left.add(Label::new("Environment").selectable(false));
-        right.with_layout(Layout::right_to_left(Align::Min), |right| {
-            ComboBox::from_id_salt("room_environment")
-                .selected_text(format!("{}", data.environment))
-                .show_ui(right, |ui| {
-                    Environment::iter().for_each(|env| {
-                        ui.selectable_value(&mut data.environment, env, format!("{env}"));
-                    });
-                });
-        });
-    });
-
-    // Rarity
-    ui.columns_const(|[left, right]| {
-        left.add(Label::new("Rarity").selectable(false));
-        right.with_layout(Layout::right_to_left(Align::Min), |right| {
-            ComboBox::from_id_salt("room_rarity")
-                .selected_text(format!("{}", data.rarity))
-                .show_ui(right, |ui| {
-                    Rarity::iter().for_each(|rarity| {
-                        ui.selectable_value(&mut data.rarity, rarity, format!("{rarity}"));
-                    });
-                });
-        });
-    });
-
-    ui.separator();
-
-    // Selection
-    ScrollArea::vertical().show(ui, |ui| {});
-}
-
-//
-// Utility
-//
-
-pub fn room_part_to_editor_bundle(
-    room_part: &RoomPart,
-    meshes: &mut ResMut<Assets<Mesh>>,
-) -> impl Bundle {
-    let RoomPart {
-        uuid,
-        transform,
-        data,
-    } = room_part;
-
-    match data {
-        RoomPartPayload::Stl {
-            vertices, indices, ..
-        } => {
-            let mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all())
-                .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices.clone())
-                .with_inserted_indices(Indices::U32(indices.clone()));
-
-            (
-                ModeSpecific(EditorMode::Rooms, None),
-                RenderLayers::from_layers(&[render_layer::EDITOR]),
-                RoomPartUuid(*uuid),
-                Selectable,
-                WireframeIndicatesSelection,
-                Wireframe,
-                WireframeColor {
-                    color: Color::WHITE,
-                },
-                Mesh3d(meshes.add(mesh)),
-                transform.to_owned(),
-            )
-        }
-    }
 }
