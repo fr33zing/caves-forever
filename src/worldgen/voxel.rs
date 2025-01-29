@@ -27,9 +27,12 @@ impl VoxelHardness {
     }
 }
 
-#[derive(FromRepr, EnumProperty, Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
+#[derive(
+    FromRepr, EnumProperty, Default, Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize,
+)]
 #[repr(u8)]
 pub enum VoxelMaterial {
+    #[default]
     #[strum(props(Name = "Unset"))]
     Unset = 255,
 

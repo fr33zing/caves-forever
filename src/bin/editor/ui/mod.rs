@@ -1,6 +1,6 @@
 use bevy::{
     app::{App, Plugin, Update},
-    prelude::{Commands, MouseButton, ResMut, Resource, Single, With},
+    prelude::{Commands, Entity, MouseButton, ResMut, Resource, Single, With},
     window::{PrimaryWindow, Window},
 };
 use bevy_egui::{
@@ -12,10 +12,12 @@ use egui::{
     vec2, Align2, Area, Frame, Id, Label, Layout, RichText, Rounding, SelectableLabel, SidePanel,
     TopBottomPanel, Vec2, Visuals,
 };
+use mines::worldgen::asset::RoomPartUuid;
 use nalgebra::{Point3, Vector3};
 use strum::{EnumProperty, IntoEnumIterator};
 
 use crate::{
+    gizmos::PrimarySelection,
     mode::{room, tunnel},
     state::{
         EditorMode, EditorState, EditorViewMode, FilePayload, FilePickerState, SpawnPickerMode,
@@ -99,6 +101,7 @@ fn ui(
     mut contexts: EguiContexts,
     trackball: Option<Single<(&mut TrackballController, &mut TrackballCamera)>>,
     window: Option<Single<&Window, With<PrimaryWindow>>>,
+    room_mode_primary_selection: Option<Single<(Entity, &RoomPartUuid), With<PrimarySelection>>>,
 ) {
     let ctx = contexts.ctx_mut();
     ctx.set_visuals(Visuals::dark());
@@ -156,7 +159,12 @@ fn ui(
             .show(ctx, |ui| {
                 match state.mode() {
                     EditorMode::Tunnels => tunnel::ui::sidebar(&mut state, ui),
-                    EditorMode::Rooms => room::ui::sidebar(&mut state, ui),
+                    EditorMode::Rooms => room::ui::sidebar(
+                        &mut state,
+                        ui,
+                        &mut commands,
+                        room_mode_primary_selection,
+                    ),
                 };
                 ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
             });

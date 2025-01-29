@@ -1,9 +1,12 @@
-use bevy::prelude::Transform;
+use bevy::prelude::{Commands, Entity, Single, Transform, With};
 use egui::{menu, Align, ComboBox, Frame, Label, Layout, RichText, ScrollArea, Ui};
-use strum::IntoEnumIterator;
+use strum::{EnumProperty, IntoEnumIterator};
 
-use crate::state::{EditorState, EditorViewMode, FilePayload};
-use mines::worldgen::asset::{Environment, Rarity, RoomPart};
+use crate::{
+    gizmos::PrimarySelection,
+    state::{EditorState, EditorViewMode, FilePayload},
+};
+use mines::worldgen::asset::{Environment, Rarity, RoomPart, RoomPartPayload, RoomPartUuid};
 
 pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
     let Some(data) = state.files.current_data_mut() else {
@@ -31,7 +34,12 @@ pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
     }
 }
 
-pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
+pub fn sidebar(
+    state: &mut EditorState,
+    ui: &mut Ui,
+    commands: &mut Commands,
+    selected: Option<Single<(Entity, &RoomPartUuid), With<PrimarySelection>>>,
+) {
     let picker = &mut state.files;
     let Some(file) = picker.current_file_mut() else {
         return;
@@ -78,5 +86,33 @@ pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
     ui.separator();
 
     // Selection
-    ScrollArea::vertical().show(ui, |ui| {});
+    ScrollArea::vertical().show(ui, |ui| {
+        let Some(selected) = selected else {
+            return;
+        };
+        let (selected_entity, selected_uuid) = selected.into_inner();
+        let Some(part) = data.parts.get_mut(&selected_uuid.0) else {
+            todo!()
+        };
+
+        ui.add(
+            Label::new(RichText::new(part.data.get_str("name").unwrap()).heading())
+                .selectable(false),
+        );
+
+        match &mut part.data {
+            RoomPartPayload::Stl { path, .. } => {
+                ui.text_edit_singleline(path);
+                ui.with_layout(Layout::right_to_left(Align::Min), |ui| {
+                    if ui.button("Load").clicked() {
+                        // TODO handle error
+                        part.reload_stl().unwrap();
+                        // TODO just reload the mesh so selection is preserved
+                        commands.entity(selected_entity).clear();
+                    }
+                    if ui.button("Browse").clicked() {}
+                });
+            }
+        }
+    });
 }
