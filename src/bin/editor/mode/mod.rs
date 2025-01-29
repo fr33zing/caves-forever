@@ -2,7 +2,10 @@ use core::f32;
 use std::collections::HashMap;
 
 use bevy::{
-    ecs::{system::SystemId, world::CommandQueue},
+    ecs::{
+        system::{SystemId, SystemState},
+        world::CommandQueue,
+    },
     prelude::*,
 };
 use bevy_trackball::TrackballCamera;
@@ -17,6 +20,46 @@ use crate::{
 
 pub mod rooms;
 pub mod tunnels;
+
+/// This command must be executed after a file is reverted.
+/// It ensures that the visual representation of the file is reset.
+pub struct RevertCommand;
+impl Command for RevertCommand {
+    fn apply(self, world: &mut World) {
+        let mut systems_to_run = Vec::<Option<SystemId>>::new();
+        {
+            let mut system_state: SystemState<(
+                Commands,
+                Res<EditorState>,
+                Res<ModeSwitcher>,
+                Query<Entity, With<ModeSpecific>>,
+            )> = SystemState::new(world);
+            let (mut commands, state, switcher, mode_specific_entities) =
+                system_state.get_mut(world);
+
+            mode_specific_entities.iter().for_each(|entity| {
+                commands.entity(entity).clear();
+            });
+
+            let (mode, view) = (state.mode(), state.view);
+            if let Some(systems) = switcher.mode_systems.get(&mode) {
+                systems_to_run = vec![
+                    systems.exit,
+                    systems.enter,
+                    systems.enter_view.get(&view).copied(),
+                ];
+            }
+
+            system_state.apply(world);
+        }
+
+        systems_to_run.iter().for_each(|system| {
+            if let Some(system) = system {
+                world.run_system(*system).unwrap();
+            }
+        });
+    }
+}
 
 #[derive(Default, Clone)]
 struct ModeSystems {
@@ -103,7 +146,6 @@ pub fn setup(world: &mut World) {
             EditorMode::Rooms,
             ModeSystems {
                 update: vec![
-                    world.register_system(rooms::detect_file_changes),
                     world.register_system(rooms::detect_world_changes),
                     world.register_system(rooms::detect_additions),
                 ],

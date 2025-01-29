@@ -8,13 +8,14 @@ use bevy::{
 };
 use egui::{menu, Frame, Ui};
 use mines::worldgen::asset::{RoomPart, RoomPartPayload, RoomPartUuid};
-use transform_gizmo_bevy::GizmoTarget;
 use uuid::Uuid;
 
 use crate::{
     gizmos::Pickable,
-    state::{EditorState, EditorViewMode, FilePayload},
+    state::{EditorMode, EditorState, EditorViewMode, FilePayload},
 };
+
+use super::ModeSpecific;
 
 //
 // Systems
@@ -64,32 +65,6 @@ pub fn detect_world_changes(
         };
 
         part.transform = *transform;
-    });
-}
-
-// HACK there should probably be a proper revert event
-// Hook: update
-pub fn detect_file_changes(
-    mut state: ResMut<EditorState>,
-    mut parts: Query<(&mut Transform, &RoomPartUuid)>,
-    gizmo_targets: Query<(Entity, &GizmoTarget)>,
-) {
-    if gizmo_targets.iter().any(|(_, target)| target.is_focused()) {
-        return;
-    }
-    let Some(data) = state.files.current_data_mut() else {
-        return;
-    };
-    let FilePayload::Room(data) = data else {
-        return;
-    };
-
-    parts.iter_mut().for_each(|(mut transform, uuid)| {
-        let Some(part) = data.parts.get_mut(&uuid.0) else {
-            return;
-        };
-
-        *transform = part.transform;
     });
 }
 
@@ -143,6 +118,7 @@ pub fn room_part_to_editor_bundle(
                 .with_inserted_indices(Indices::U32(indices.clone()));
 
             (
+                ModeSpecific(EditorMode::Rooms, None),
                 RoomPartUuid(uuid),
                 Pickable(None, None),
                 Wireframe,

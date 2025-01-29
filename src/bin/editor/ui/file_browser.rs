@@ -1,3 +1,4 @@
+use bevy::prelude::Commands;
 use egui::{
     menu, Align, Align2, Area, Button, Color32, ComboBox, Context, Frame, Id, Label, Layout,
     Margin, Response, RichText, Rounding, ScrollArea, SelectableLabel, Sense, Stroke, TextEdit, Ui,
@@ -6,6 +7,7 @@ use egui::{
 use strum::{EnumProperty, IntoEnumIterator};
 
 use crate::{
+    mode::RevertCommand,
     state::{EditorMode, EditorState},
     ui::{open_file_action_dialog, FileActionDialogMode},
 };
@@ -333,6 +335,7 @@ pub fn file_action_dialog(
 }
 
 pub fn execute_file_action_dialog_action(
+    commands: &mut Commands,
     state: &mut EditorState,
     FileActionDialogState {
         mode,
@@ -357,6 +360,7 @@ pub fn execute_file_action_dialog_action(
         }
         FileActionDialogMode::Revert => {
             state.files.revert_file(*file_index).unwrap();
+            commands.queue(RevertCommand);
         }
         FileActionDialogMode::Delete => {
             state.files.delete_file(*file_index).unwrap();

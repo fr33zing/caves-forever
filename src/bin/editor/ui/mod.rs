@@ -1,6 +1,6 @@
 use bevy::{
     app::{App, Plugin, Update},
-    prelude::{MouseButton, ResMut, Resource, Single, With},
+    prelude::{Commands, MouseButton, ResMut, Resource, Single, With},
     window::{PrimaryWindow, Window},
 };
 use bevy_egui::{
@@ -86,6 +86,7 @@ impl Plugin for EditorUiPlugin {
 }
 
 fn ui(
+    mut commands: Commands,
     mut state: ResMut<EditorState>,
     mut side_panel_visibility: ResMut<SidePanelVisibility>,
     mut dialogs: ResMut<EditorDialogVisibility>,
@@ -245,7 +246,11 @@ fn ui(
             dialogs.show_filename_dialog = false;
         }
         if execute_action {
-            execute_file_action_dialog_action(&mut state, &mut file_action_dialog_state);
+            execute_file_action_dialog_action(
+                &mut commands,
+                &mut state,
+                &mut file_action_dialog_state,
+            );
         }
     }
 }
