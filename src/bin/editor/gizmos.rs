@@ -1,10 +1,6 @@
 use bevy::{
     math::Vec3A, pbr::wireframe::WireframeColor, picking::backend::ray::RayMap, prelude::*,
 };
-use mines::{
-    tnua::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
-    worldgen::terrain::Chunk,
-};
 use transform_gizmo_bevy::{
     Color32, GizmoHotkeys, GizmoOptions, GizmoTarget, GizmoVisuals, TransformGizmoPlugin,
 };
@@ -12,6 +8,11 @@ use transform_gizmo_bevy::{
 use crate::{
     mode::ModeSpecific,
     state::{EditorState, EditorViewMode, SpawnPickerMode},
+    ui::CursorOverEguiPanel,
+};
+use mines::{
+    tnua::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
+    worldgen::terrain::Chunk,
 };
 
 pub struct EditorGizmosPlugin;
@@ -136,11 +137,15 @@ fn pick(
     ray_map: Res<RayMap>,
     state: Res<EditorState>,
     mouse: Res<ButtonInput<MouseButton>>,
+    cursor_over_egui_panel: Res<CursorOverEguiPanel>,
     keyboard: Res<ButtonInput<KeyCode>>,
     selectable: Query<Entity, With<Selectable>>,
     gizmo_targets: Query<(Entity, &GizmoTarget)>,
     primary_selection: Query<Entity, With<PrimarySelection>>,
 ) {
+    if cursor_over_egui_panel.0 {
+        return;
+    }
     if state.spawn.mode != SpawnPickerMode::Inactive {
         return;
     }
@@ -252,7 +257,11 @@ fn pick_spawn_position(
     mut state: ResMut<EditorState>,
     mouse: Res<ButtonInput<MouseButton>>,
     chunks: Query<Entity, With<Chunk>>,
+    cursor_over_egui_panel: Res<CursorOverEguiPanel>,
 ) {
+    if cursor_over_egui_panel.0 {
+        return;
+    }
     if state.spawn.mode != SpawnPickerMode::Picking {
         return;
     }

@@ -33,7 +33,7 @@ use crate::{
         SelectionMaterials,
     },
     state::{EditorMode, EditorState, EditorViewMode, FilePayload},
-    ui::CursorOverEditSelectionPanel,
+    ui::CursorOverEguiPanel,
     util::mesh_text,
 };
 
@@ -239,7 +239,7 @@ pub fn pick_profile_point(
     window: Single<&Window, With<PrimaryWindow>>,
     camera: Single<(&Camera, &GlobalTransform), With<TrackballCamera>>,
     mouse: Res<ButtonInput<MouseButton>>,
-    cursor_over_edit_selection_panel: Res<CursorOverEditSelectionPanel>,
+    cursor_over_egui_panel: Res<CursorOverEguiPanel>,
 ) {
     if state.view != EditorViewMode::Editor {
         return;
@@ -302,7 +302,7 @@ pub fn pick_profile_point(
                 state.tunnels_mode.drag_start = Some((data.points[picked].position, cursor));
                 state.tunnels_mode.selected_point = Some(picked);
             }
-        } else if !cursor_over_edit_selection_panel.0 {
+        } else if !cursor_over_egui_panel.0 {
             state.tunnels_mode.selected_point = None;
         }
     } else if mouse.just_released(MouseButton::Left) {

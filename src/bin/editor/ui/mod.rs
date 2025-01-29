@@ -27,6 +27,10 @@ mod icons;
 
 use file_browser::{execute_file_action_dialog_action, file_action_dialog, file_browser};
 
+const TOP_PANEL_HEIGHT: f32 = 30.0;
+const LEFT_PANEL_WIDTH: f32 = 230.0;
+const RIGHT_PANEL_WIDTH: f32 = 230.0;
+
 #[derive(Resource, Default)]
 pub struct EditorDialogVisibility {
     pub show_filename_dialog: bool,
@@ -71,7 +75,7 @@ impl Default for SidePanelVisibility {
 }
 
 #[derive(Resource, Default)]
-pub struct CursorOverEditSelectionPanel(pub bool);
+pub struct CursorOverEguiPanel(pub bool);
 
 pub struct EditorUiPlugin;
 
@@ -80,7 +84,7 @@ impl Plugin for EditorUiPlugin {
         app.init_resource::<EditorDialogVisibility>();
         app.init_resource::<SidePanelVisibility>();
         app.init_resource::<FileActionDialogState>();
-        app.init_resource::<CursorOverEditSelectionPanel>();
+        app.init_resource::<CursorOverEguiPanel>();
         app.add_systems(Update, ui);
     }
 }
@@ -91,7 +95,7 @@ fn ui(
     mut side_panel_visibility: ResMut<SidePanelVisibility>,
     mut dialogs: ResMut<EditorDialogVisibility>,
     mut file_action_dialog_state: ResMut<FileActionDialogState>,
-    mut cursor_over_edit_selection_panel: ResMut<CursorOverEditSelectionPanel>,
+    mut cursor_over_egui_panel: ResMut<CursorOverEguiPanel>,
     mut contexts: EguiContexts,
     trackball: Option<Single<(&mut TrackballController, &mut TrackballCamera)>>,
     window: Option<Single<&Window, With<PrimaryWindow>>>,
@@ -100,12 +104,11 @@ fn ui(
     ctx.set_visuals(Visuals::dark());
 
     // Top panel
-    let top_panel_height = 30.0;
     let mut top_frame = Frame::side_top_panel(&ctx.style());
     top_frame.inner_margin = Margin::same(8.0);
     TopBottomPanel::top("top_panel")
         .frame(top_frame)
-        .default_height(top_panel_height)
+        .default_height(TOP_PANEL_HEIGHT)
         .resizable(false)
         .show(ctx, |ui| {
             top_panel(
@@ -119,7 +122,7 @@ fn ui(
 
     // Left panel
     let left_panel_width = if side_panel_visibility.left {
-        230.0
+        LEFT_PANEL_WIDTH
     } else {
         0.0
     };
@@ -138,7 +141,7 @@ fn ui(
 
     // Right panel
     let right_panel_width = if side_panel_visibility.right {
-        230.0
+        LEFT_PANEL_WIDTH
     } else {
         0.0
     };
@@ -158,11 +161,12 @@ fn ui(
                 ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
             });
     }
-    cursor_over_edit_selection_panel.0 = if let Some(window) = window {
+
+    cursor_over_egui_panel.0 = if let Some(ref window) = window {
         if let Some(cursor) = window.cursor_position() {
-            side_panel_visibility.right
-                && cursor.x >= window.width() - right_panel_width
-                && cursor.y > top_panel_height
+            (side_panel_visibility.right && cursor.x >= window.width() - RIGHT_PANEL_WIDTH)
+                || (side_panel_visibility.left && cursor.x <= LEFT_PANEL_WIDTH)
+                || (cursor.y <= TOP_PANEL_HEIGHT)
         } else {
             false
         }
@@ -174,7 +178,7 @@ fn ui(
     Area::new(Id::new("toggle_left_panel"))
         .anchor(
             Align2::LEFT_TOP,
-            vec2(left_panel_width + 8.0, top_panel_height + 8.0),
+            vec2(left_panel_width + 8.0, TOP_PANEL_HEIGHT + 8.0),
         )
         .show(ctx, |ui| {
             ui.checkbox(&mut side_panel_visibility.left, "File browser");
@@ -182,7 +186,7 @@ fn ui(
     let right_panel_toggle_hovered = Area::new(Id::new("toggle_right_panel"))
         .anchor(
             Align2::RIGHT_TOP,
-            vec2(-right_panel_width - 8.0, top_panel_height + 8.0),
+            vec2(-right_panel_width - 8.0, TOP_PANEL_HEIGHT + 8.0),
         )
         .show(ctx, |ui| {
             ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
@@ -192,8 +196,7 @@ fn ui(
         .inner
         .inner
         .contains_pointer();
-    cursor_over_edit_selection_panel.0 =
-        cursor_over_edit_selection_panel.0 || right_panel_toggle_hovered;
+    cursor_over_egui_panel.0 = cursor_over_egui_panel.0 || right_panel_toggle_hovered;
 
     // No open files indicator
     if state.files.current.is_none() {
@@ -303,22 +306,26 @@ fn top_panel(
 
         // Playtest
         if state.view == EditorViewMode::Preview {
-            if state.spawn.mode != SpawnPickerMode::Playing {
-                if ui.button("Play").clicked() {
-                    state.spawn.mode = match state.spawn.mode {
-                        SpawnPickerMode::Inactive => SpawnPickerMode::Picking,
-                        _ => SpawnPickerMode::Inactive,
+            match state.spawn.mode {
+                SpawnPickerMode::Despawning | SpawnPickerMode::Inactive => {
+                    if ui.button("Play").clicked() {
+                        state.spawn.mode = SpawnPickerMode::Picking;
                     }
                 }
-            } else {
-                if ui.button("Stop playing").clicked() {
-                    state.spawn.mode = SpawnPickerMode::Despawning;
+                SpawnPickerMode::Picking => {
+                    if ui.button("Stop picking").clicked() {
+                        state.spawn.mode = SpawnPickerMode::Picking;
+                    }
+                    ui.add(
+                        Label::new("Click on terrain to choose a spawn position.")
+                            .selectable(false),
+                    );
                 }
-            }
-            if state.spawn.mode == SpawnPickerMode::Picking {
-                ui.add(
-                    Label::new("Click on terrain to choose a spawn position.").selectable(false),
-                );
+                SpawnPickerMode::Spawning | SpawnPickerMode::Playing => {
+                    if ui.button("Stop playing").clicked() {
+                        state.spawn.mode = SpawnPickerMode::Despawning;
+                    }
+                }
             }
         }
 
