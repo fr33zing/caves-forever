@@ -253,9 +253,12 @@ fn draw_connection_planes(
 fn draw_connection_points(
     mut gizmos: Gizmos,
     state: Res<EditorState>,
-    camera: Single<&Transform, With<Camera3d>>,
+    camera: Option<Single<&Transform, With<Camera3d>>>,
     points: Query<(&GlobalTransform, Option<&Pickable>), With<ConnectionPoint>>,
 ) {
+    let Some(camera) = camera else {
+        return;
+    };
     if state.spawn.mode == SpawnPickerMode::Playing {
         return;
     };
