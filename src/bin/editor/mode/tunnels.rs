@@ -12,10 +12,10 @@ use egui::{menu, Align, ComboBox, Frame, Label, Layout, RichText, ScrollArea, Ui
 use nalgebra::{Point2, Point3};
 use pathfinding::prelude::dfs;
 use strum::IntoEnumIterator;
-use transform_gizmo_bevy::{enum_set, GizmoMode, GizmoOrientation};
 
 use mines::{
     materials::LineMaterial,
+    render_layer,
     tnua::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
     worldgen::{
         asset::{Environment, Rarity, Tunnel, TunnelMeshInfo},
@@ -55,7 +55,7 @@ pub fn spawn_size_reference_labels(
 ) {
     // "Player"
     commands.spawn((
-        RenderLayers::from_layers(&[1]),
+        RenderLayers::from_layers(&[render_layer::EDITOR]),
         ModeSpecific(EditorMode::Tunnels, None),
         Transform::from_rotation(Quat::from_euler(
             EulerRot::ZXY,
@@ -79,7 +79,7 @@ pub fn spawn_size_reference_labels(
 
     // "Chunk"
     commands.spawn((
-        RenderLayers::from_layers(&[1]),
+        RenderLayers::from_layers(&[render_layer::EDITOR]),
         ModeSpecific(EditorMode::Tunnels, None),
         Transform::from_rotation(Quat::from_euler(
             EulerRot::ZXY,
@@ -110,7 +110,7 @@ fn spawn_doorway(
 ) {
     commands
         .spawn((
-            RenderLayers::from_layers(&[1]),
+            RenderLayers::from_layers(&[render_layer::EDITOR_PREVIEW]),
             ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
             ConnectionPlane,
             RayCastBackfaces,
@@ -131,7 +131,7 @@ fn spawn_doorway(
         ));
 
     commands.spawn((
-        RenderLayers::from_layers(&[1]),
+        RenderLayers::from_layers(&[render_layer::EDITOR_PREVIEW]),
         ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
         ConnectionPoint,
         Transform::from_translation(transform.translation * Vec3::new(0.4, 1.0, 0.0)),
@@ -152,7 +152,7 @@ pub fn enter_preview(
     let y = door_scale.z / 2.0 + 2.0;
 
     commands.spawn((
-        RenderLayers::from_layers(&[1]),
+        RenderLayers::from_layers(&[render_layer::EDITOR_PREVIEW]),
         ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
         ConnectionPoint,
         Transform::from_translation(Vec3::Y * y),
@@ -376,11 +376,12 @@ pub fn update_tunnel_info(
         let tunnel = data.clone();
         let mesh = tunnel.to_mesh();
         let mesh_info = TunnelMeshInfo::from_mesh(&mesh);
-        let model = TunnelInfo(tunnel, mesh_info);
+        let tunnel_info = TunnelInfo(tunnel, mesh_info);
 
         commands.spawn((
             ModeSpecific(EditorMode::Tunnels, None),
-            model,
+            RenderLayers::from_layers(&[render_layer::EDITOR]),
+            tunnel_info,
             Mesh3d(meshes.add(mesh)),
             MeshMaterial3d(materials.add(LineMaterial {
                 color: Color::srgb(1.0, 1.0, 1.0),
@@ -491,6 +492,7 @@ pub fn remesh_preview_path(
     commands
         .spawn((
             ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
+            RenderLayers::from_layers(&[render_layer::EDITOR_PREVIEW]),
             ConnectedPath,
             Mesh3d(meshes.add(line_mesh)),
             MeshMaterial3d(materials.add(LineMaterial {
@@ -502,6 +504,7 @@ pub fn remesh_preview_path(
         .with_children(|parent| {
             parent.spawn((
                 ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
+                RenderLayers::from_layers(&[render_layer::EDITOR_PREVIEW]),
                 Mesh3d(meshes.add(curve_mesh)),
                 MeshMaterial3d(materials.add(LineMaterial {
                     color: Color::WHITE,

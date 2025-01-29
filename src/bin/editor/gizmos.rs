@@ -6,8 +6,7 @@ use mines::{
     worldgen::terrain::Chunk,
 };
 use transform_gizmo_bevy::{
-    Color32, GizmoHotkeys, GizmoMode, GizmoOptions, GizmoOrientation, GizmoTarget, GizmoVisuals,
-    TransformGizmoPlugin,
+    Color32, GizmoHotkeys, GizmoOptions, GizmoTarget, GizmoVisuals, TransformGizmoPlugin,
 };
 
 use crate::{

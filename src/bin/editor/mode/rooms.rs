@@ -22,9 +22,12 @@ use crate::{
     gizmos::{Selectable, WireframeIndicatesSelection},
     state::{EditorMode, EditorState, EditorViewMode, FilePayload},
 };
-use mines::worldgen::{
-    asset::{Environment, Rarity, RoomPart, RoomPartPayload, RoomPartUuid},
-    brush::TerrainBrush,
+use mines::{
+    render_layer,
+    worldgen::{
+        asset::{Environment, Rarity, RoomPart, RoomPartPayload, RoomPartUuid},
+        brush::TerrainBrush,
+    },
 };
 
 #[derive(Component)]
@@ -250,7 +253,7 @@ pub fn room_part_to_editor_bundle(
 
             (
                 ModeSpecific(EditorMode::Rooms, None),
-                RenderLayers::from_layers(&[1]),
+                RenderLayers::from_layers(&[render_layer::EDITOR]),
                 RoomPartUuid(*uuid),
                 Selectable,
                 WireframeIndicatesSelection,

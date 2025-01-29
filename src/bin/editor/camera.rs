@@ -5,6 +5,7 @@ use bevy_trackball::{
     prelude::{Bound, Clamp, Scope},
     TrackballCamera, TrackballController, TrackballInput, TrackballVelocity, TrackballWheelUnit,
 };
+use mines::render_layer;
 use nalgebra::{Point3, Vector3};
 use transform_gizmo_bevy::GizmoCamera;
 
@@ -14,9 +15,11 @@ use crate::state::{EditorMode, EditorState, EditorViewMode};
 pub struct AllowOrbit(pub bool);
 
 pub fn on_change_mode(
+    mut commands: Commands,
     state: Res<EditorState>,
     trackball: Option<
         Single<(
+            Entity,
             &mut TrackballController,
             &mut TrackballCamera,
             &mut AllowOrbit,
@@ -26,7 +29,7 @@ pub fn on_change_mode(
     let Some(trackball) = trackball else {
         return;
     };
-    let (mut controller, mut camera, mut allow_orbit) = trackball.into_inner();
+    let (entity, mut controller, mut camera, mut allow_orbit) = trackball.into_inner();
     let (d, mut target, up, eps) = (16.0, Point3::origin(), &Vector3::y_axis(), f32::EPSILON);
 
     let mut block_orbit = false;
@@ -53,8 +56,6 @@ pub fn on_change_mode(
         }
     }
 
-    camera.reset = camera.frame;
-
     controller.input.orbit_button = if block_orbit {
         None
     } else {
@@ -65,6 +66,15 @@ pub fn on_change_mode(
         }
     };
 
+    commands.entity(entity).insert(match state.view {
+        EditorViewMode::Editor => {
+            RenderLayers::from_layers(&[render_layer::WORLD, render_layer::EDITOR])
+        }
+        EditorViewMode::Preview => {
+            RenderLayers::from_layers(&[render_layer::WORLD, render_layer::EDITOR_PREVIEW])
+        }
+    });
+    camera.reset = camera.frame;
     camera.clamp = clamp(!block_orbit);
     allow_orbit.0 = !block_orbit;
 }
@@ -126,7 +136,7 @@ pub fn setup(mut commands: Commands) {
     };
 
     commands.spawn((
-        RenderLayers::from_layers(&[0, 1]),
+        RenderLayers::from_layers(&[render_layer::WORLD, render_layer::EDITOR]),
         AllowOrbit(false),
         controller,
         TrackballCamera::look_at(Vec3::ZERO, Vec3::new(0.00, 16.0, f32::EPSILON), Vec3::Y)
