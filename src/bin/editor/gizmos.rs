@@ -237,7 +237,6 @@ fn update_selection_indications(
 
     material_indicators.iter().for_each(|entity| {
         let mut commands = commands.entity(entity);
-        // commands.remove::<MeshMaterial3d<StandardMaterial>>();
 
         if selected.get(entity).is_ok() {
             if is_primary_selection(&entity, &primary_selection) {
@@ -364,10 +363,10 @@ fn draw_connection_planes(
 fn draw_connection_points(
     mut gizmos: Gizmos,
     state: Res<EditorState>,
-    camera: Option<Single<&Transform, With<Camera3d>>>,
+    camera: Query<&Transform, With<Camera3d>>,
     points: Query<(&GlobalTransform, Option<&Selectable>), With<ConnectionPoint>>,
 ) {
-    let Some(camera) = camera else {
+    let Ok(camera) = camera.get_single() else {
         return;
     };
     if state.spawn.mode == SpawnPickerMode::Playing {
