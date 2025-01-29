@@ -24,6 +24,7 @@ use mines::{
         voxel::VoxelMaterial,
     },
 };
+use uuid::Uuid;
 
 use super::{EditorHandleGizmos, ModeSpecific};
 use crate::{
@@ -576,15 +577,18 @@ pub fn update_preview_brush(
         return;
     }
 
-    commands.entity(brush.0).despawn();
+    let (entity, upb) = brush.into_inner();
+
+    commands.entity(entity).despawn();
     terrain_brushes.iter().for_each(|entity| {
         commands.entity(entity).despawn();
     });
 
     commands.spawn(TerrainBrushRequest::Sweep {
+        uuid: Uuid::new_v4().into(),
         material: VoxelMaterial::BrownRock,
-        rail: brush.1.rail.clone(),
-        profile: brush.1.profile.clone(),
+        rail: upb.rail.clone(),
+        profile: upb.profile.clone(),
     });
 }
 

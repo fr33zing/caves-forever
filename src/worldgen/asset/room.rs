@@ -30,10 +30,8 @@ impl Default for Room {
 }
 
 impl Room {
-    pub fn push(&mut self, part: RoomPart) -> Uuid {
-        let uuid = Uuid::new_v4();
-        self.parts.insert(uuid, part);
-        uuid
+    pub fn push(&mut self, part: RoomPart) {
+        self.parts.insert(part.uuid, part);
     }
 }
 
@@ -42,6 +40,7 @@ pub struct RoomPartUuid(pub Uuid);
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RoomPart {
+    pub uuid: Uuid,
     pub transform: Transform,
     pub data: RoomPartPayload,
 }
@@ -58,7 +57,11 @@ pub enum RoomPartPayload {
 
 impl RoomPart {
     pub fn to_brush_request(&self) -> TerrainBrushRequest {
-        let Self { transform, data } = self;
+        let Self {
+            uuid,
+            transform,
+            data,
+        } = self;
 
         match data {
             RoomPartPayload::Stl {
@@ -67,6 +70,7 @@ impl RoomPart {
                 indices,
                 ..
             } => TerrainBrushRequest::Mesh {
+                uuid: (*uuid).into(),
                 material: *material,
                 transform: *transform,
                 mesh: Mesh::new(
@@ -90,6 +94,7 @@ impl RoomPart {
         ));
 
         Ok(Self {
+            uuid: Uuid::new_v4(),
             transform,
             data: RoomPartPayload::Stl {
                 path: path.to_owned(),

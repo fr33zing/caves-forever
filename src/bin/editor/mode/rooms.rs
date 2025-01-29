@@ -51,10 +51,9 @@ pub fn detect_additions(
     parts.iter().for_each(|uuid| {
         existing.insert(uuid.0);
     });
-
     data.parts.iter().for_each(|(uuid, part)| {
         if !existing.contains(uuid) {
-            commands.spawn(room_part_to_editor_bundle(part, *uuid, &mut meshes));
+            commands.spawn(room_part_to_editor_bundle(part, &mut meshes));
         }
     });
 }
@@ -105,7 +104,7 @@ pub fn update_preview_brushes(
     time: Res<Time>,
     state: Res<EditorState>,
     update_preview_brushes: Query<(Entity, &UpdatePreviewBrush)>,
-    terrain_brushes: Query<Entity, With<TerrainBrush>>,
+    terrain_brushes: Query<(Entity, &TerrainBrush)>,
 ) {
     let Some(data) = state.files.current_data() else {
         return;
@@ -116,7 +115,7 @@ pub fn update_preview_brushes(
 
     const TIMER_SECS: f64 = 0.5;
 
-    let mut clear_brushes = false;
+    let mut clear_brushes = Vec::<Uuid>::new();
 
     update_preview_brushes.iter().for_each(|(upb_entity, upb)| {
         if time.elapsed_secs_f64() - upb.time < TIMER_SECS {
@@ -127,16 +126,20 @@ pub fn update_preview_brushes(
             todo!();
         };
 
-        clear_brushes = true;
+        clear_brushes.push(upb.uuid);
         commands.entity(upb_entity).clear();
         commands.spawn(part.to_brush_request());
     });
 
-    if clear_brushes {
-        terrain_brushes.iter().for_each(|entity| {
-            commands.entity(entity).despawn();
+    clear_brushes.into_iter().for_each(|uuid| {
+        let uuid = uuid.to_string();
+
+        terrain_brushes.iter().for_each(|(entity, brush)| {
+            if brush.uuid() == &uuid {
+                commands.entity(entity).despawn();
+            }
         });
-    }
+    });
 }
 
 //
@@ -175,10 +178,13 @@ pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
 
 pub fn room_part_to_editor_bundle(
     room_part: &RoomPart,
-    uuid: Uuid,
     meshes: &mut ResMut<Assets<Mesh>>,
 ) -> impl Bundle {
-    let RoomPart { transform, data } = room_part;
+    let RoomPart {
+        uuid,
+        transform,
+        data,
+    } = room_part;
 
     match data {
         RoomPartPayload::Stl {
@@ -191,7 +197,7 @@ pub fn room_part_to_editor_bundle(
             (
                 ModeSpecific(EditorMode::Rooms, None),
                 RenderLayers::from_layers(&[1]),
-                RoomPartUuid(uuid),
+                RoomPartUuid(*uuid),
                 Pickable(None, None),
                 Wireframe,
                 WireframeColor {
