@@ -26,7 +26,7 @@ use mines::{
 };
 use uuid::Uuid;
 
-use super::{EditorHandleGizmos, ModeSpecific};
+use super::{EditorGizmos, ModeSpecific};
 use crate::{
     gizmos::{
         ConnectedPath, ConnectionPlane, ConnectionPoint, MaterialIndicatesSelection, Selectable,
@@ -194,7 +194,7 @@ pub fn enter_preview(
 }
 
 /// Hook: update
-pub fn draw_size_references(mut gizmos: Gizmos, info: Option<Single<&TunnelInfo>>) {
+pub fn draw_size_references(mut gizmos: Gizmos<EditorGizmos>, info: Option<Single<&TunnelInfo>>) {
     // Player
     gizmos.rounded_cuboid(
         Vec3::ZERO,
@@ -234,7 +234,7 @@ pub fn draw_size_references(mut gizmos: Gizmos, info: Option<Single<&TunnelInfo>
 
 /// Hook: update
 pub fn pick_profile_point(
-    mut gizmos: Gizmos<EditorHandleGizmos>,
+    mut gizmos: Gizmos<EditorGizmos>,
     mut state: ResMut<EditorState>,
     window: Single<&Window, With<PrimaryWindow>>,
     camera: Single<(&Camera, &GlobalTransform), With<TrackballCamera>>,

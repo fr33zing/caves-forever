@@ -7,10 +7,14 @@ use bevy::{
         world::CommandQueue,
     },
     prelude::*,
+    render::view::RenderLayers,
 };
 use bevy_trackball::TrackballCamera;
 use common_macros::hash_map;
-use mines::tnua::{consts::PLAYER_HEIGHT, DespawnPlayerCommand, SpawnPlayerCommand};
+use mines::{
+    render_layer,
+    tnua::{consts::PLAYER_HEIGHT, DespawnPlayerCommand, SpawnPlayerCommand},
+};
 use nalgebra::Vector3;
 
 use crate::{
@@ -83,15 +87,18 @@ struct ModeSwitcher {
 #[derive(Component)]
 pub struct ModeSpecific(pub EditorMode, pub Option<EditorViewMode>);
 
-/// These gizmos will render above the rest.
 #[derive(Default, Reflect, GizmoConfigGroup)]
-pub struct EditorHandleGizmos;
+pub struct EditorGizmos;
+
+#[derive(Default, Reflect, GizmoConfigGroup)]
+pub struct EditorPreviewGizmos;
 
 pub struct EditorModesPlugin;
 
 impl Plugin for EditorModesPlugin {
     fn build(&self, app: &mut App) {
-        app.init_gizmo_group::<EditorHandleGizmos>();
+        app.init_gizmo_group::<EditorGizmos>();
+        app.init_gizmo_group::<EditorPreviewGizmos>();
 
         let world = app.world_mut();
         let camera_on_change_mode_system = world.register_system(camera::on_change_mode);
@@ -116,10 +123,12 @@ impl Plugin for EditorModesPlugin {
 
 pub fn setup(world: &mut World) {
     world.resource_scope(|_, mut gizmos_config: Mut<GizmoConfigStore>| {
+        gizmos_config.config_mut::<EditorGizmos>().0.render_layers =
+            RenderLayers::layer(render_layer::EDITOR);
         gizmos_config
-            .config_mut::<EditorHandleGizmos>()
+            .config_mut::<EditorPreviewGizmos>()
             .0
-            .depth_bias = -1.0;
+            .render_layers = RenderLayers::layer(render_layer::EDITOR_PREVIEW);
     });
 
     world.resource_scope(|world, mut switcher: Mut<ModeSwitcher>| {

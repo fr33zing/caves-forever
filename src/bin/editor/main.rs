@@ -5,6 +5,7 @@ use bevy::{
     prelude::*,
     render::{
         settings::{RenderCreation, WgpuFeatures, WgpuSettings},
+        view::RenderLayers,
         RenderPlugin,
     },
     window::PresentMode,
@@ -18,6 +19,7 @@ use noisy_bevy::NoisyShaderPlugin;
 
 use mines::{
     materials::{CaveMaterialExtension, LineMaterialPlugin},
+    render_layer,
     tnua::PlayerPlugin,
     worldgen::terrain::TerrainPlugin,
 };
@@ -86,7 +88,10 @@ fn main() {
 }
 
 fn setup(mut commands: Commands) {
-    commands.spawn(InfiniteGridBundle { ..default() });
+    commands.spawn((
+        InfiniteGridBundle { ..default() },
+        RenderLayers::from_layers(&[render_layer::EDITOR, render_layer::EDITOR_PREVIEW]),
+    ));
 
     commands.insert_resource(AmbientLight {
         color: Color::srgb(1.0, 1.0, 1.0).into(),
