@@ -651,12 +651,7 @@ pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
                 .selected_text(format!("{}", data.environment))
                 .show_ui(right, |ui| {
                     Environment::iter().for_each(|env| {
-                        if ui
-                            .selectable_value(&mut data.environment, env, format!("{env}"))
-                            .clicked()
-                        {
-                            //file.changed = true;
-                        };
+                        ui.selectable_value(&mut data.environment, env, format!("{env}"));
                     });
                 });
         });
@@ -670,12 +665,7 @@ pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
                 .selected_text(format!("{}", data.rarity))
                 .show_ui(right, |ui| {
                     Rarity::iter().for_each(|rarity| {
-                        if ui
-                            .selectable_value(&mut data.rarity, rarity, format!("{rarity}"))
-                            .clicked()
-                        {
-                            //file.changed = true;
-                        };
+                        ui.selectable_value(&mut data.rarity, rarity, format!("{rarity}"));
                     });
                 });
         });

@@ -1,27 +1,31 @@
 use std::collections::HashSet;
 
 use bevy::{
-    asset::RenderAssetUsages,
+    asset::{Assets, RenderAssetUsages},
+    color::Color,
     pbr::wireframe::{Wireframe, WireframeColor},
-    prelude::*,
+    prelude::{
+        Bundle, Changed, Commands, Component, Entity, Mesh, Mesh3d, Query, Res, ResMut, Transform,
+    },
     render::{
         mesh::{Indices, PrimitiveTopology},
         view::RenderLayers,
     },
+    time::Time,
 };
-use egui::{menu, Frame, Ui};
-use mines::worldgen::{
-    asset::{RoomPart, RoomPartPayload, RoomPartUuid},
-    brush::TerrainBrush,
-};
+use egui::{menu, Align, ComboBox, Frame, Label, Layout, RichText, ScrollArea, Ui};
+use strum::IntoEnumIterator;
 use uuid::Uuid;
 
+use super::ModeSpecific;
 use crate::{
     gizmos::Pickable,
     state::{EditorMode, EditorState, EditorViewMode, FilePayload},
 };
-
-use super::ModeSpecific;
+use mines::worldgen::{
+    asset::{Environment, Rarity, RoomPart, RoomPartPayload, RoomPartUuid},
+    brush::TerrainBrush,
+};
 
 #[derive(Component)]
 pub struct UpdatePreviewBrush {
@@ -170,6 +174,67 @@ pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
         }
         EditorViewMode::Preview => {}
     }
+}
+
+pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
+    let picker = &mut state.files;
+    let Some(file) = picker.current_file_mut() else {
+        return;
+    };
+    let Some(ref mut data) = file.data else {
+        return;
+    };
+    let FilePayload::Room(data) = data else {
+        todo!();
+    };
+
+    ui.style_mut().spacing.item_spacing.y = 8.0;
+
+    ui.add(Label::new(RichText::new("Room").heading()).selectable(false));
+
+    // Environment
+    ui.columns_const(|[left, right]| {
+        left.add(Label::new("Environment").selectable(false));
+        right.with_layout(Layout::right_to_left(Align::Min), |right| {
+            ComboBox::from_id_salt("room_environment")
+                .selected_text(format!("{}", data.environment))
+                .show_ui(right, |ui| {
+                    Environment::iter().for_each(|env| {
+                        ui.selectable_value(&mut data.environment, env, format!("{env}"));
+                    });
+                });
+        });
+    });
+
+    // Rarity
+    ui.columns_const(|[left, right]| {
+        left.add(Label::new("Rarity").selectable(false));
+        right.with_layout(Layout::right_to_left(Align::Min), |right| {
+            ComboBox::from_id_salt("room_rarity")
+                .selected_text(format!("{}", data.rarity))
+                .show_ui(right, |ui| {
+                    Rarity::iter().for_each(|rarity| {
+                        ui.selectable_value(&mut data.rarity, rarity, format!("{rarity}"));
+                    });
+                });
+        });
+    });
+
+    ui.separator();
+
+    // Point
+    ScrollArea::vertical().show(ui, |ui| {
+        if let Some(selection_index) = state.tunnels_mode.selected_point {
+            ui.add(
+                Label::new(RichText::new(format!("Point {selection_index}")).heading())
+                    .selectable(false),
+            );
+
+        } else {
+            ui.add(Label::new(RichText::new("Point").heading()).selectable(false));
+            ui.add(Label::new("No point selected.").selectable(false));
+        }
+    });
 }
 
 //

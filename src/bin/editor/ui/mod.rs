@@ -153,8 +153,8 @@ fn ui(
             .show(ctx, |ui| {
                 match state.mode() {
                     EditorMode::Tunnels => tunnels::sidebar(&mut state, ui),
-                    EditorMode::Rooms => {}
-                }
+                    EditorMode::Rooms => rooms::sidebar(&mut state, ui),
+                };
                 ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
             });
     }
