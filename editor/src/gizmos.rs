@@ -11,7 +11,7 @@ use crate::{
     ui::CursorOverEguiPanel,
 };
 use lib::{
-    tnua::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
+    player::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
     worldgen::terrain::Chunk,
 };
 

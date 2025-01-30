@@ -19,7 +19,7 @@ use noisy_bevy::NoisyShaderPlugin;
 use lib::{
     materials::{CaveMaterialExtension, LineMaterialPlugin},
     render_layer,
-    tnua::PlayerPlugin,
+    player::PlayerPlugin,
     worldgen::terrain::TerrainPlugin,
 };
 

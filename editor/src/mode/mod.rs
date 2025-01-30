@@ -13,7 +13,7 @@ use bevy_trackball::TrackballCamera;
 use common_macros::hash_map;
 use lib::{
     render_layer,
-    tnua::{consts::PLAYER_HEIGHT, DespawnPlayerCommand, SpawnPlayerCommand},
+    player::{consts::PLAYER_HEIGHT, DespawnPlayerCommand, SpawnPlayerCommand},
 };
 use nalgebra::Vector3;
 

@@ -13,8 +13,8 @@ use pathfinding::prelude::dfs;
 
 use lib::{
     materials::LineMaterial,
+    player::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
     render_layer,
-    tnua::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
     worldgen::{
         asset::{Tunnel, TunnelMeshInfo},
         brush::{curve::mesh_curve, sweep::ProfileRamp, TerrainBrush, TerrainBrushRequest},
