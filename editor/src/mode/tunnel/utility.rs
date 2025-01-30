@@ -47,7 +47,7 @@ pub fn spawn_fake_portal(
             RayCastBackfaces,
             transform,
             Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(1.0, 0.125, 1.0)))),
-            MeshMaterial3d(materials.unselected.clone()),
+            materials.unselected(),
             MaterialIndicatesSelection,
             Selectable,
         ))
@@ -58,7 +58,7 @@ pub fn spawn_fake_portal(
                 1.0,
                 1.0 / transform.scale.z,
             )),
-            MeshMaterial3d(materials.unselected.clone()),
+            materials.unselected(),
         ));
 
     commands.spawn((
@@ -67,7 +67,7 @@ pub fn spawn_fake_portal(
         ConnectionPoint,
         Transform::from_translation(transform.translation),
         Mesh3d(meshes.add(Sphere::new(0.5))),
-        MeshMaterial3d(materials.unselected.clone()),
+        materials.unselected(),
         MaterialIndicatesSelection,
         Selectable,
     ));

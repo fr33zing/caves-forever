@@ -43,11 +43,12 @@ pub struct PrimarySelection;
 
 #[derive(Resource)]
 pub struct SelectionMaterials {
-    pub unselected: Handle<StandardMaterial>,
-    pub selected: Handle<StandardMaterial>,
-    pub multiselected: Handle<StandardMaterial>,
+    unselected: Handle<StandardMaterial>,
+    selected: Handle<StandardMaterial>,
+    multiselected: Handle<StandardMaterial>,
 }
 
+#[allow(unused)]
 impl SelectionMaterials {
     pub fn unselected(&self) -> MeshMaterial3d<StandardMaterial> {
         MeshMaterial3d(self.unselected.clone())
@@ -62,10 +63,11 @@ impl SelectionMaterials {
 
 #[derive(Resource)]
 pub struct SelectionWireframeColors {
-    pub unselected: WireframeColor,
-    pub selected: WireframeColor,
-    pub multiselected: WireframeColor,
+    unselected: WireframeColor,
+    selected: WireframeColor,
+    multiselected: WireframeColor,
 }
+#[allow(unused)]
 impl SelectionWireframeColors {
     pub fn unselected(&self) -> WireframeColor {
         self.unselected.clone()

@@ -34,6 +34,7 @@ pub enum Rarity {
 }
 
 impl Rarity {
+    #[allow(unused)]
     pub fn weight(&self) -> f32 {
         match self {
             Rarity::Abundant => 3.0,

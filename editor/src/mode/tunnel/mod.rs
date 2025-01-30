@@ -119,7 +119,7 @@ pub fn enter_preview(
         ConnectionPoint,
         Transform::from_translation(Vec3::Y * y),
         Mesh3d(meshes.add(Sphere::new(0.5))),
-        MeshMaterial3d(materials.unselected.clone()),
+        materials.unselected(),
         MaterialIndicatesSelection,
         Selectable,
     ));
