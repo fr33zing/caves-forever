@@ -16,7 +16,7 @@ use super::{
     CaveMaterialHandle, Chunk, ChunkData, ChunkRemeshRequest, DestroyTerrain, TerrainState,
     TerrainStateMutex, CHUNK_SAMPLE_RESOLUTION, CHUNK_SIZE_F,
 };
-use crate::{physics::GameLayer, tnua::IsPlayer, worldgen::voxel::VoxelMaterial};
+use crate::{physics::GameLayer, player::IsPlayer, worldgen::voxel::VoxelMaterial};
 
 #[derive(Default, Clone)]
 pub struct ChunkSpawnRequest {

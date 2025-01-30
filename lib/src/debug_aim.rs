@@ -1,7 +1,7 @@
 use avian3d::prelude::*;
 use bevy::{prelude::*, window::PrimaryWindow};
 
-use crate::{tnua::IsPlayer, worldgen::terrain::DestroyTerrainEvent};
+use crate::{player::IsPlayer, worldgen::terrain::DestroyTerrainEvent};
 
 pub struct DebugAimPlugin;
 
