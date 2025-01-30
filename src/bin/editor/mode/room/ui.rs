@@ -37,8 +37,7 @@ pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
 pub fn sidebar(
     state: &mut EditorState,
     ui: &mut Ui,
-    commands: &mut Commands,
-    selected: Option<Single<(Entity, &RoomPartUuid), With<PrimarySelection>>>,
+    selected: Option<Single<&RoomPartUuid, With<PrimarySelection>>>,
 ) {
     let picker = &mut state.files;
     let Some(file) = picker.current_file_mut() else {
@@ -90,7 +89,7 @@ pub fn sidebar(
         let Some(selected) = selected else {
             return;
         };
-        let (selected_entity, selected_uuid) = selected.into_inner();
+        let selected_uuid = selected.into_inner();
         let Some(part) = data.parts.get_mut(&selected_uuid.0) else {
             todo!()
         };
@@ -107,8 +106,6 @@ pub fn sidebar(
                     if ui.button("Load").clicked() {
                         // TODO handle error
                         part.reload_stl().unwrap();
-                        // TODO just reload the mesh so selection is preserved
-                        //commands.entity(selected_entity).clear();
                     }
                     if ui.button("Browse").clicked() {}
                 });

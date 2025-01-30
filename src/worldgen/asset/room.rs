@@ -101,7 +101,6 @@ impl RoomPart {
 
         (*vertices, *indices) = Self::load_stl_to_raw_geometry(&path)?;
         *geometry_hash = Self::hash_geometry(&vertices, &indices);
-        println!("hash: {}", geometry_hash);
 
         Ok(())
     }

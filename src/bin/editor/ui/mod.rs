@@ -101,7 +101,7 @@ fn ui(
     mut contexts: EguiContexts,
     trackball: Option<Single<(&mut TrackballController, &mut TrackballCamera)>>,
     window: Option<Single<&Window, With<PrimaryWindow>>>,
-    room_mode_primary_selection: Option<Single<(Entity, &RoomPartUuid), With<PrimarySelection>>>,
+    room_mode_primary_selection: Option<Single<&RoomPartUuid, With<PrimarySelection>>>,
 ) {
     let ctx = contexts.ctx_mut();
     ctx.set_visuals(Visuals::dark());
@@ -159,12 +159,9 @@ fn ui(
             .show(ctx, |ui| {
                 match state.mode() {
                     EditorMode::Tunnels => tunnel::ui::sidebar(&mut state, ui),
-                    EditorMode::Rooms => room::ui::sidebar(
-                        &mut state,
-                        ui,
-                        &mut commands,
-                        room_mode_primary_selection,
-                    ),
+                    EditorMode::Rooms => {
+                        room::ui::sidebar(&mut state, ui, room_mode_primary_selection)
+                    }
                 };
                 ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
             });
