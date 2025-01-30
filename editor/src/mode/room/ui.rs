@@ -1,4 +1,7 @@
-use bevy::prelude::{Single, Transform, With};
+use bevy::{
+    math::{EulerRot, Quat, Vec3},
+    prelude::{Single, Transform, With},
+};
 use egui::{
     menu, Align, CollapsingHeader, ComboBox, Frame, Label, Layout, RichText, ScrollArea, Ui,
 };
@@ -28,6 +31,19 @@ pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
                         if ui.selectable_label(false, "STL Import").clicked() {
                             ui.close_menu();
                             data.push(RoomPart::default_stl(Transform::default()).unwrap());
+                        };
+                        if ui.selectable_label(false, "Portal").clicked() {
+                            ui.close_menu();
+                            data.push(RoomPart::portal(
+                                Transform::from_scale(Vec3::new(10.0, 1.0, 10.0)).with_rotation(
+                                    Quat::from_euler(
+                                        EulerRot::YXZ,
+                                        -90.0_f32.to_radians(),
+                                        -90.0_f32.to_radians(),
+                                        0.0,
+                                    ),
+                                ),
+                            ));
                         };
                     });
                 });

@@ -376,9 +376,16 @@ fn draw_connection_planes(
             };
             gizmos.rect(isometry, scale.xz(), color);
 
+            // Forward arrow
             let t = Transform::from_translation(*translation).with_rotation(*rotation);
+            let start = t.transform_point(Vec3::NEG_Y * 2.0);
             let end = t.transform_point(Vec3::Y * 2.0);
-            gizmos.arrow(*translation, end, color);
+            gizmos.arrow(start, end, color);
+
+            // Upward arrow
+            let start = t.transform_point(Vec3::NEG_Z * 2.0);
+            let end = t.transform_point(Vec3::Z * 2.0);
+            gizmos.arrow(start, end, color);
         },
     );
 }

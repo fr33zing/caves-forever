@@ -80,7 +80,7 @@ impl Command for SpawnRoomPartEditorBundle {
                     RenderLayers::from_layers(&[render_layer::EDITOR]),
                     RoomPartUuid(*uuid, None),
                     ConnectionPlane,
-                    Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(1.0, 0.125, 1.0)))),
+                    Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(1.0, 1.0, 1.0)))),
                     materials.unselected(),
                     MaterialIndicatesSelection,
                     Selectable,

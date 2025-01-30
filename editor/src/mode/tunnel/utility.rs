@@ -66,7 +66,7 @@ pub fn spawn_connection_plane(
         RenderLayers::from_layers(&[render_layer::EDITOR_PREVIEW]),
         ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
         ConnectionPoint,
-        Transform::from_translation(transform.translation * Vec3::new(0.4, 1.0, 0.0)),
+        Transform::from_translation(transform.translation),
         Mesh3d(meshes.add(Sphere::new(0.5))),
         MeshMaterial3d(materials.unselected.clone()),
         MaterialIndicatesSelection,
