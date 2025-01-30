@@ -11,18 +11,6 @@ use curvo::prelude::{NurbsCurve3D, Tessellation};
 use nalgebra::{Point2, Point3};
 use pathfinding::prelude::dfs;
 
-use lib::{
-    materials::LineMaterial,
-    player::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
-    render_layer,
-    worldgen::{
-        asset::{Tunnel, TunnelMeshInfo},
-        brush::{curve::mesh_curve, sweep::ProfileRamp, TerrainBrush, TerrainBrushRequest},
-        consts::CHUNK_SIZE_F,
-        voxel::VoxelMaterial,
-    },
-};
-use utility::{cursor_to_ground_plane, spawn_connection_plane};
 use uuid::Uuid;
 
 use super::{EditorGizmos, ModeSpecific};
@@ -35,9 +23,21 @@ use crate::{
     ui::CursorOverEguiPanel,
     util::mesh_text,
 };
+use lib::{
+    materials::LineMaterial,
+    player::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
+    render_layer,
+    worldgen::{
+        asset::{Tunnel, TunnelMeshInfo},
+        brush::{curve::mesh_curve, sweep::ProfileRamp, TerrainBrush, TerrainBrushRequest},
+        consts::CHUNK_SIZE_F,
+        voxel::VoxelMaterial,
+    },
+};
 
 pub mod ui;
 mod utility;
+use utility::{cursor_to_ground_plane, spawn_connection_plane};
 
 #[derive(Component)]
 pub struct TunnelInfo(Tunnel, TunnelMeshInfo);

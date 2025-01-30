@@ -17,7 +17,7 @@ use lib::worldgen::{
 pub mod ui;
 mod utility;
 
-use utility::room_part_to_editor_bundle;
+use utility::SpawnRoomPartEditorBundle;
 
 #[derive(Component)]
 pub struct UpdatePreviewBrush {
@@ -32,7 +32,6 @@ pub struct UpdatePreviewBrush {
 // Hook: update
 pub fn detect_additions(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
     state: Res<EditorState>,
     parts: Query<&RoomPartUuid>,
 ) {
@@ -47,9 +46,9 @@ pub fn detect_additions(
     parts.iter().for_each(|uuid| {
         existing.insert(uuid.0);
     });
-    data.parts.iter().for_each(|(uuid, part)| {
+    data.parts.iter().for_each(|(uuid, _)| {
         if !existing.contains(uuid) {
-            commands.spawn(room_part_to_editor_bundle(part, &mut meshes));
+            commands.queue(SpawnRoomPartEditorBundle(*uuid));
         }
     });
 }
@@ -136,6 +135,7 @@ pub fn detect_hash_changes(
                 commands.entity(entity).insert(Mesh3d(meshes.add(mesh)));
                 update_uuids.push(*uuid);
             }
+            _ => {}
         }
     });
 
@@ -182,7 +182,10 @@ pub fn update_preview_brushes(
 
         clear_brushes.push(upb.uuid);
         commands.entity(upb_entity).clear();
-        commands.spawn(part.to_brush_request());
+
+        if let Some(brush_request) = part.to_brush_request() {
+            commands.spawn(brush_request);
+        }
     });
 
     clear_brushes.into_iter().for_each(|uuid| {

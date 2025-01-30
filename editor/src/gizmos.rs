@@ -48,11 +48,34 @@ pub struct SelectionMaterials {
     pub multiselected: Handle<StandardMaterial>,
 }
 
+impl SelectionMaterials {
+    pub fn unselected(&self) -> MeshMaterial3d<StandardMaterial> {
+        MeshMaterial3d(self.unselected.clone())
+    }
+    pub fn selected(&self) -> MeshMaterial3d<StandardMaterial> {
+        MeshMaterial3d(self.selected.clone())
+    }
+    pub fn multiselected(&self) -> MeshMaterial3d<StandardMaterial> {
+        MeshMaterial3d(self.multiselected.clone())
+    }
+}
+
 #[derive(Resource)]
 pub struct SelectionWireframeColors {
     pub unselected: WireframeColor,
     pub selected: WireframeColor,
     pub multiselected: WireframeColor,
+}
+impl SelectionWireframeColors {
+    pub fn unselected(&self) -> WireframeColor {
+        self.unselected.clone()
+    }
+    pub fn selected(&self) -> WireframeColor {
+        self.selected.clone()
+    }
+    pub fn multiselected(&self) -> WireframeColor {
+        self.multiselected.clone()
+    }
 }
 
 impl Plugin for EditorGizmosPlugin {

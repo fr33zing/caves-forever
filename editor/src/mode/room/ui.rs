@@ -127,6 +127,7 @@ pub fn sidebar(
                     part.reload_stl().unwrap();
                 }
             }
+            _ => {}
         }
     });
 }

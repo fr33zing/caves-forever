@@ -1,6 +1,7 @@
 use bevy::{
     asset::RenderAssetUsages,
-    pbr::wireframe::{Wireframe, WireframeColor},
+    ecs::system::SystemState,
+    pbr::wireframe::Wireframe,
     prelude::*,
     render::{
         mesh::{Indices, PrimitiveTopology},
@@ -11,47 +12,83 @@ use lib::{
     render_layer,
     worldgen::asset::{RoomPart, RoomPartPayload, RoomPartUuid},
 };
+use uuid::Uuid;
 
 use crate::{
-    gizmos::{Selectable, WireframeIndicatesSelection},
+    gizmos::{
+        ConnectionPlane, MaterialIndicatesSelection, Selectable, SelectionMaterials,
+        SelectionWireframeColors, WireframeIndicatesSelection,
+    },
     mode::ModeSpecific,
-    state::EditorMode,
+    state::{EditorMode, EditorState, FilePayload},
 };
 
-pub fn room_part_to_editor_bundle(
-    room_part: &RoomPart,
-    meshes: &mut ResMut<Assets<Mesh>>,
-) -> impl Bundle {
-    let RoomPart {
-        uuid,
-        transform,
-        data,
-    } = room_part;
+pub struct SpawnRoomPartEditorBundle(pub Uuid);
 
-    match data {
-        RoomPartPayload::Stl {
-            vertices,
-            indices,
-            geometry_hash,
-            ..
-        } => {
-            let mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all())
-                .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices.clone())
-                .with_inserted_indices(Indices::U32(indices.clone()));
+impl Command for SpawnRoomPartEditorBundle {
+    fn apply(self, world: &mut World) {
+        let mut system_state: SystemState<(
+            Commands,
+            ResMut<Assets<Mesh>>,
+            Res<SelectionMaterials>,
+            Res<SelectionWireframeColors>,
+            Res<EditorState>,
+        )> = SystemState::new(world);
+        let (mut commands, mut meshes, materials, wireframes, state) = system_state.get_mut(world);
 
-            (
-                ModeSpecific(EditorMode::Rooms, None),
-                RenderLayers::from_layers(&[render_layer::EDITOR]),
-                RoomPartUuid(*uuid, Some(*geometry_hash)),
-                Selectable,
-                WireframeIndicatesSelection,
-                Wireframe,
-                WireframeColor {
-                    color: Color::WHITE,
-                },
-                Mesh3d(meshes.add(mesh)),
-                transform.to_owned(),
-            )
-        }
+        let Some(data) = state.files.current_data() else {
+            return;
+        };
+        let FilePayload::Room(data) = data else {
+            return;
+        };
+        let Some(part) = data.parts.get(&self.0) else {
+            return;
+        };
+        let RoomPart {
+            uuid,
+            transform,
+            data,
+        } = part;
+
+        match data {
+            RoomPartPayload::Stl {
+                vertices,
+                indices,
+                geometry_hash,
+                ..
+            } => {
+                let mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all())
+                    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices.clone())
+                    .with_inserted_indices(Indices::U32(indices.clone()));
+
+                commands.spawn((
+                    ModeSpecific(EditorMode::Rooms, None),
+                    RenderLayers::from_layers(&[render_layer::EDITOR]),
+                    RoomPartUuid(*uuid, Some(*geometry_hash)),
+                    Selectable,
+                    WireframeIndicatesSelection,
+                    Wireframe,
+                    wireframes.unselected(),
+                    Mesh3d(meshes.add(mesh)),
+                    *transform,
+                ));
+            }
+            RoomPartPayload::Portal => {
+                commands.spawn((
+                    ModeSpecific(EditorMode::Rooms, None),
+                    RenderLayers::from_layers(&[render_layer::EDITOR]),
+                    RoomPartUuid(*uuid, None),
+                    ConnectionPlane,
+                    Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(1.0, 0.125, 1.0)))),
+                    materials.unselected(),
+                    MaterialIndicatesSelection,
+                    Selectable,
+                    *transform,
+                ));
+            }
+        };
+
+        system_state.apply(world);
     }
 }

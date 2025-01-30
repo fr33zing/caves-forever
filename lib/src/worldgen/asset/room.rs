@@ -59,10 +59,11 @@ pub enum RoomPartPayload {
         geometry_hash: u64,
         vhacd_parameters: VhacdParameters,
     },
+    Portal,
 }
 
 impl RoomPart {
-    pub fn to_brush_request(&self) -> TerrainBrushRequest {
+    pub fn to_brush_request(&self) -> Option<TerrainBrushRequest> {
         let Self {
             uuid,
             transform,
@@ -75,7 +76,7 @@ impl RoomPart {
                 vertices,
                 indices,
                 ..
-            } => TerrainBrushRequest::Mesh {
+            } => Some(TerrainBrushRequest::Mesh {
                 uuid: (*uuid).into(),
                 material: *material,
                 transform: *transform,
@@ -85,31 +86,18 @@ impl RoomPart {
                 )
                 .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices.clone())
                 .with_inserted_indices(Indices::U32(indices.clone())),
-            },
+            }),
+            _ => None,
         }
     }
 
-    pub fn reload_stl(&mut self) -> anyhow::Result<()> {
-        let RoomPartPayload::Stl {
-            ref mut vertices,
-            ref mut indices,
-            ref mut geometry_hash,
-            path,
-            ..
-        } = &mut self.data
-        else {
-            return Err(anyhow!("not an stl"));
-        };
-
-        (*vertices, *indices) = Self::load_stl_to_raw_geometry(&path)?;
-        *geometry_hash = Self::hash_geometry(&vertices, &indices);
-
-        Ok(())
-    }
+    //
+    // Stl
+    //
 
     pub fn stl(path: &str, material: VoxelMaterial, transform: Transform) -> anyhow::Result<Self> {
-        let (vertices, indices) = Self::load_stl_to_raw_geometry(path)?;
-        let geometry_hash = Self::hash_geometry(&vertices, &indices);
+        let (vertices, indices) = load_stl_to_raw_geometry(path)?;
+        let geometry_hash = hash_geometry(&vertices, &indices);
         Ok(Self {
             uuid: Uuid::new_v4(),
             transform,
@@ -132,52 +120,82 @@ impl RoomPart {
         )
     }
 
-    //
-    // Utility
-    //
+    pub fn reload_stl(&mut self) -> anyhow::Result<()> {
+        let RoomPartPayload::Stl {
+            ref mut vertices,
+            ref mut indices,
+            ref mut geometry_hash,
+            path,
+            ..
+        } = &mut self.data
+        else {
+            return Err(anyhow!("not an stl"));
+        };
 
-    fn hash_geometry(vertices: &[[f32; 3]], indices: &[u32]) -> u64 {
-        let mut hasher = std::hash::DefaultHasher::new();
-        vertices
-            .iter()
-            .for_each(|v| v.iter().for_each(|f| hasher.write_u32(f.to_bits())));
-        indices.iter().for_each(|i| hasher.write_u32(*i));
+        (*vertices, *indices) = load_stl_to_raw_geometry(&path)?;
+        *geometry_hash = hash_geometry(&vertices, &indices);
 
-        hasher.finish()
+        Ok(())
     }
 
-    fn load_stl_to_raw_geometry(path: &str) -> anyhow::Result<(Vec<[f32; 3]>, Vec<u32>)> {
-        let mut file = OpenOptions::new().read(true).open(path)?;
-        let stl = stl_io::read_stl(&mut file)?;
-        let stl_to_bevy_transform = Transform::from_rotation(Quat::from_euler(
-            EulerRot::XZY,
-            -90.0_f32.to_radians(),
-            180.0_f32.to_radians(),
-            0.0,
-        ));
+    //
+    // Portal
+    //
 
-        let vertices = stl
-            .vertices
-            .into_iter()
-            .map(|v| {
-                // Transform to Y up / Z forward here so we don't
-                // need to do it every time we export from Blender.
-                let v: [f32; 3] = v.into();
-                stl_to_bevy_transform.transform_point(v.into()).into()
-            })
-            .collect();
-        let indices = stl
-            .faces
-            .into_iter()
-            .flat_map(|f| {
-                [
-                    f.vertices[0] as u32,
-                    f.vertices[1] as u32,
-                    f.vertices[2] as u32,
-                ]
-            })
-            .collect();
-
-        Ok((vertices, indices))
+    pub fn portal(transform: Transform) -> Self {
+        Self {
+            uuid: Uuid::new_v4(),
+            transform,
+            data: RoomPartPayload::Portal,
+        }
     }
+}
+
+//
+// Utility
+//
+
+fn hash_geometry(vertices: &[[f32; 3]], indices: &[u32]) -> u64 {
+    let mut hasher = std::hash::DefaultHasher::new();
+    vertices
+        .iter()
+        .for_each(|v| v.iter().for_each(|f| hasher.write_u32(f.to_bits())));
+    indices.iter().for_each(|i| hasher.write_u32(*i));
+
+    hasher.finish()
+}
+
+fn load_stl_to_raw_geometry(path: &str) -> anyhow::Result<(Vec<[f32; 3]>, Vec<u32>)> {
+    let mut file = OpenOptions::new().read(true).open(path)?;
+    let stl = stl_io::read_stl(&mut file)?;
+    let stl_to_bevy_transform = Transform::from_rotation(Quat::from_euler(
+        EulerRot::XZY,
+        -90.0_f32.to_radians(),
+        180.0_f32.to_radians(),
+        0.0,
+    ));
+
+    let vertices = stl
+        .vertices
+        .into_iter()
+        .map(|v| {
+            // Transform to Y up / Z forward here so we don't
+            // need to do it every time we export from Blender.
+            let v: [f32; 3] = v.into();
+            stl_to_bevy_transform.transform_point(v.into()).into()
+        })
+        .collect();
+    let indices = stl
+        .faces
+        .into_iter()
+        .flat_map(|f| {
+            [
+                f.vertices[0] as u32,
+                f.vertices[1] as u32,
+                f.vertices[2] as u32,
+            ]
+        })
+        .collect();
+
+    Ok((vertices, indices))
 }
