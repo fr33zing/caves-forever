@@ -3,8 +3,13 @@ name = "editor"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "editor_lib"
+path = "./src/lib.rs"
+
 [[bin]]
 name = "editor"
+path = "./src/bin/editor.rs"  
 
 [dependencies]
 lib = { path = "../lib" }

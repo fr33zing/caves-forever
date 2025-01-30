@@ -6,6 +6,7 @@ use bevy::{
 };
 use curvo::prelude::{NurbsCurve3D, Tessellation};
 use nalgebra::{Const, Point3};
+use serde::Serialize;
 
 use super::{
     chunk::ChunksAABB,

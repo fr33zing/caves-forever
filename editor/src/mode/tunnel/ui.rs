@@ -95,7 +95,7 @@ pub fn sidebar(state: &mut EditorState, ui: &mut Ui) {
             ui.add(
                 Label::new(format!(
                     "{selection_index}: ({}, {})",
-                    selection.position.x, selection.position.y
+                    selection.x, selection.y
                 ))
                 .selectable(false),
             );

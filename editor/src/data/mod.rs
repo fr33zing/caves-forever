@@ -21,6 +21,12 @@ pub enum Environment {
     Development = 2,
 }
 
+impl Environment {
+    pub fn should_include_for(&self, env: Environment) -> bool {
+        *self as u8 <= env as u8
+    }
+}
+
 #[repr(u8)]
 #[derive(
     EnumIter, strum_macros::Display, Serialize, Deserialize, Clone, Copy, Debug, Eq, PartialEq,

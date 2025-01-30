@@ -12,27 +12,17 @@ use bevy::{
 use bevy_egui::EguiPlugin;
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 use bevy_trackball::TrackballPlugin;
-use gizmos::EditorGizmosPlugin;
-use mode::EditorModesPlugin;
 use noisy_bevy::NoisyShaderPlugin;
 
+use editor_lib::{
+    gizmos::EditorGizmosPlugin, mode::EditorModesPlugin, state::EditorState, ui::EditorUiPlugin,
+};
 use lib::{
     materials::{CaveMaterialExtension, LineMaterialPlugin},
     player::PlayerPlugin,
     render_layer,
     worldgen::terrain::TerrainPlugin,
 };
-
-mod camera;
-mod data;
-mod gizmos;
-mod mode;
-mod state;
-mod ui;
-mod util;
-
-use state::EditorState;
-use ui::EditorUiPlugin;
 
 fn main() {
     let mut app = App::new();

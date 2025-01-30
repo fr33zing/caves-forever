@@ -222,14 +222,14 @@ pub fn pick_profile_point(
     data.points.iter().enumerate().for_each(|(i, p)| {
         let isometry = Isometry3d {
             rotation: Quat::from_euler(EulerRot::XYZ, -90.0_f32.to_radians(), 0.0, 0.0),
-            translation: Vec3A::new(p.position.x, 0.0, p.position.y),
+            translation: Vec3A::new(p.x, 0.0, p.y),
         };
 
         let mut picked_this = false;
         if let Some(cursor) = cursor {
             if !state.tunnels_mode.dragging()
                 && picked.is_none()
-                && cursor.distance(Vec2::new(p.position.x, p.position.y)) <= radius
+                && cursor.distance(Vec2::new(p.x, p.y)) <= radius
             {
                 picked_this = true;
             }
@@ -261,7 +261,7 @@ pub fn pick_profile_point(
     if mouse.just_pressed(MouseButton::Left) {
         if let Some(picked) = picked {
             if let Some(cursor) = cursor {
-                state.tunnels_mode.drag_start = Some((data.points[picked].position, cursor));
+                state.tunnels_mode.drag_start = Some((data.points[picked], cursor));
                 state.tunnels_mode.selected_point = Some(picked);
             }
         } else if !cursor_over_egui_panel.0 {
@@ -301,7 +301,7 @@ pub fn drag_profile_point(
     let cursor_diff = cursor - cursor_start;
     let point_new_pos = Point2::new(point_start.x + cursor_diff.x, point_start.y + cursor_diff.y);
 
-    data.points[drag_point].position = point_new_pos;
+    data.points[drag_point] = point_new_pos;
     let len = data.points.len();
 
     if !mirror || drag_point == 0 || drag_point == len / 2 {
@@ -314,7 +314,7 @@ pub fn drag_profile_point(
     );
 
     let mirror_point = (len - drag_point) % len;
-    data.points[mirror_point].position = point_new_pos;
+    data.points[mirror_point] = point_new_pos;
 }
 
 // Hook: update

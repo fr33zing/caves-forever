@@ -11,9 +11,7 @@ use nalgebra::{Const, OPoint, Point2, Point3};
 use serde::{Deserialize, Serialize};
 
 use super::{Environment, Rarity};
-
-// All tunnel profiles must have this number of points.
-pub const TUNNEL_POINTS: usize = 16;
+use lib::worldgen::asset::TUNNEL_POINTS;
 
 const TUNNEL_DEFAULT_RADIUS: f32 = 5.0;
 
@@ -22,24 +20,19 @@ pub struct TunnelMeshInfo {
     pub size: Vec2,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Default)]
-pub struct TunnelPoint {
-    pub position: Point2<f32>,
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Tunnel {
     pub environment: Environment,
     pub rarity: Rarity,
-    pub points: [TunnelPoint; TUNNEL_POINTS],
+    pub points: [Point2<f32>; TUNNEL_POINTS],
 }
 
 impl Default for Tunnel {
     fn default() -> Self {
-        let mut points = [TunnelPoint::default(); TUNNEL_POINTS];
+        let mut points = [Point2::<f32>::default(); TUNNEL_POINTS];
         for i in 0..TUNNEL_POINTS {
             let radians = (i as f32 / TUNNEL_POINTS as f32) * PI * 2.0;
-            points[i].position = Point2::new(radians.sin(), -radians.cos()) * TUNNEL_DEFAULT_RADIUS;
+            points[i] = Point2::new(radians.sin(), -radians.cos()) * TUNNEL_DEFAULT_RADIUS;
         }
 
         Self {
@@ -51,17 +44,24 @@ impl Default for Tunnel {
 }
 
 impl Tunnel {
+    pub fn build(&self) -> lib::worldgen::asset::Tunnel {
+        lib::worldgen::asset::Tunnel {
+            weight: self.rarity.weight(),
+            points: self.points,
+        }
+    }
+
     pub fn to_3d_xz(&self) -> Vec<OPoint<f32, Const<3>>> {
         self.points
             .iter()
-            .map(|p| Point3::new(p.position.x, 0.0, p.position.y))
+            .map(|p| Point3::new(p.x, 0.0, p.y))
             .collect()
     }
 
     pub fn to_3d_xy_scaled(&self, scale: Vec2) -> Vec<OPoint<f32, Const<3>>> {
         self.points
             .iter()
-            .map(|p| Point3::new(p.position.x * scale.x, p.position.y * scale.y, 0.0))
+            .map(|p| Point3::new(p.x * scale.x, p.y * scale.y, 0.0))
             .collect()
     }
 
@@ -88,8 +88,8 @@ impl Tunnel {
     pub fn center(&mut self) {
         let info = TunnelMeshInfo::from_mesh(&self.to_mesh());
         for point in self.points.iter_mut() {
-            point.position.x -= info.center.x;
-            point.position.y -= info.center.y;
+            point.x -= info.center.x;
+            point.y -= info.center.y;
         }
     }
 }

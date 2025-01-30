@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs::OpenOptions, hash::Hasher};
 
 use anyhow::anyhow;
-use avian3d::prelude::VhacdParameters;
+use avian3d::prelude::*;
 use bevy::{
     asset::RenderAssetUsages,
     prelude::*,
@@ -34,6 +34,58 @@ impl Default for Room {
 impl Room {
     pub fn push(&mut self, part: RoomPart) {
         self.parts.insert(part.uuid, part);
+    }
+
+    pub fn build(&self) -> anyhow::Result<lib::worldgen::asset::Room> {
+        let mut colliders = Vec::new();
+        let mut portals = Vec::new();
+
+        // TODO adjust transform so everything is centered on world origin
+        // each roompart must implement compute_aabb()
+
+        for part in self.parts.values().cloned() {
+            let RoomPart {
+                transform, data, ..
+            } = part;
+
+            match data {
+                RoomPartPayload::Stl {
+                    vertices,
+                    indices,
+                    vhacd_parameters,
+                    ..
+                } => {
+                    let mesh = Mesh::new(
+                        PrimitiveTopology::TriangleList,
+                        RenderAssetUsages::MAIN_WORLD,
+                    )
+                    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices.clone())
+                    .with_inserted_indices(Indices::U32(indices.clone()))
+                    .transformed_by(transform);
+
+                    let collider = Collider::convex_decomposition_from_mesh_with_config(
+                        &mesh,
+                        &vhacd_parameters,
+                    )
+                    .ok_or_else(|| anyhow!("convex decomposition failed"))?;
+                    colliders.push(collider);
+                }
+                RoomPartPayload::Portal => portals.push(transform),
+            }
+        }
+
+        let cavity = Collider::compound(
+            colliders
+                .into_iter()
+                .map(|c| (Position::default(), Rotation::default(), c))
+                .collect(),
+        );
+
+        Ok(lib::worldgen::asset::Room {
+            weight: self.rarity.weight(),
+            cavity,
+            portals,
+        })
     }
 }
 
