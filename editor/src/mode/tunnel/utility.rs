@@ -6,8 +6,7 @@ use bevy::{
 use super::ModeSpecific;
 use crate::{
     gizmos::{
-        ConnectionPlane, ConnectionPoint, MaterialIndicatesSelection, Selectable,
-        SelectionMaterials,
+        ConnectionPoint, MaterialIndicatesSelection, PortalGizmos, Selectable, SelectionMaterials,
     },
     state::{EditorMode, EditorViewMode},
 };
@@ -34,7 +33,7 @@ pub fn cursor_to_ground_plane(
     Some(global_cursor.xz())
 }
 
-pub fn spawn_connection_plane(
+pub fn spawn_fake_portal(
     commands: &mut Commands,
     materials: &SelectionMaterials,
     meshes: &mut ResMut<Assets<Mesh>>,
@@ -44,7 +43,7 @@ pub fn spawn_connection_plane(
         .spawn((
             RenderLayers::from_layers(&[render_layer::EDITOR_PREVIEW]),
             ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
-            ConnectionPlane,
+            PortalGizmos,
             RayCastBackfaces,
             transform,
             Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(1.0, 0.125, 1.0)))),

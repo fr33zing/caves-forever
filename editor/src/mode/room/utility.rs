@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 use crate::{
     gizmos::{
-        ConnectionPlane, MaterialIndicatesSelection, Selectable, SelectionMaterials,
+        MaterialIndicatesSelection, PortalGizmos, Selectable, SelectionMaterials,
         SelectionWireframeColors, WireframeIndicatesSelection,
     },
     mode::ModeSpecific,
@@ -79,7 +79,7 @@ impl Command for SpawnRoomPartEditorBundle {
                     ModeSpecific(EditorMode::Rooms, None),
                     RenderLayers::from_layers(&[render_layer::EDITOR]),
                     RoomPartUuid(*uuid, None),
-                    ConnectionPlane,
+                    PortalGizmos,
                     Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(1.0, 1.0, 1.0)))),
                     materials.unselected(),
                     MaterialIndicatesSelection,

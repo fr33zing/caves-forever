@@ -21,7 +21,7 @@ pub struct EditorGizmosPlugin;
 pub struct SpawnPositionIndicator;
 
 #[derive(Component)]
-pub struct ConnectionPlane;
+pub struct PortalGizmos;
 
 #[derive(Component)]
 pub struct ConnectionPoint;
@@ -110,7 +110,7 @@ impl Plugin for EditorGizmosPlugin {
                     .after(pick)
                     .after(pick_spawn_position),
                 draw_spawn_position,
-                draw_connection_planes,
+                draw_portals,
                 draw_connection_points,
             ),
         );
@@ -345,10 +345,10 @@ fn draw_spawn_position(
     }
 }
 
-fn draw_connection_planes(
+fn draw_portals(
     mut gizmos: Gizmos,
     state: Res<EditorState>,
-    planes: Query<(&Transform, Option<&GizmoTarget>), With<ConnectionPlane>>,
+    planes: Query<(&Transform, Option<&GizmoTarget>), With<PortalGizmos>>,
 ) {
     if state.spawn.mode == SpawnPickerMode::Playing {
         return;

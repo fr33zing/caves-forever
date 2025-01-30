@@ -16,7 +16,7 @@ use uuid::Uuid;
 use super::{EditorGizmos, ModeSpecific};
 use crate::{
     gizmos::{
-        ConnectedPath, ConnectionPlane, ConnectionPoint, MaterialIndicatesSelection, Selectable,
+        ConnectedPath, ConnectionPoint, MaterialIndicatesSelection, PortalGizmos, Selectable,
         SelectionMaterials,
     },
     state::{EditorMode, EditorState, EditorViewMode, FilePayload},
@@ -37,7 +37,7 @@ use lib::{
 
 pub mod ui;
 mod utility;
-use utility::{cursor_to_ground_plane, spawn_connection_plane};
+use utility::{cursor_to_ground_plane, spawn_fake_portal};
 
 #[derive(Component)]
 pub struct TunnelInfo(Tunnel, TunnelMeshInfo);
@@ -110,8 +110,8 @@ pub fn enter_preview(
     mut meshes: ResMut<Assets<Mesh>>,
     materials: Res<SelectionMaterials>,
 ) {
-    let door_scale = Vec3::new(10.0, 1.0, 10.0);
-    let y = door_scale.z / 2.0 + 2.0;
+    let fake_portal_scale = Vec3::new(10.0, 1.0, 10.0);
+    let y = fake_portal_scale.z / 2.0 + 2.0;
 
     commands.spawn((
         RenderLayers::from_layers(&[render_layer::EDITOR_PREVIEW]),
@@ -124,13 +124,13 @@ pub fn enter_preview(
         Selectable,
     ));
 
-    spawn_connection_plane(
+    spawn_fake_portal(
         &mut commands,
         &materials,
         &mut meshes,
         Transform::default()
             .with_translation(Vec3::new(CHUNK_SIZE_F / 2.0, y, 0.0))
-            .with_scale(door_scale)
+            .with_scale(fake_portal_scale)
             .with_rotation(Quat::from_euler(
                 EulerRot::YXZ,
                 -90.0_f32.to_radians(),
@@ -139,13 +139,13 @@ pub fn enter_preview(
             )),
     );
 
-    spawn_connection_plane(
+    spawn_fake_portal(
         &mut commands,
         &materials,
         &mut meshes,
         Transform::default()
             .with_translation(Vec3::new(-CHUNK_SIZE_F / 2.0, y, 0.0))
-            .with_scale(door_scale)
+            .with_scale(fake_portal_scale)
             .with_rotation(Quat::from_euler(
                 EulerRot::YXZ,
                 90.0_f32.to_radians(),
@@ -378,7 +378,7 @@ pub fn remesh_preview_path(
     time: Res<Time>,
     any_pickable_changed: Query<&Selectable, Changed<Transform>>,
     path: Option<Single<Entity, With<ConnectedPath>>>,
-    planes: Query<&GlobalTransform, With<ConnectionPlane>>,
+    planes: Query<&GlobalTransform, With<PortalGizmos>>,
     points: Query<&GlobalTransform, With<ConnectionPoint>>,
     info: Option<Single<&mut TunnelInfo>>,
 ) {
