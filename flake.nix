@@ -13,10 +13,7 @@
         devShells.default = pkgs.mkShell rec {
           nativeBuildInputs = with pkgs; [ pkg-config ];
           buildInputs = with pkgs; [
-            (rust-bin.stable.latest.default.override {
-              targets = [ "wasm32-unknown-unknown" ];
-            })
-            trunk
+            rust-bin.stable.latest.default
 
             lld
             clang
