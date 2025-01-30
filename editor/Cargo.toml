@@ -9,33 +9,27 @@ name = "editor"
 [dependencies]
 lib = { path = "../lib" }
 
-anyhow = "1.0.95"
-avian3d = { version = "^0.2", features = ["serialize"] }
-bevy = { version = "0.15.0", features = ["bevy_mesh_picking_backend", "wayland"] }
-bevy-tnua = "0.21.0"
-bevy-tnua-avian3d = "0.2.0"
-bevy_egui = "0.32.0"
+anyhow = { workspace = true }
+avian3d = { workspace = true }
+bevy = { workspace = true }
+bevy_egui = { workspace = true }
+egui = { workspace = true }
+nalgebra = { workspace = true }
+noisy_bevy = { workspace = true }
+common_macros = { workspace = true }
+curvo = { workspace = true }
+serde = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+uuid = { workspace = true }
+rayon = { workspace = true }
+
 bevy_infinite_grid = "0.14.1"
 bevy_trackball = { version = "0.9.0", features = ["bevy_egui"] }
-common_macros = "0.1.1"
-curvo  = "0.1.46"
-earclip = "1.1.0"
-egui = "0.30.0"
 meshtext = "0.3.1"
-nalgebra = "0.33.2"
-noisy_bevy = "0.8.0"
 pathfinding = "4.14.0"
-rayon = "1.10.0"
 ron = "0.8.1"
-serde = { version = "1.0.217", features = ["derive"] }
-strum = { version = "0.26.3", features = ["derive", "strum_macros"] }
-strum_macros = "0.26.4"
-uuid = { version = "1.12.1", features = ["fast-rng", "serde", "v4"] }
-stl_io = "0.8.3"
 
 # TODO change this when main crate supports bevy 0.15
 transform-gizmo-bevy = { git = "https://github.com/UnderbudgetGames/transform-gizmo.git" }
 
-# fast-surface-nets
-glam = "0.29"
-ndshape = "0.3"

@@ -6,10 +6,24 @@ members = [
 ]
 resolver = "2"
 
-# Enable a small amount of optimization in debug mode
+[workspace.dependencies]
+anyhow = "1.0.95"
+avian3d = { version = "^0.2", features = ["serialize"] }
+bevy = { version = "0.15.0", features = ["bevy_mesh_picking_backend", "wayland"] }
+bevy_egui = "0.32.0"
+common_macros = "0.1.1"
+curvo  = "0.1.46"
+egui = "0.30.0"
+nalgebra = "0.33.2"
+noisy_bevy = "0.8.0"
+serde = { version = "1.0.217", features = ["derive"] }
+strum = { version = "0.26.3", features = ["derive", "strum_macros"] }
+strum_macros = "0.26.4"
+uuid = { version = "1.12.1", features = ["fast-rng", "serde", "v4"] }
+rayon = "1.10.0"
+
 [profile.dev]
 opt-level = 1
 
-# Enable high optimizations for dependencies
 [profile.dev.package."*"]
 opt-level = 3
