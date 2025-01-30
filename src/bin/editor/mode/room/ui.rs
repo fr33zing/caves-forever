@@ -1,10 +1,13 @@
 use bevy::prelude::{Single, Transform, With};
-use egui::{menu, Align, ComboBox, Frame, Label, Layout, RichText, ScrollArea, Ui};
+use egui::{
+    menu, Align, CollapsingHeader, ComboBox, Frame, Label, Layout, RichText, ScrollArea, Ui,
+};
 use strum::{EnumProperty, IntoEnumIterator};
 
 use crate::{
     gizmos::PrimarySelection,
     state::{EditorState, EditorViewMode, FilePayload},
+    ui::vhacd_parameters_sidebar,
 };
 use mines::worldgen::asset::{Environment, Rarity, RoomPart, RoomPartPayload, RoomPartUuid};
 
@@ -94,21 +97,35 @@ pub fn sidebar(
             todo!()
         };
 
-        ui.add(
-            Label::new(RichText::new(part.data.get_str("name").unwrap()).heading())
-                .selectable(false),
-        );
+        ui.add(Label::new(RichText::new("Selection").heading()).selectable(false));
 
+        let part_name = part.data.get_str("name").unwrap();
         match &mut part.data {
-            RoomPartPayload::Stl { path, .. } => {
-                ui.text_edit_singleline(path);
-                ui.with_layout(Layout::right_to_left(Align::Min), |ui| {
-                    if ui.button("Load").clicked() {
-                        // TODO handle error
-                        part.reload_stl().unwrap();
-                    }
-                    if ui.button("Browse").clicked() {}
-                });
+            RoomPartPayload::Stl {
+                path,
+                vhacd_parameters,
+                ..
+            } => {
+                let mut reload = false;
+
+                CollapsingHeader::new(part_name)
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        ui.text_edit_singleline(path);
+                        ui.with_layout(Layout::right_to_left(Align::Min), |ui| {
+                            if ui.button("Load").clicked() {
+                                reload = true;
+                            }
+                            if ui.button("Browse").clicked() {}
+                        });
+                    });
+
+                vhacd_parameters_sidebar(ui, vhacd_parameters);
+
+                if reload {
+                    // TODO handle error
+                    part.reload_stl().unwrap();
+                }
             }
         }
     });

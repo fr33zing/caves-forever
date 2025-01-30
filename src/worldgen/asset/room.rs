@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fs::OpenOptions, hash::Hasher};
 
 use anyhow::anyhow;
+use avian3d::prelude::VhacdParameters;
 use bevy::{
     asset::RenderAssetUsages,
     prelude::*,
@@ -56,6 +57,7 @@ pub enum RoomPartPayload {
         vertices: Vec<[f32; 3]>,
         indices: Vec<u32>,
         geometry_hash: u64,
+        vhacd_parameters: VhacdParameters,
     },
 }
 
@@ -117,6 +119,7 @@ impl RoomPart {
                 vertices,
                 indices,
                 geometry_hash,
+                vhacd_parameters: VhacdParameters::default(),
             },
         })
     }

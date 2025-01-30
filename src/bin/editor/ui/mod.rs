@@ -26,8 +26,10 @@ use crate::{
 
 mod file_browser;
 mod icons;
+mod vhacd;
 
 use file_browser::{execute_file_action_dialog_action, file_action_dialog, file_browser};
+pub use vhacd::vhacd_parameters_sidebar;
 
 const TOP_PANEL_HEIGHT: f32 = 30.0;
 const LEFT_PANEL_WIDTH: f32 = 230.0;
