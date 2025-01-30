@@ -8,11 +8,11 @@ use bevy::{
 };
 use uuid::Uuid;
 
-use crate::state::{EditorState, FilePayload};
-use lib::worldgen::{
-    asset::{RoomPartPayload, RoomPartUuid},
-    brush::TerrainBrush,
+use crate::{
+    data::{RoomPartPayload, RoomPartUuid},
+    state::{EditorState, FilePayload},
 };
+use lib::worldgen::brush::TerrainBrush;
 
 pub mod ui;
 mod utility;

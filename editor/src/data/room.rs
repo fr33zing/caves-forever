@@ -11,9 +11,8 @@ use serde::{Deserialize, Serialize};
 use strum::{EnumIter, EnumProperty};
 use uuid::Uuid;
 
-use crate::worldgen::{brush::TerrainBrushRequest, voxel::VoxelMaterial};
-
 use super::{Environment, Rarity};
+use lib::worldgen::{brush::TerrainBrushRequest, voxel::VoxelMaterial};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Room {

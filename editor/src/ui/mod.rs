@@ -12,11 +12,11 @@ use egui::{
     vec2, Align2, Area, Frame, Id, Label, Layout, RichText, Rounding, SelectableLabel, SidePanel,
     TopBottomPanel, Vec2, Visuals,
 };
-use lib::worldgen::asset::RoomPartUuid;
 use nalgebra::{Point3, Vector3};
 use strum::{EnumProperty, IntoEnumIterator};
 
 use crate::{
+    data::RoomPartUuid,
     gizmos::PrimarySelection,
     mode::{room, tunnel},
     state::{

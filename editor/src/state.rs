@@ -8,10 +8,11 @@ use std::{
 
 use anyhow::anyhow;
 use bevy::prelude::*;
-use lib::worldgen::asset::{Room, Tunnel};
 use nalgebra::Point2;
 use serde::{Deserialize, Serialize};
 use strum::{EnumIter, EnumProperty, IntoEnumIterator};
+
+use crate::data::{Room, Tunnel};
 
 //
 // Modes

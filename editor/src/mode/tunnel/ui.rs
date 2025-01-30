@@ -1,8 +1,10 @@
 use egui::{menu, Align, ComboBox, Frame, Label, Layout, RichText, ScrollArea, Ui};
-use lib::worldgen::asset::{Environment, Rarity};
 use strum::IntoEnumIterator;
 
-use crate::state::{EditorState, EditorViewMode, FilePayload};
+use crate::{
+    data::{Environment, Rarity},
+    state::{EditorState, EditorViewMode, FilePayload},
+};
 
 pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
     let Some(data) = state.files.current_data_mut() else {

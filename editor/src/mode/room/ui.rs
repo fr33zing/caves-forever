@@ -8,11 +8,11 @@ use egui::{
 use strum::{EnumProperty, IntoEnumIterator};
 
 use crate::{
+    data::{Environment, Rarity, RoomPart, RoomPartPayload, RoomPartUuid},
     gizmos::PrimarySelection,
     state::{EditorState, EditorViewMode, FilePayload},
     ui::vhacd_parameters_sidebar,
 };
-use lib::worldgen::asset::{Environment, Rarity, RoomPart, RoomPartPayload, RoomPartUuid};
 
 pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
     let Some(data) = state.files.current_data_mut() else {

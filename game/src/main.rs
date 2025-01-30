@@ -6,7 +6,7 @@ use noisy_bevy::NoisyShaderPlugin;
 use lib::{
     debug_aim::DebugAimPlugin,
     materials::{CaveMaterialExtension, LineMaterialPlugin},
-    tnua::PlayerPlugin,
+    player::PlayerPlugin,
     worldgen::terrain::TerrainPlugin,
 };
 

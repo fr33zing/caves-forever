@@ -8,13 +8,10 @@ use bevy::{
         view::RenderLayers,
     },
 };
-use lib::{
-    render_layer,
-    worldgen::asset::{RoomPart, RoomPartPayload, RoomPartUuid},
-};
 use uuid::Uuid;
 
 use crate::{
+    data::{RoomPart, RoomPartPayload, RoomPartUuid},
     gizmos::{
         MaterialIndicatesSelection, PortalGizmos, Selectable, SelectionMaterials,
         SelectionWireframeColors, WireframeIndicatesSelection,
@@ -22,6 +19,7 @@ use crate::{
     mode::ModeSpecific,
     state::{EditorMode, EditorState, FilePayload},
 };
+use lib::render_layer;
 
 pub struct SpawnRoomPartEditorBundle(pub Uuid);
 

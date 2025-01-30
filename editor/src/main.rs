@@ -18,12 +18,13 @@ use noisy_bevy::NoisyShaderPlugin;
 
 use lib::{
     materials::{CaveMaterialExtension, LineMaterialPlugin},
-    render_layer,
     player::PlayerPlugin,
+    render_layer,
     worldgen::terrain::TerrainPlugin,
 };
 
 mod camera;
+mod data;
 mod gizmos;
 mod mode;
 mod state;

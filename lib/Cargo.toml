@@ -25,7 +25,6 @@ rayon = { workspace = true }
 bevy-tnua = "0.21.0"
 bevy-tnua-avian3d = "0.2.0"
 earclip = "1.1.0"
-stl_io = "0.8.3"
 
 # fast-surface-nets
 glam = "0.29"

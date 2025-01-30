@@ -15,6 +15,7 @@ use uuid::Uuid;
 
 use super::{EditorGizmos, ModeSpecific};
 use crate::{
+    data::{Tunnel, TunnelMeshInfo},
     gizmos::{
         ConnectedPath, ConnectionPoint, MaterialIndicatesSelection, PortalGizmos, Selectable,
         SelectionMaterials,
@@ -28,7 +29,6 @@ use lib::{
     player::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
     render_layer,
     worldgen::{
-        asset::{Tunnel, TunnelMeshInfo},
         brush::{curve::mesh_curve, sweep::ProfileRamp, TerrainBrush, TerrainBrushRequest},
         consts::CHUNK_SIZE_F,
         voxel::VoxelMaterial,
