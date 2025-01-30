@@ -101,7 +101,7 @@ impl Plugin for LineMaterialPlugin {
         load_internal_asset!(
             app,
             SHADER_HANDLE,
-            "../../assets/shaders/line_material.wgsl",
+            "../../../assets/shaders/line_material.wgsl",
             Shader::from_wgsl
         );
         app.add_plugins(MaterialPlugin::<LineMaterial>::default());
