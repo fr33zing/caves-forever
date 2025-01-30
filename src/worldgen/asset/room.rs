@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs::OpenOptions};
+use std::{collections::HashMap, fs::OpenOptions, hash::Hasher};
 
 use anyhow::anyhow;
 use bevy::{
@@ -38,7 +38,7 @@ impl Room {
 }
 
 #[derive(Component)]
-pub struct RoomPartUuid(pub Uuid);
+pub struct RoomPartUuid(pub Uuid, pub Option<u64>);
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RoomPart {
@@ -55,6 +55,7 @@ pub enum RoomPartPayload {
         material: VoxelMaterial,
         vertices: Vec<[f32; 3]>,
         indices: Vec<u32>,
+        geometry_hash: u64,
     },
 }
 
@@ -90,6 +91,7 @@ impl RoomPart {
         let RoomPartPayload::Stl {
             ref mut vertices,
             ref mut indices,
+            ref mut geometry_hash,
             path,
             ..
         } = &mut self.data
@@ -98,11 +100,15 @@ impl RoomPart {
         };
 
         (*vertices, *indices) = Self::load_stl_to_raw_geometry(&path)?;
+        *geometry_hash = Self::hash_geometry(&vertices, &indices);
+        println!("hash: {}", geometry_hash);
+
         Ok(())
     }
 
     pub fn stl(path: &str, material: VoxelMaterial, transform: Transform) -> anyhow::Result<Self> {
         let (vertices, indices) = Self::load_stl_to_raw_geometry(path)?;
+        let geometry_hash = Self::hash_geometry(&vertices, &indices);
         Ok(Self {
             uuid: Uuid::new_v4(),
             transform,
@@ -111,6 +117,7 @@ impl RoomPart {
                 material,
                 vertices,
                 indices,
+                geometry_hash,
             },
         })
     }
@@ -126,6 +133,16 @@ impl RoomPart {
     //
     // Utility
     //
+
+    fn hash_geometry(vertices: &[[f32; 3]], indices: &[u32]) -> u64 {
+        let mut hasher = std::hash::DefaultHasher::new();
+        vertices
+            .iter()
+            .for_each(|v| v.iter().for_each(|f| hasher.write_u32(f.to_bits())));
+        indices.iter().for_each(|i| hasher.write_u32(*i));
+
+        hasher.finish()
+    }
 
     fn load_stl_to_raw_geometry(path: &str) -> anyhow::Result<(Vec<[f32; 3]>, Vec<u32>)> {
         let mut file = OpenOptions::new().read(true).open(path)?;

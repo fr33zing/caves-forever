@@ -28,7 +28,7 @@ impl VoxelHardness {
 }
 
 #[derive(
-    FromRepr, EnumProperty, Default, Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize,
+    FromRepr, EnumProperty, Default, Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize, Hash,
 )]
 #[repr(u8)]
 pub enum VoxelMaterial {

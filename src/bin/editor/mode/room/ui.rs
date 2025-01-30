@@ -108,7 +108,7 @@ pub fn sidebar(
                         // TODO handle error
                         part.reload_stl().unwrap();
                         // TODO just reload the mesh so selection is preserved
-                        commands.entity(selected_entity).clear();
+                        //commands.entity(selected_entity).clear();
                     }
                     if ui.button("Browse").clicked() {}
                 });

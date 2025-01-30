@@ -30,7 +30,10 @@ pub fn room_part_to_editor_bundle(
 
     match data {
         RoomPartPayload::Stl {
-            vertices, indices, ..
+            vertices,
+            indices,
+            geometry_hash,
+            ..
         } => {
             let mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all())
                 .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices.clone())
@@ -39,7 +42,7 @@ pub fn room_part_to_editor_bundle(
             (
                 ModeSpecific(EditorMode::Rooms, None),
                 RenderLayers::from_layers(&[render_layer::EDITOR]),
-                RoomPartUuid(*uuid),
+                RoomPartUuid(*uuid, Some(*geometry_hash)),
                 Selectable,
                 WireframeIndicatesSelection,
                 Wireframe,

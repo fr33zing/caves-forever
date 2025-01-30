@@ -1,14 +1,18 @@
 use std::collections::HashSet;
 
 use bevy::{
-    asset::Assets,
-    prelude::{Changed, Commands, Component, Entity, Mesh, Query, Res, ResMut, Transform},
+    asset::{Assets, RenderAssetUsages},
+    prelude::{Changed, Commands, Component, Entity, Mesh, Mesh3d, Query, Res, ResMut, Transform},
+    render::mesh::{Indices, PrimitiveTopology},
     time::Time,
 };
 use uuid::Uuid;
 
 use crate::state::{EditorState, FilePayload};
-use mines::worldgen::{asset::RoomPartUuid, brush::TerrainBrush};
+use mines::worldgen::{
+    asset::{RoomPartPayload, RoomPartUuid},
+    brush::TerrainBrush,
+};
 
 pub mod ui;
 mod utility;
@@ -81,7 +85,65 @@ pub fn detect_world_changes(
             commands.entity(entity).clear();
         }
     }
+    for uuid in update_uuids {
+        commands.spawn(UpdatePreviewBrush {
+            time: time.elapsed_secs_f64(),
+            uuid,
+        });
+    }
+}
 
+pub fn detect_hash_changes(
+    time: Res<Time>,
+    state: Res<EditorState>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut parts: Query<(Entity, &mut RoomPartUuid)>,
+    update_preview_brushes: Query<(Entity, &UpdatePreviewBrush)>,
+) {
+    let Some(data) = state.files.current_data() else {
+        return;
+    };
+    let FilePayload::Room(data) = data else {
+        return;
+    };
+
+    let mut update_uuids = Vec::<Uuid>::new();
+
+    parts.iter_mut().for_each(|mut world_part| {
+        let (entity, ref mut uuid_hash) = world_part;
+        let (ref uuid, ref mut world_hash) = (uuid_hash.0, uuid_hash.1);
+
+        let Some(data_part) = data.parts.get(uuid) else {
+            todo!();
+        };
+
+        match data_part.data {
+            RoomPartPayload::Stl {
+                geometry_hash,
+                ref vertices,
+                ref indices,
+                ..
+            } => {
+                if *world_hash == Some(geometry_hash) {
+                    return;
+                }
+
+                world_part.1 .1 = Some(geometry_hash);
+                let mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all())
+                    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices.clone())
+                    .with_inserted_indices(Indices::U32(indices.clone()));
+                commands.entity(entity).insert(Mesh3d(meshes.add(mesh)));
+                update_uuids.push(*uuid);
+            }
+        }
+    });
+
+    for (entity, update_preview_brush) in update_preview_brushes.into_iter() {
+        if update_uuids.contains(&update_preview_brush.uuid) {
+            commands.entity(entity).clear();
+        }
+    }
     for uuid in update_uuids {
         commands.spawn(UpdatePreviewBrush {
             time: time.elapsed_secs_f64(),
