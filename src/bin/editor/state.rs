@@ -401,7 +401,7 @@ impl FileState {
             return Err(anyhow!("tried to save file with no path"));
         };
 
-        let s = ron::to_string(&data)?;
+        let s = ron::ser::to_string_pretty(&data, ron::ser::PrettyConfig::default())?;
         let mut file = File::create(path.clone())?;
         file.write_all(s.as_bytes())?;
 
