@@ -1,4 +1,4 @@
-use bevy::prelude::{Commands, Entity, Single, Transform, With};
+use bevy::prelude::{Single, Transform, With};
 use egui::{menu, Align, ComboBox, Frame, Label, Layout, RichText, ScrollArea, Ui};
 use strum::{EnumProperty, IntoEnumIterator};
 
