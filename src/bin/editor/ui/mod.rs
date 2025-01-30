@@ -1,6 +1,6 @@
 use bevy::{
     app::{App, Plugin, Update},
-    prelude::{Commands, MouseButton, ResMut, Single, With},
+    prelude::{Commands, MouseButton, ResMut, Resource, Single, With},
     window::{PrimaryWindow, Window},
 };
 use bevy_egui::{
