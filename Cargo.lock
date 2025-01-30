@@ -2214,8 +2214,8 @@ dependencies = [
  "earclip",
  "egui 0.30.0",
  "glam",
+ "lib",
  "meshtext",
- "mines",
  "nalgebra",
  "ndshape",
  "noisy_bevy",
@@ -2642,7 +2642,7 @@ dependencies = [
  "curvo",
  "egui 0.30.0",
  "glam",
- "mines",
+ "lib",
  "nalgebra",
  "ndshape",
  "noisy_bevy",
@@ -3304,6 +3304,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "lib"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "avian3d",
+ "bevy",
+ "bevy-tnua",
+ "bevy-tnua-avian3d",
+ "bevy_egui 0.32.0",
+ "bevy_infinite_grid",
+ "bevy_trackball",
+ "common_macros",
+ "curvo",
+ "earclip",
+ "egui 0.30.0",
+ "glam",
+ "meshtext",
+ "nalgebra",
+ "ndshape",
+ "noisy_bevy",
+ "pathfinding",
+ "rayon",
+ "ron",
+ "serde",
+ "stl_io",
+ "strum",
+ "strum_macros",
+ "transform-gizmo-bevy",
+ "uuid",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.169"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3456,38 +3488,6 @@ dependencies = [
  "log",
  "objc",
  "paste",
-]
-
-[[package]]
-name = "mines"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "avian3d",
- "bevy",
- "bevy-tnua",
- "bevy-tnua-avian3d",
- "bevy_egui 0.32.0",
- "bevy_infinite_grid",
- "bevy_trackball",
- "common_macros",
- "curvo",
- "earclip",
- "egui 0.30.0",
- "glam",
- "meshtext",
- "nalgebra",
- "ndshape",
- "noisy_bevy",
- "pathfinding",
- "rayon",
- "ron",
- "serde",
- "stl_io",
- "strum",
- "strum_macros",
- "transform-gizmo-bevy",
- "uuid",
 ]
 
 [[package]]

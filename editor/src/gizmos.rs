@@ -10,7 +10,7 @@ use crate::{
     state::{EditorState, EditorViewMode, SpawnPickerMode},
     ui::CursorOverEguiPanel,
 };
-use mines::{
+use lib::{
     tnua::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
     worldgen::terrain::Chunk,
 };

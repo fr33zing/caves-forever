@@ -11,7 +11,7 @@ use bevy::{
 };
 use bevy_trackball::TrackballCamera;
 use common_macros::hash_map;
-use mines::{
+use lib::{
     render_layer,
     tnua::{consts::PLAYER_HEIGHT, DespawnPlayerCommand, SpawnPlayerCommand},
 };

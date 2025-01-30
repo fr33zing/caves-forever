@@ -12,7 +12,7 @@ use egui::{
     vec2, Align2, Area, Frame, Id, Label, Layout, RichText, Rounding, SelectableLabel, SidePanel,
     TopBottomPanel, Vec2, Visuals,
 };
-use mines::worldgen::asset::RoomPartUuid;
+use lib::worldgen::asset::RoomPartUuid;
 use nalgebra::{Point3, Vector3};
 use strum::{EnumProperty, IntoEnumIterator};
 

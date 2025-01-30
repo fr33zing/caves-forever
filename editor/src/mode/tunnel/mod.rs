@@ -11,7 +11,7 @@ use curvo::prelude::{NurbsCurve3D, Tessellation};
 use nalgebra::{Point2, Point3};
 use pathfinding::prelude::dfs;
 
-use mines::{
+use lib::{
     materials::LineMaterial,
     render_layer,
     tnua::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},

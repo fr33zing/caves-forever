@@ -7,7 +7,7 @@ edition = "2021"
 name = "game"
 
 [dependencies]
-mines = { path = "../lib" }
+lib = { path = "../lib" }
 
 anyhow = "1.0.95"
 avian3d = { version = "^0.2", features = ["serialize"] }

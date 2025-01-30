@@ -5,7 +5,7 @@ use bevy_trackball::{
     prelude::{Bound, Clamp, Scope},
     TrackballCamera, TrackballController, TrackballInput, TrackballVelocity, TrackballWheelUnit,
 };
-use mines::render_layer;
+use lib::render_layer;
 use nalgebra::{Point3, Vector3};
 use transform_gizmo_bevy::GizmoCamera;
 

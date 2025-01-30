@@ -1,5 +1,5 @@
 use egui::{menu, Align, ComboBox, Frame, Label, Layout, RichText, ScrollArea, Ui};
-use mines::worldgen::asset::{Environment, Rarity};
+use lib::worldgen::asset::{Environment, Rarity};
 use strum::IntoEnumIterator;
 
 use crate::state::{EditorState, EditorViewMode, FilePayload};

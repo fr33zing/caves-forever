@@ -3,7 +3,7 @@ use bevy::{pbr::ExtendedMaterial, prelude::*, window::PresentMode};
 use bevy_egui::EguiPlugin;
 use noisy_bevy::NoisyShaderPlugin;
 
-use mines::{
+use lib::{
     debug_aim::DebugAimPlugin,
     materials::{CaveMaterialExtension, LineMaterialPlugin},
     tnua::PlayerPlugin,

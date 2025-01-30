@@ -8,7 +8,7 @@ use std::{
 
 use anyhow::anyhow;
 use bevy::prelude::*;
-use mines::worldgen::asset::{Room, Tunnel};
+use lib::worldgen::asset::{Room, Tunnel};
 use nalgebra::Point2;
 use serde::{Deserialize, Serialize};
 use strum::{EnumIter, EnumProperty, IntoEnumIterator};

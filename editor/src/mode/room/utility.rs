@@ -7,7 +7,7 @@ use bevy::{
         view::RenderLayers,
     },
 };
-use mines::{
+use lib::{
     render_layer,
     worldgen::asset::{RoomPart, RoomPartPayload, RoomPartUuid},
 };

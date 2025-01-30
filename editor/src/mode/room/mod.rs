@@ -9,7 +9,7 @@ use bevy::{
 use uuid::Uuid;
 
 use crate::state::{EditorState, FilePayload};
-use mines::worldgen::{
+use lib::worldgen::{
     asset::{RoomPartPayload, RoomPartUuid},
     brush::TerrainBrush,
 };

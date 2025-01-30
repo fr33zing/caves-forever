@@ -11,7 +11,7 @@ use crate::{
     },
     state::{EditorMode, EditorViewMode},
 };
-use mines::render_layer;
+use lib::render_layer;
 
 /// Adapted from: https://bevy-cheatbook.github.io/cookbook/cursor2world.html
 pub fn cursor_to_ground_plane(

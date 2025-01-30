@@ -16,7 +16,7 @@ use gizmos::EditorGizmosPlugin;
 use mode::EditorModesPlugin;
 use noisy_bevy::NoisyShaderPlugin;
 
-use mines::{
+use lib::{
     materials::{CaveMaterialExtension, LineMaterialPlugin},
     render_layer,
     tnua::PlayerPlugin,

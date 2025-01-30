@@ -9,7 +9,7 @@ use crate::{
     state::{EditorState, EditorViewMode, FilePayload},
     ui::vhacd_parameters_sidebar,
 };
-use mines::worldgen::asset::{Environment, Rarity, RoomPart, RoomPartPayload, RoomPartUuid};
+use lib::worldgen::asset::{Environment, Rarity, RoomPart, RoomPartPayload, RoomPartUuid};
 
 pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
     let Some(data) = state.files.current_data_mut() else {
