@@ -33,14 +33,8 @@ struct UiState {
 }
 
 impl Default for UiState {
-    #[cfg(not(feature = "webgl2"))]
     fn default() -> Self {
         Self { sensitivity: 1.0 }
-    }
-
-    #[cfg(feature = "webgl2")]
-    fn default() -> Self {
-        Self { sensitivity: 5.0 }
     }
 }
 

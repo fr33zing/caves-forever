@@ -28,8 +28,6 @@ impl Default for LineMaterial {
 struct LineMaterialUniform {
     color: Vec4,
     opacity: f32,
-    #[cfg(feature = "webgl2")]
-    _webgl2_padding: bevy::math::Vec3,
 }
 
 impl From<&LineMaterial> for LineMaterialUniform {
@@ -37,8 +35,6 @@ impl From<&LineMaterial> for LineMaterialUniform {
         LineMaterialUniform {
             color: LinearRgba::from(material.color).to_f32_array().into(),
             opacity: material.opacity,
-            #[cfg(feature = "webgl2")]
-            _webgl2_padding: Default::default(),
         }
     }
 }
@@ -62,11 +58,7 @@ impl Material for LineMaterial {
         layout: &bevy::render::mesh::MeshVertexBufferLayoutRef,
         _key: bevy::pbr::MaterialPipelineKey<Self>,
     ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
-        // WebGL2 structs must be 16 byte aligned.
-        let mut shader_defs = vec![
-            #[cfg(feature = "webgl2")]
-            "SIXTEEN_BYTE_ALIGNMENT".into(),
-        ];
+        let mut shader_defs = vec![];
 
         if layout.0.contains(Mesh::ATTRIBUTE_COLOR) {
             shader_defs.push("VERTEX_COLORS".into());
