@@ -1,6 +1,5 @@
 use avian3d::prelude::*;
 use bevy::{
-    asset::AssetMetaCheck,
     pbr::{wireframe::WireframePlugin, ExtendedMaterial},
     prelude::*,
     render::{
@@ -47,12 +46,11 @@ fn main() {
                 ..default()
             })
             .set(AssetPlugin {
-                meta_check: AssetMetaCheck::Never,
+                file_path: "../assets".to_owned(),
                 ..default()
             })
             .set(RenderPlugin {
                 render_creation: RenderCreation::Automatic(WgpuSettings {
-                    // WARN this is a native only feature. It will not work with webgl or webgpu
                     features: WgpuFeatures::POLYGON_MODE_LINE,
                     ..default()
                 }),

@@ -1,0 +1,31 @@
+[package]
+name = "game"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "game"
+
+[dependencies]
+mines = { path = "../lib" }
+
+anyhow = "1.0.95"
+avian3d = { version = "^0.2", features = ["serialize"] }
+bevy = { version = "0.15.0", features = ["bevy_mesh_picking_backend", "wayland"] }
+bevy-tnua = "0.21.0"
+bevy-tnua-avian3d = "0.2.0"
+bevy_egui = "0.32.0"
+common_macros = "0.1.1"
+curvo  = "0.1.46"
+egui = "0.30.0"
+nalgebra = "0.33.2"
+noisy_bevy = "0.8.0"
+pathfinding = "4.14.0"
+rayon = "1.10.0"
+serde = { version = "1.0.217", features = ["derive"] }
+strum = { version = "0.26.3", features = ["derive", "strum_macros"] }
+strum_macros = "0.26.4"
+
+# fast-surface-nets
+glam = "0.29"
+ndshape = "0.3"

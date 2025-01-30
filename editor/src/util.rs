@@ -3,7 +3,7 @@ use bevy::render::render_resource::PrimitiveTopology;
 use meshtext::{MeshGenerator, MeshText, TextSection};
 
 pub fn mesh_text(text: &str, flat: bool) -> Mesh {
-    let font_data = include_bytes!("../../../assets/fonts/Urbanist-Regular.ttf");
+    let font_data = include_bytes!("../../assets/fonts/Urbanist-Regular.ttf");
     let mut generator = MeshGenerator::new(font_data);
     let transform = Mat4::IDENTITY.to_cols_array();
     let text_mesh: MeshText = generator

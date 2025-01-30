@@ -1,5 +1,5 @@
 use avian3d::prelude::*;
-use bevy::{asset::AssetMetaCheck, pbr::ExtendedMaterial, prelude::*, window::PresentMode};
+use bevy::{pbr::ExtendedMaterial, prelude::*, window::PresentMode};
 use bevy_egui::EguiPlugin;
 use noisy_bevy::NoisyShaderPlugin;
 
@@ -18,15 +18,12 @@ fn main() {
                 primary_window: Some(Window {
                     present_mode: PresentMode::AutoNoVsync,
                     title: "Caves Forever".to_string(),
-                    canvas: Some("#bevy".to_owned()),
-                    fit_canvas_to_parent: true,
-                    prevent_default_event_handling: false,
                     ..default()
                 }),
                 ..default()
             })
             .set(AssetPlugin {
-                meta_check: AssetMetaCheck::Never,
+                file_path: "../assets".to_owned(),
                 ..default()
             }),
     );
