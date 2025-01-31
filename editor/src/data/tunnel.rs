@@ -44,13 +44,6 @@ impl Default for Tunnel {
 }
 
 impl Tunnel {
-    pub fn build(&self) -> lib::worldgen::asset::Tunnel {
-        lib::worldgen::asset::Tunnel {
-            weight: self.rarity.weight(),
-            points: self.points,
-        }
-    }
-
     pub fn to_3d_xz(&self) -> Vec<OPoint<f32, Const<3>>> {
         self.points
             .iter()

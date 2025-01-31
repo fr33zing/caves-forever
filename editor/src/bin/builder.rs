@@ -221,6 +221,7 @@ fn build_asset_collection(
             s.spawn(move || {
                 let span = span!(Level::TRACE, "build");
                 let _enter = span.enter();
+                let file_name = file.display().to_string();
 
                 let data = match load_file_payload(env, file) {
                     (_, Some(data)) => data,
@@ -241,14 +242,16 @@ fn build_asset_collection(
                         assets.tunnels.push(tunnel.build());
                         true
                     }
-                    FilePayload::Room(room) => {
-                        if let Ok(room) = room.build() {
+                    FilePayload::Room(room) => match room.build() {
+                        Ok(room) => {
                             assets.rooms.push(room);
                             true
-                        } else {
+                        }
+                        Err(err) => {
+                            tracing::warn!(file = file_name, "{err}\n");
                             false
                         }
-                    }
+                    },
                 };
 
                 let mut stats = stats.lock().unwrap();

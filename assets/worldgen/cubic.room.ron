@@ -2,22 +2,11 @@ Room((
     environment: Development,
     rarity: Uncommon,
     parts: {
-        "024debbb-7c4f-49ff-9880-a33946f4b4d4": (
-            uuid: "024debbb-7c4f-49ff-9880-a33946f4b4d4",
-            transform: (
-                translation: (10.789755, 6.6379943, 0.0),
-                rotation: (-0.49999997, -0.49999997, -0.49999997, 0.49999997),
-                scale: (9.999999, 2.3423777, 9.999999),
-            ),
-            data: Portal(
-                direction: Entrance,
-            ),
-        ),
         "d0e0b971-84a8-40e5-a7f8-0fb8a668fc76": (
             uuid: "d0e0b971-84a8-40e5-a7f8-0fb8a668fc76",
             transform: (
                 translation: (-10.833314, 6.610011, 0.0),
-                rotation: (-0.49999997, -0.49999997, -0.49999997, 0.49999997),
+                rotation: (-0.5, 0.49999997, 0.49999997, 0.4999999),
                 scale: (9.999999, 2.3038018, 9.999999),
             ),
             data: Portal(
@@ -96,6 +85,17 @@ Room((
                     convex_hull_approximation: true,
                     max_convex_hulls: 1024,
                 ),
+            ),
+        ),
+        "024debbb-7c4f-49ff-9880-a33946f4b4d4": (
+            uuid: "024debbb-7c4f-49ff-9880-a33946f4b4d4",
+            transform: (
+                translation: (10.789755, 6.6379943, 0.0),
+                rotation: (-0.5, 0.49999997, 0.49999997, 0.4999999),
+                scale: (9.999999, 2.3423777, 9.999999),
+            ),
+            data: Portal(
+                direction: Entrance,
             ),
         ),
     },

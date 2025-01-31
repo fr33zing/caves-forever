@@ -12,12 +12,7 @@ use strum::{EnumIter, EnumProperty};
 use uuid::Uuid;
 
 use super::{Environment, Rarity};
-use lib::worldgen::{
-    asset::{self, PortalDirection},
-    brush::TerrainBrushRequest,
-    utility::safe_vhacd,
-    voxel::VoxelMaterial,
-};
+use lib::worldgen::{asset::PortalDirection, brush::TerrainBrushRequest, voxel::VoxelMaterial};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Room {
@@ -39,52 +34,6 @@ impl Default for Room {
 impl Room {
     pub fn push(&mut self, part: RoomPart) {
         self.parts.insert(part.uuid, part);
-    }
-
-    pub fn build(&self) -> anyhow::Result<asset::Room> {
-        let mut cavities = Vec::new();
-        let mut portals = Vec::new();
-
-        // TODO adjust transform so everything is centered on world origin
-        // each roompart must implement compute_aabb()
-
-        for part in self.parts.values().cloned() {
-            let RoomPart {
-                transform, data, ..
-            } = part;
-
-            match data {
-                RoomPartPayload::Stl {
-                    vertices,
-                    indices,
-                    vhacd_parameters,
-                    ..
-                } => {
-                    let mesh = Mesh::new(
-                        PrimitiveTopology::TriangleList,
-                        RenderAssetUsages::MAIN_WORLD,
-                    )
-                    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices.clone())
-                    .with_inserted_indices(Indices::U32(indices.clone()))
-                    .transformed_by(transform);
-
-                    let collider = safe_vhacd(&mesh, &vhacd_parameters)?;
-                    cavities.push(collider);
-                }
-                RoomPartPayload::Portal { direction } => {
-                    portals.push(asset::Portal {
-                        transform,
-                        direction,
-                    });
-                }
-            }
-        }
-
-        Ok(asset::Room {
-            weight: self.rarity.weight(),
-            cavities,
-            portals,
-        })
     }
 }
 

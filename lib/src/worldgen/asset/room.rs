@@ -12,7 +12,17 @@ pub struct Room {
 
 #[repr(u8)]
 #[derive(
-    EnumIter, strum::Display, Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq,
+    EnumIter,
+    strum::Display,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
 )]
 pub enum PortalDirection {
     #[default]

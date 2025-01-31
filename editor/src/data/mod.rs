@@ -2,6 +2,7 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use strum::EnumIter;
 
+mod build;
 mod room;
 mod tunnel;
 mod utility;
