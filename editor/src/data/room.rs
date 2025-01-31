@@ -37,7 +37,7 @@ impl Room {
     }
 
     pub fn build(&self) -> anyhow::Result<lib::worldgen::asset::Room> {
-        let mut colliders = Vec::new();
+        let mut cavities = Vec::new();
         let mut portals = Vec::new();
 
         // TODO adjust transform so everything is centered on world origin
@@ -68,22 +68,15 @@ impl Room {
                         &vhacd_parameters,
                     )
                     .ok_or_else(|| anyhow!("convex decomposition failed"))?;
-                    colliders.push(collider);
+                    cavities.push(collider);
                 }
                 RoomPartPayload::Portal => portals.push(transform),
             }
         }
 
-        let cavity = Collider::compound(
-            colliders
-                .into_iter()
-                .map(|c| (Position::default(), Rotation::default(), c))
-                .collect(),
-        );
-
         Ok(lib::worldgen::asset::Room {
             weight: self.rarity.weight(),
-            cavity,
+            cavities,
             portals,
         })
     }

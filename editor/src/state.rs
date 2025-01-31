@@ -12,7 +12,7 @@ use nalgebra::Point2;
 use serde::{Deserialize, Serialize};
 use strum::{EnumIter, EnumProperty, IntoEnumIterator};
 
-use crate::data::{Room, Tunnel};
+use crate::data::{Environment, Room, Tunnel};
 
 //
 // Modes
@@ -120,6 +120,13 @@ pub enum FilePayload {
 }
 
 impl FilePayload {
+    pub fn environment(&self) -> Environment {
+        match self {
+            FilePayload::Tunnel(tunnel) => tunnel.environment,
+            FilePayload::Room(room) => room.environment,
+        }
+    }
+
     pub fn default_for_mode(mode: EditorMode) -> Self {
         match mode {
             EditorMode::Tunnels => Self::Tunnel(Tunnel::default()),

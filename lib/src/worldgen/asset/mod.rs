@@ -5,8 +5,8 @@ mod tunnel;
 pub use room::*;
 pub use tunnel::*;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct AssetCollection {
-    tunnels: Vec<Tunnel>,
-    rooms: Vec<Room>,
+    pub tunnels: Vec<Tunnel>,
+    pub rooms: Vec<Room>,
 }

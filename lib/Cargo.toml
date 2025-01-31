@@ -13,6 +13,7 @@ bevy = { workspace = true }
 bevy_egui = { workspace = true }
 nalgebra = { workspace = true }
 noisy_bevy = { workspace = true }
+cbor4ii = { workspace = true }
 common_macros = { workspace = true }
 curvo = { workspace = true }
 egui = { workspace = true }

@@ -1,3 +1,4 @@
+use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use strum::EnumIter;
 
@@ -8,7 +9,16 @@ pub use tunnel::*;
 
 #[repr(u8)]
 #[derive(
-    EnumIter, strum_macros::Display, Serialize, Deserialize, Clone, Copy, Debug, Eq, PartialEq,
+    EnumIter,
+    strum_macros::Display,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    PartialEq,
+    ValueEnum,
 )]
 pub enum Environment {
     /// Asset will be used in release mode and debug mode.
