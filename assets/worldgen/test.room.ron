@@ -2,34 +2,23 @@ Room((
     environment: Development,
     rarity: Uncommon,
     parts: {
-        "024debbb-7c4f-49ff-9880-a33946f4b4d4": (
-            uuid: "024debbb-7c4f-49ff-9880-a33946f4b4d4",
+        "1628f6c3-edd0-4a6f-acdd-94a87a2afe5f": (
+            uuid: "1628f6c3-edd0-4a6f-acdd-94a87a2afe5f",
             transform: (
-                translation: (10.789755, 6.6379943, 0.0),
+                translation: (-6.933816, 6.0808473, 0.0),
                 rotation: (-0.49999997, -0.49999997, -0.49999997, 0.49999997),
-                scale: (9.999999, 2.3423777, 9.999999),
+                scale: (10.0, 1.0, 10.0),
             ),
             data: Portal(
                 direction: Entrance,
             ),
         ),
-        "d0e0b971-84a8-40e5-a7f8-0fb8a668fc76": (
-            uuid: "d0e0b971-84a8-40e5-a7f8-0fb8a668fc76",
+        "7078ac81-43cb-4dd6-89fd-5d9383838bfd": (
+            uuid: "7078ac81-43cb-4dd6-89fd-5d9383838bfd",
             transform: (
-                translation: (-10.833314, 6.610011, 0.0),
-                rotation: (-0.49999997, -0.49999997, -0.49999997, 0.49999997),
-                scale: (9.999999, 2.3038018, 9.999999),
-            ),
-            data: Portal(
-                direction: Exit,
-            ),
-        ),
-        "45fa189c-c1e5-4747-80aa-22cace6cfbb7": (
-            uuid: "45fa189c-c1e5-4747-80aa-22cace6cfbb7",
-            transform: (
-                translation: (0.0, 11.496904, 0.0),
+                translation: (0.0, 6.1968, 0.0),
                 rotation: (0.0, 0.0, 0.0, 1.0),
-                scale: (5.4079504, 5.4079504, 5.4079504),
+                scale: (3.41119, 3.41119, 3.41119),
             ),
             data: Stl(
                 path: "assets/stl/default.stl",

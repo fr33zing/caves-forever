@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use bevy::{
     asset::{Assets, RenderAssetUsages},
+    math::Vec3,
     prelude::{Changed, Commands, Component, Entity, Mesh, Mesh3d, Query, Res, ResMut, Transform},
     render::mesh::{Indices, PrimitiveTopology},
     time::Time,
@@ -10,9 +11,10 @@ use uuid::Uuid;
 
 use crate::{
     data::{RoomPartPayload, RoomPartUuid},
+    gizmos::PortalGizmos,
     state::{EditorState, FilePayload},
 };
-use lib::worldgen::brush::TerrainBrush;
+use lib::worldgen::{asset::PortalDirection, brush::TerrainBrush};
 
 pub mod ui;
 mod utility;
@@ -196,5 +198,73 @@ pub fn update_preview_brushes(
                 commands.entity(entity).despawn();
             }
         });
+    });
+}
+
+pub fn correct_portal_orientations(
+    state: Res<EditorState>,
+    terrain_brushes: Query<(Entity, &TerrainBrush)>,
+    mut room_parts: Query<(&RoomPartUuid, &mut Transform)>,
+) {
+    let Some(data) = state.files.current_data() else {
+        return;
+    };
+    let FilePayload::Room(data) = data else {
+        return;
+    };
+    room_parts.iter_mut().for_each(|(uuid, mut transform)| {
+        let Some(part) = data.parts.get(&uuid.0) else {
+            return;
+        };
+        let RoomPartPayload::Portal { direction } = part.data else {
+            return;
+        };
+        let test_points = [
+            transform.transform_point(Vec3::Y / 2.0),     // Inward
+            transform.transform_point(Vec3::NEG_Y / 2.0), // Outward
+        ];
+        let mut inside = (false, false);
+
+        for (_, brush) in terrain_brushes.iter() {
+            let TerrainBrush::Collider {
+                collider,
+                transform: collider_transform,
+                ..
+            } = brush
+            else {
+                continue;
+            };
+
+            let inside_this = test_points
+                .into_iter()
+                .map(|point| {
+                    collider
+                        .project_point(
+                            collider_transform.translation,
+                            collider_transform.rotation,
+                            point,
+                            true,
+                        )
+                        .1
+                })
+                .collect::<Vec<_>>();
+
+            inside.0 |= inside_this[0];
+            inside.1 |= inside_this[1];
+
+            if inside.0 && inside.1 {
+                break;
+            }
+        }
+
+        let flip = match (direction, inside.0, inside.1) {
+            (PortalDirection::Entrance, false, true) | (PortalDirection::Exit, true, false) => true,
+            _ => false,
+        };
+
+        if flip {
+            transform.rotate_local_x(180.0_f32.to_radians());
+            transform.rotate_local_y(180.0_f32.to_radians());
+        }
     });
 }

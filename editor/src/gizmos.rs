@@ -6,13 +6,14 @@ use transform_gizmo_bevy::{
 };
 
 use crate::{
+    data::{RoomPart, RoomPartPayload, RoomPartUuid},
     mode::ModeSpecific,
-    state::{EditorState, EditorViewMode, SpawnPickerMode},
+    state::{EditorState, EditorViewMode, FilePayload, SpawnPickerMode},
     ui::CursorOverEguiPanel,
 };
 use lib::{
     player::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
-    worldgen::terrain::Chunk,
+    worldgen::{asset::PortalDirection, terrain::Chunk},
 };
 
 pub struct EditorGizmosPlugin;
@@ -123,9 +124,9 @@ fn setup_selection_indications(
     mut commands: Commands,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let unselected = Color::srgba(1.0, 1.0, 1.0, 0.8);
-    let selected = Color::srgba(0.0, 1.0, 1.0, 0.8);
-    let multiselected = Color::srgba(0.0, 0.4, 1.0, 0.8);
+    let unselected = Color::srgba(1.0, 1.0, 1.0, 0.6);
+    let selected = Color::srgba(0.0, 1.0, 1.0, 0.6);
+    let multiselected = Color::srgba(0.0, 0.4, 1.0, 0.6);
 
     commands.insert_resource(SelectionMaterials {
         unselected: materials.add(StandardMaterial {
@@ -350,7 +351,7 @@ fn draw_spawn_position(
 fn draw_portals(
     mut gizmos: Gizmos,
     state: Res<EditorState>,
-    planes: Query<(&Transform, Option<&GizmoTarget>), With<PortalGizmos>>,
+    planes: Query<(&Transform, Option<&GizmoTarget>, Option<&RoomPartUuid>), With<PortalGizmos>>,
 ) {
     if state.spawn.mode == SpawnPickerMode::Playing {
         return;
@@ -364,6 +365,7 @@ fn draw_portals(
                 scale,
             },
             selected,
+            uuid,
         )| {
             let color = if selected.is_some() {
                 Color::srgb(0.0, 1.0, 1.0)
@@ -378,16 +380,41 @@ fn draw_portals(
             };
             gizmos.rect(isometry, scale.xz(), color);
 
-            // Forward arrow
-            let t = Transform::from_translation(*translation).with_rotation(*rotation);
-            let start = t.transform_point(Vec3::NEG_Y * 2.0);
-            let end = t.transform_point(Vec3::Y * 2.0);
-            gizmos.arrow(start, end, color);
+            let bidirectional = 'bd: {
+                let Some(uuid) = uuid else {
+                    break 'bd false;
+                };
+                let Some(data) = state.files.current_data() else {
+                    break 'bd false;
+                };
+                let FilePayload::Room(data) = data else {
+                    break 'bd false;
+                };
+                let Some(part) = data.parts.get(&uuid.0) else {
+                    break 'bd false;
+                };
+                let RoomPartPayload::Portal { direction } = part.data else {
+                    break 'bd false;
+                };
+
+                direction == PortalDirection::Bidirectional
+            };
 
             // Upward arrow
-            let start = t.transform_point(Vec3::NEG_Z * 2.0);
-            let end = t.transform_point(Vec3::Z * 2.0);
+            let t = Transform::from_translation(*translation).with_rotation(*rotation);
+            let arrow_len: f32 = 2.0;
+            let end = t.transform_point(scale.z / 2.0 * Vec3::Z);
+            let start = t.transform_point((scale.z / 2.0 - arrow_len) * Vec3::Z);
             gizmos.arrow(start, end, color);
+
+            let arrow_len = 6.0;
+            let start = t.transform_point(arrow_len / 2.0 * Vec3::NEG_Y);
+            let end = t.transform_point(arrow_len / 2.0 * Vec3::Y);
+            gizmos.arrow(start, end, color);
+
+            if bidirectional {
+                gizmos.arrow(end, start, color);
+            }
         },
     );
 }

@@ -159,6 +159,7 @@ pub fn setup(world: &mut World) {
                     world.register_system(room::detect_additions),
                     world.register_system(room::detect_hash_changes),
                     world.register_system(room::update_preview_brushes),
+                    world.register_system(room::correct_portal_orientations),
                 ],
                 ..default()
             },

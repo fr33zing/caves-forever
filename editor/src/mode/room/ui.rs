@@ -5,6 +5,7 @@ use bevy::{
 use egui::{
     menu, Align, CollapsingHeader, ComboBox, Frame, Label, Layout, RichText, ScrollArea, Ui,
 };
+use lib::worldgen::asset::PortalDirection;
 use strum::{EnumProperty, IntoEnumIterator};
 
 use crate::{
@@ -112,12 +113,11 @@ pub fn sidebar(
         let Some(part) = data.parts.get_mut(&selected_uuid.0) else {
             todo!()
         };
-
-        ui.add(Label::new(RichText::new("Selection").heading()).selectable(false));
-
         let Some(part_name) = part.data.get_str("name") else {
             return;
         };
+
+        ui.add(Label::new(RichText::new("Selection").heading()).selectable(false));
 
         match &mut part.data {
             RoomPartPayload::Stl {
@@ -148,7 +148,24 @@ pub fn sidebar(
                     part.rehash_stl().unwrap();
                 }
             }
-            _ => {}
+            RoomPartPayload::Portal { direction } => {
+                CollapsingHeader::new(part_name)
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        ui.columns_const(|[left, right]| {
+                            left.add(Label::new("Direction").selectable(false));
+                            right.with_layout(Layout::right_to_left(Align::Min), |right| {
+                                ComboBox::from_id_salt("portal_direction")
+                                    .selected_text(direction.to_string())
+                                    .show_ui(right, |ui| {
+                                        PortalDirection::iter().for_each(|dir| {
+                                            ui.selectable_value(direction, dir, dir.to_string());
+                                        });
+                                    });
+                            });
+                        });
+                    });
+            }
         }
     });
 }

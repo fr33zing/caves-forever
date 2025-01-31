@@ -72,7 +72,7 @@ impl Command for SpawnRoomPartEditorBundle {
                     *transform,
                 ));
             }
-            RoomPartPayload::Portal => {
+            RoomPartPayload::Portal { .. } => {
                 commands.spawn((
                     ModeSpecific(EditorMode::Rooms, None),
                     RenderLayers::from_layers(&[render_layer::EDITOR]),

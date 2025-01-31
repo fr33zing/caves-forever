@@ -12,7 +12,12 @@ use strum::{EnumIter, EnumProperty};
 use uuid::Uuid;
 
 use super::{Environment, Rarity};
-use lib::worldgen::{brush::TerrainBrushRequest, utility::safe_vhacd, voxel::VoxelMaterial};
+use lib::worldgen::{
+    asset::{self, PortalDirection},
+    brush::TerrainBrushRequest,
+    utility::safe_vhacd,
+    voxel::VoxelMaterial,
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Room {
@@ -36,7 +41,7 @@ impl Room {
         self.parts.insert(part.uuid, part);
     }
 
-    pub fn build(&self) -> anyhow::Result<lib::worldgen::asset::Room> {
+    pub fn build(&self) -> anyhow::Result<asset::Room> {
         let mut cavities = Vec::new();
         let mut portals = Vec::new();
 
@@ -66,11 +71,16 @@ impl Room {
                     let collider = safe_vhacd(&mesh, &vhacd_parameters)?;
                     cavities.push(collider);
                 }
-                RoomPartPayload::Portal => portals.push(transform),
+                RoomPartPayload::Portal { direction } => {
+                    portals.push(asset::Portal {
+                        transform,
+                        direction,
+                    });
+                }
             }
         }
 
-        Ok(lib::worldgen::asset::Room {
+        Ok(asset::Room {
             weight: self.rarity.weight(),
             cavities,
             portals,
@@ -99,7 +109,8 @@ pub enum RoomPartPayload {
         geometry_hash: u64,
         vhacd_parameters: VhacdParameters,
     },
-    Portal,
+    #[strum(props(name = "Portal"))]
+    Portal { direction: PortalDirection },
 }
 
 impl RoomPart {
@@ -208,7 +219,9 @@ impl RoomPart {
         Self {
             uuid: Uuid::new_v4(),
             transform,
-            data: RoomPartPayload::Portal,
+            data: RoomPartPayload::Portal {
+                direction: Default::default(),
+            },
         }
     }
 }
