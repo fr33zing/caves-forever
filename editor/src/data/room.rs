@@ -12,7 +12,7 @@ use strum::{EnumIter, EnumProperty};
 use uuid::Uuid;
 
 use super::{Environment, Rarity};
-use lib::worldgen::{brush::TerrainBrushRequest, voxel::VoxelMaterial};
+use lib::worldgen::{brush::TerrainBrushRequest, utility::safe_vhacd, voxel::VoxelMaterial};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Room {
@@ -63,11 +63,7 @@ impl Room {
                     .with_inserted_indices(Indices::U32(indices.clone()))
                     .transformed_by(transform);
 
-                    let collider = Collider::convex_decomposition_from_mesh_with_config(
-                        &mesh,
-                        &vhacd_parameters,
-                    )
-                    .ok_or_else(|| anyhow!("convex decomposition failed"))?;
+                    let collider = safe_vhacd(&mesh, &vhacd_parameters)?;
                     cavities.push(collider);
                 }
                 RoomPartPayload::Portal => portals.push(transform),
@@ -121,20 +117,18 @@ impl RoomPart {
                 indices,
                 vhacd_parameters,
                 ..
-            } => {
-                Some(TerrainBrushRequest::Mesh {
-                            uuid: (*uuid).into(),
-                            material: *material,
-                            transform: *transform,
-                            mesh: Mesh::new(
-                                PrimitiveTopology::TriangleList,
-                                RenderAssetUsages::MAIN_WORLD,
-                            )
-                            .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices.clone())
-                            .with_inserted_indices(Indices::U32(indices.clone())),
-                            vhacd_parameters: vhacd_parameters.clone(),
-                        })
-            },
+            } => Some(TerrainBrushRequest::Mesh {
+                uuid: (*uuid).into(),
+                material: *material,
+                transform: *transform,
+                mesh: Mesh::new(
+                    PrimitiveTopology::TriangleList,
+                    RenderAssetUsages::MAIN_WORLD,
+                )
+                .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices.clone())
+                .with_inserted_indices(Indices::U32(indices.clone())),
+                vhacd_parameters: vhacd_parameters.clone(),
+            }),
             _ => None,
         }
     }
