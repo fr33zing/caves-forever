@@ -21,25 +21,25 @@ use lib::worldgen::asset::AssetCollection;
 
 #[derive(Parser, Clone)]
 #[command(name = "Asset Builder")]
-#[command(about = "Builds assets into a format consumable by the main game.", long_about = None)]
+#[command(about = "Builds assets into a format consumable by the main game.")]
 struct Args {
-    // Which environment to build for.
+    /// Which environment to build for.
     #[arg(value_enum, short, long, default_value = "production")]
     env: Environment,
 
-    // Directory that contains the editor output.
+    /// Directory that contains the editor output.
     #[arg(short, long, default_value = "./assets/worldgen")]
     input: PathBuf,
 
-    // Output directory.
+    /// Output directory.
     #[arg(short, long, default_value = "./assets")]
     output: PathBuf,
 
-    // Output file prefix.
+    /// Output file prefix.
     #[arg(short, long, default_value = "worldgen")]
     name: String,
 
-    // Output file format. Only CBOR is used in-game, any other format is for debugging.
+    /// Output file format. Only CBOR is used in-game, any other format is for debugging.
     #[arg(short, long, default_value = "cbor")]
     format: Format,
 }
