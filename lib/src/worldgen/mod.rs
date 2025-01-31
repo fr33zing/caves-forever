@@ -22,7 +22,7 @@ pub mod consts {
     pub const CHUNK_INTERNAL_GEOMETRY: bool = true;
     pub const WORLD_RENDER_ORIGIN: bool = false;
 
-    pub const VHACD_PARAMETERS: VhacdParameters = VhacdParameters {
+    pub const TUNNEL_VHACD_PARAMETERS: VhacdParameters = VhacdParameters {
         // Changed
         alpha: 0.025,
         beta: 0.025,
@@ -37,4 +37,24 @@ pub mod consts {
             detect_cavities: false,
         },
     };
+}
+
+pub mod utility {
+    use anyhow::anyhow;
+    use avian3d::prelude::{Collider, VhacdParameters};
+    use bevy::prelude::Mesh;
+    use std::sync::Mutex;
+
+    pub fn safe_vhacd(mesh: &Mesh, vhacd_parameters: &VhacdParameters) -> anyhow::Result<Collider> {
+        let mesh = Mutex::new(mesh);
+        std::panic::catch_unwind(|| {
+            let collider = Collider::convex_decomposition_from_mesh_with_config(
+                &mesh.lock().unwrap(),
+                vhacd_parameters,
+            );
+            collider
+        })
+        .map_err(|_| anyhow!("convex decomposition panicked"))?
+        .ok_or_else(|| anyhow!("convex decomposition failed"))
+    }
 }

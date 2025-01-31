@@ -115,7 +115,10 @@ pub fn sidebar(
 
         ui.add(Label::new(RichText::new("Selection").heading()).selectable(false));
 
-        let part_name = part.data.get_str("name").unwrap();
+        let Some(part_name) = part.data.get_str("name") else {
+            return;
+        };
+
         match &mut part.data {
             RoomPartPayload::Stl {
                 path,
@@ -136,11 +139,13 @@ pub fn sidebar(
                         });
                     });
 
-                vhacd_parameters_sidebar(ui, vhacd_parameters);
+                let vhacd_changed = vhacd_parameters_sidebar(ui, vhacd_parameters);
 
+                // TODO handle errors
                 if reload {
-                    // TODO handle error
                     part.reload_stl().unwrap();
+                } else if vhacd_changed {
+                    part.rehash_stl().unwrap();
                 }
             }
             _ => {}

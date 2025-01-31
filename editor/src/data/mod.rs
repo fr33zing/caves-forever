@@ -4,6 +4,7 @@ use strum::EnumIter;
 
 mod room;
 mod tunnel;
+mod utility;
 pub use room::*;
 pub use tunnel::*;
 

@@ -119,18 +119,22 @@ impl RoomPart {
                 material,
                 vertices,
                 indices,
+                vhacd_parameters,
                 ..
-            } => Some(TerrainBrushRequest::Mesh {
-                uuid: (*uuid).into(),
-                material: *material,
-                transform: *transform,
-                mesh: Mesh::new(
-                    PrimitiveTopology::TriangleList,
-                    RenderAssetUsages::MAIN_WORLD,
-                )
-                .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices.clone())
-                .with_inserted_indices(Indices::U32(indices.clone())),
-            }),
+            } => {
+                Some(TerrainBrushRequest::Mesh {
+                            uuid: (*uuid).into(),
+                            material: *material,
+                            transform: *transform,
+                            mesh: Mesh::new(
+                                PrimitiveTopology::TriangleList,
+                                RenderAssetUsages::MAIN_WORLD,
+                            )
+                            .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices.clone())
+                            .with_inserted_indices(Indices::U32(indices.clone())),
+                            vhacd_parameters: vhacd_parameters.clone(),
+                        })
+            },
             _ => None,
         }
     }
@@ -141,7 +145,9 @@ impl RoomPart {
 
     pub fn stl(path: &str, material: VoxelMaterial, transform: Transform) -> anyhow::Result<Self> {
         let (vertices, indices) = load_stl_to_raw_geometry(path)?;
-        let geometry_hash = hash_geometry(&vertices, &indices);
+        let vhacd_parameters = VhacdParameters::default();
+        let geometry_hash = hash_geometry(&vertices, &indices, &vhacd_parameters);
+
         Ok(Self {
             uuid: Uuid::new_v4(),
             transform,
@@ -151,7 +157,7 @@ impl RoomPart {
                 vertices,
                 indices,
                 geometry_hash,
-                vhacd_parameters: VhacdParameters::default(),
+                vhacd_parameters,
             },
         })
     }
@@ -169,6 +175,7 @@ impl RoomPart {
             ref mut vertices,
             ref mut indices,
             ref mut geometry_hash,
+            ref vhacd_parameters,
             path,
             ..
         } = &mut self.data
@@ -177,7 +184,24 @@ impl RoomPart {
         };
 
         (*vertices, *indices) = load_stl_to_raw_geometry(&path)?;
-        *geometry_hash = hash_geometry(&vertices, &indices);
+        *geometry_hash = hash_geometry(&vertices, &indices, &vhacd_parameters);
+
+        Ok(())
+    }
+
+    pub fn rehash_stl(&mut self) -> anyhow::Result<()> {
+        let RoomPartPayload::Stl {
+            ref vertices,
+            ref indices,
+            ref mut geometry_hash,
+            ref vhacd_parameters,
+            ..
+        } = &mut self.data
+        else {
+            return Err(anyhow!("not an stl"));
+        };
+
+        *geometry_hash = hash_geometry(&vertices, &indices, &vhacd_parameters);
 
         Ok(())
     }
@@ -199,12 +223,32 @@ impl RoomPart {
 // Utility
 //
 
-fn hash_geometry(vertices: &[[f32; 3]], indices: &[u32]) -> u64 {
+fn hash_geometry(vertices: &[[f32; 3]], indices: &[u32], vhacd: &VhacdParameters) -> u64 {
     let mut hasher = std::hash::DefaultHasher::new();
+
     vertices
         .iter()
         .for_each(|v| v.iter().for_each(|f| hasher.write_u32(f.to_bits())));
     indices.iter().for_each(|i| hasher.write_u32(*i));
+
+    hasher.write_u32(vhacd.concavity.to_bits());
+    hasher.write_u32(vhacd.alpha.to_bits());
+    hasher.write_u32(vhacd.beta.to_bits());
+    hasher.write_u32(vhacd.resolution);
+    hasher.write_u32(vhacd.plane_downsampling);
+    hasher.write_u32(vhacd.convex_hull_downsampling);
+    hasher.write_u8(match vhacd.fill_mode {
+        FillMode::SurfaceOnly => 2,
+        FillMode::FloodFill { detect_cavities } => match detect_cavities {
+            true => 1,
+            false => 0,
+        },
+    });
+    hasher.write_u8(match vhacd.convex_hull_approximation {
+        true => 1,
+        false => 0,
+    });
+    hasher.write_u32(vhacd.max_convex_hulls);
 
     hasher.finish()
 }

@@ -1,7 +1,7 @@
 use avian3d::prelude::{FillMode, VhacdParameters};
 use egui::{Checkbox, CollapsingHeader, Label, Slider, Ui};
 
-pub fn vhacd_parameters_sidebar(ui: &mut Ui, vhacd_parameters: &mut VhacdParameters) {
+pub fn vhacd_parameters_sidebar(ui: &mut Ui, vhacd_parameters: &mut VhacdParameters) -> bool {
     let mut vhacd = vhacd_parameters.clone();
     let mut changed = false;
 
@@ -54,4 +54,6 @@ pub fn vhacd_parameters_sidebar(ui: &mut Ui, vhacd_parameters: &mut VhacdParamet
     if changed {
         *vhacd_parameters = vhacd;
     }
+
+    changed
 }

@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use avian3d::prelude::*;
 use bevy::{
     prelude::*,
@@ -9,7 +8,8 @@ use nalgebra::{Const, Point3};
 
 use super::{
     chunk::ChunksAABB,
-    consts::{VHACD_PARAMETERS, VOXEL_REAL_SIZE},
+    consts::{TUNNEL_VHACD_PARAMETERS, VOXEL_REAL_SIZE},
+    utility::safe_vhacd,
     voxel::{VoxelMaterial, VoxelSample},
 };
 
@@ -41,6 +41,7 @@ pub enum TerrainBrushRequest {
         material: VoxelMaterial,
         mesh: Mesh,
         transform: Transform,
+        vhacd_parameters: VhacdParameters,
     },
 }
 
@@ -84,10 +85,12 @@ impl TerrainBrushRequest {
                 material,
                 mesh,
                 transform,
-            } => TerrainBrush::mesh(&uuid, material, &mesh, Some(transform)).unwrap_or_else(|_| {
-                // TODO dynamic fallback sphere radius
-                TerrainBrush::collider(&uuid, VoxelMaterial::Invalid, Collider::sphere(4.0))
-            }),
+                vhacd_parameters,
+            } => TerrainBrush::mesh(&uuid, material, &mesh, Some(transform), &vhacd_parameters)
+                .unwrap_or_else(|_| {
+                    // TODO dynamic fallback sphere radius
+                    TerrainBrush::collider(&uuid, VoxelMaterial::Invalid, Collider::sphere(4.0))
+                }),
         }
     }
 }
@@ -142,7 +145,7 @@ impl TerrainBrush {
         let rail = NurbsCurve3D::<f32>::try_interpolate(rail, 3)?;
         let mesh = sweep_zero_twist_filled::<Const<4>>(profile, &rail, Some(4))?;
 
-        Self::mesh(uuid, material, &mesh, None)
+        Self::mesh(uuid, material, &mesh, None, &TUNNEL_VHACD_PARAMETERS)
     }
 
     pub fn mesh(
@@ -150,15 +153,14 @@ impl TerrainBrush {
         material: VoxelMaterial,
         mesh: &Mesh,
         transform: Option<Transform>,
+        vhacd_parameters: &VhacdParameters,
     ) -> anyhow::Result<Self> {
         let mesh = if let Some(transform) = transform {
             &mesh.clone().transformed_by(transform)
         } else {
             mesh
         };
-        let collider =
-            Collider::convex_decomposition_from_mesh_with_config(mesh, &VHACD_PARAMETERS)
-                .ok_or_else(|| anyhow!("convex decomposition failed"))?;
+        let collider = safe_vhacd(&mesh, &vhacd_parameters)?;
 
         Ok(Self::collider(uuid, material, collider))
     }

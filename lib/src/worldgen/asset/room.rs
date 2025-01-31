@@ -8,3 +8,9 @@ pub struct Room {
     pub cavities: Vec<Collider>,
     pub portals: Vec<Transform>,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Portal {
+    transform: Transform,
+    bidirectional: bool,
+}
