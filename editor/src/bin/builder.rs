@@ -8,8 +8,7 @@ use std::{
 
 use anyhow::anyhow;
 use bytesize::ByteSize;
-use clap::Parser;
-use lib::worldgen::asset::AssetCollection;
+use clap::{Parser, ValueEnum};
 use tracing::{debug, error, info, span, warn, Level};
 use tracing_subscriber::util::SubscriberInitExt;
 use walkdir::WalkDir;
@@ -18,6 +17,7 @@ use editor_lib::{
     data::Environment,
     state::{EditorMode, FilePayload},
 };
+use lib::worldgen::asset::AssetCollection;
 
 #[derive(Parser, Clone)]
 #[command(name = "Asset Builder")]
@@ -38,6 +38,16 @@ struct Args {
     // Output file prefix.
     #[arg(short, long, default_value = "worldgen")]
     name: String,
+
+    // Output file format. Only CBOR is used in-game, any other format is for debugging.
+    #[arg(short, long, default_value = "cbor")]
+    format: Format,
+}
+
+#[derive(Clone, PartialEq, ValueEnum, strum::Display)]
+enum Format {
+    Cbor,
+    Ron,
 }
 
 #[derive(Default)]
@@ -150,18 +160,33 @@ fn check_build_statistics(stats: &Statistics) -> bool {
 
 fn write_archive(
     Args {
-        env, output, name, ..
+        env,
+        output,
+        name,
+        format,
+        ..
     }: Args,
     assets: AssetCollection,
 ) -> anyhow::Result<(PathBuf, u64)> {
-    let file_name = format!("{name}.{}.cbor", env.to_string().to_lowercase());
+    let file_name = format!(
+        "{name}.{}.{}",
+        env.to_string().to_lowercase(),
+        format.to_string().to_lowercase()
+    );
     let path = output.join(file_name);
     let mut file = File::create(path.clone())?;
-    let bytes = cbor4ii::serde::to_vec(Vec::new(), &assets)?;
-    let size = bytes.len();
+
+    let bytes = match format {
+        Format::Cbor => cbor4ii::serde::to_vec(Vec::new(), &assets)?,
+        Format::Ron => ron::ser::to_string_pretty(&assets, ron::ser::PrettyConfig::default())?
+            .as_bytes()
+            .to_vec(),
+    };
+
+    let size = bytes.len() as u64;
     file.write_all(&bytes)?;
 
-    Ok((path, size as u64))
+    Ok((path, size))
 }
 
 fn filter_input_files(path: PathBuf) -> anyhow::Result<Vec<PathBuf>> {
