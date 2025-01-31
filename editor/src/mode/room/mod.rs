@@ -11,7 +11,6 @@ use uuid::Uuid;
 
 use crate::{
     data::{RoomPartPayload, RoomPartUuid},
-    gizmos::PortalGizmos,
     state::{EditorState, FilePayload},
 };
 use lib::worldgen::{asset::PortalDirection, brush::TerrainBrush};

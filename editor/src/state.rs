@@ -451,7 +451,6 @@ pub struct EditorState {
     pub files: FilePickerState,
     pub spawn: SpawnPickerState,
     pub tunnels_mode: TunnelsModeState,
-    #[allow(unused)]
     pub rooms_mode: RoomsModeState,
 }
 

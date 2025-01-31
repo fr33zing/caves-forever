@@ -6,7 +6,7 @@ use transform_gizmo_bevy::{
 };
 
 use crate::{
-    data::{RoomPart, RoomPartPayload, RoomPartUuid},
+    data::{RoomPartPayload, RoomPartUuid},
     mode::ModeSpecific,
     state::{EditorState, EditorViewMode, FilePayload, SpawnPickerMode},
     ui::CursorOverEguiPanel,
@@ -407,6 +407,7 @@ fn draw_portals(
             let start = t.transform_point((scale.z / 2.0 - arrow_len) * Vec3::Z);
             gizmos.arrow(start, end, color);
 
+            // Inward/outward arrow
             let arrow_len = 6.0;
             let start = t.transform_point(arrow_len / 2.0 * Vec3::NEG_Y);
             let end = t.transform_point(arrow_len / 2.0 * Vec3::Y);
