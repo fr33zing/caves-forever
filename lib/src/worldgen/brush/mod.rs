@@ -59,6 +59,7 @@ pub enum TerrainBrush {
         collider: Collider,
         material: VoxelMaterial,
         chunks: ChunksAABB,
+        transform: Transform,
     },
 }
 
@@ -89,7 +90,12 @@ impl TerrainBrushRequest {
             } => TerrainBrush::mesh(&uuid, material, &mesh, Some(transform), &vhacd_parameters)
                 .unwrap_or_else(|_| {
                     // TODO dynamic fallback sphere radius
-                    TerrainBrush::collider(&uuid, VoxelMaterial::Invalid, Collider::sphere(4.0))
+                    TerrainBrush::collider(
+                        &uuid,
+                        VoxelMaterial::Invalid,
+                        Collider::sphere(2.0 * transform.scale.max_element()),
+                        transform,
+                    )
                 }),
         }
     }
@@ -156,16 +162,26 @@ impl TerrainBrush {
         vhacd_parameters: &VhacdParameters,
     ) -> anyhow::Result<Self> {
         let mesh = if let Some(transform) = transform {
-            &mesh.clone().transformed_by(transform)
+            &mesh.clone().scaled_by(transform.scale)
         } else {
             mesh
         };
         let collider = safe_vhacd(&mesh, &vhacd_parameters)?;
 
-        Ok(Self::collider(uuid, material, collider))
+        Ok(Self::collider(
+            uuid,
+            material,
+            collider,
+            transform.unwrap_or_else(|| Transform::default()),
+        ))
     }
 
-    pub fn collider(uuid: &str, material: VoxelMaterial, collider: Collider) -> Self {
+    pub fn collider(
+        uuid: &str,
+        material: VoxelMaterial,
+        collider: Collider,
+        transform: Transform,
+    ) -> Self {
         let aabb = collider
             .aabb(Vec3::ZERO, Rotation::default())
             .grow(Vec3::splat(VOXEL_REAL_SIZE));
@@ -176,6 +192,7 @@ impl TerrainBrush {
             collider,
             material,
             chunks,
+            transform,
         }
     }
 
@@ -205,20 +222,20 @@ impl TerrainBrush {
 
     fn sample_collider(&self, point: Vec3) -> VoxelSample {
         let TerrainBrush::Collider {
-            collider, material, ..
+            collider,
+            material,
+            transform,
+            ..
         } = self
         else {
             panic!("wrong sample function");
         };
 
-        let (closest, _) =
-            collider.project_point(Position::default(), Rotation::default(), point, false);
-        let (closest_solid, _) =
-            collider.project_point(Position::default(), Rotation::default(), point, true);
-
+        // is_inside from project_point is unreliable so we need to do it twice
+        let (position, rotation) = (transform.translation, transform.rotation);
+        let (closest, _) = collider.project_point(position, rotation, point, false);
+        let (closest_solid, _) = collider.project_point(position, rotation, point, true);
         let mut distance = point.distance(closest);
-
-        // is_inside from project_point is unreliable
         let is_inside = closest_solid.distance(point) <= 0.01;
 
         if is_inside {
