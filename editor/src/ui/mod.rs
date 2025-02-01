@@ -160,10 +160,11 @@ fn ui(
             .resizable(false)
             .show(ctx, |ui| {
                 match state.mode() {
-                    EditorMode::Tunnels => tunnel::ui::sidebar(&mut state, ui),
-                    EditorMode::Rooms => {
+                    Some(EditorMode::Tunnels) => tunnel::ui::sidebar(&mut state, ui),
+                    Some(EditorMode::Rooms) => {
                         room::ui::sidebar(&mut state, ui, room_mode_primary_selection)
                     }
+                    _ => {}
                 };
                 ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
             });
@@ -281,7 +282,7 @@ fn top_panel(
                     file_menu(state, dialogs, dialog_state, ui);
                 });
                 ui.menu_button("Viewport", |ui| {
-                    let allow_orbit = !(state.mode() == EditorMode::Tunnels
+                    let allow_orbit = !(state.mode() == Some(EditorMode::Tunnels)
                         && state.view == EditorViewMode::Editor);
                     viewport_menu(ui, allow_orbit, trackball);
                 });
@@ -338,8 +339,9 @@ fn top_panel(
 
         // Mode-specific
         match state.mode() {
-            EditorMode::Tunnels => tunnel::ui::topbar(state, ui),
-            EditorMode::Rooms => room::ui::topbar(state, ui),
+            Some(EditorMode::Tunnels) => tunnel::ui::topbar(state, ui),
+            Some(EditorMode::Rooms) => room::ui::topbar(state, ui),
+            _ => {}
         }
     });
 }

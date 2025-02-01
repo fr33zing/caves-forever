@@ -35,7 +35,7 @@ pub fn on_change_mode(
     let mut block_orbit = false;
 
     match state.mode() {
-        EditorMode::Tunnels => match state.view {
+        Some(EditorMode::Tunnels) => match state.view {
             EditorViewMode::Editor => {
                 camera.scope.set_ortho(true);
                 camera.frame.set_target(target);
@@ -49,11 +49,12 @@ pub fn on_change_mode(
                 camera.frame.set_eye(&Point3::new(0.0, d, -d / 2.0), up);
             }
         },
-        EditorMode::Rooms => {
+        Some(EditorMode::Rooms) => {
             camera.scope.set_ortho(false);
             camera.frame.set_target(target);
             camera.frame.set_eye(&Point3::new(-d, d / 2.0, -d), up);
         }
+        _ => {}
     }
 
     controller.input.orbit_button = if block_orbit {

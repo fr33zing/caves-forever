@@ -65,7 +65,7 @@ pub fn spawn_fake_portal(
         RenderLayers::from_layers(&[render_layer::EDITOR_PREVIEW]),
         ModeSpecific(EditorMode::Tunnels, Some(EditorViewMode::Preview)),
         ConnectionPoint,
-        Transform::from_translation(transform.translation),
+        Transform::from_translation(transform.translation - transform.rotation * Vec3::Y * 10.0),
         Mesh3d(meshes.add(Sphere::new(0.5))),
         materials.unselected(),
         MaterialIndicatesSelection,

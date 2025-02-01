@@ -322,11 +322,15 @@ fn draw_spawn_position(
     spawn_pos_indicator: Option<Single<Entity, With<SpawnPositionIndicator>>>,
 ) {
     if let Some(spawn_pos) = state.spawn.position {
+        let Some(mode) = state.mode() else {
+            return;
+        };
+
         let mut commands = if let Some(spawn_pos_indicator) = spawn_pos_indicator {
             commands.entity(*spawn_pos_indicator)
         } else {
             commands.spawn((
-                ModeSpecific(state.mode(), Some(EditorViewMode::Preview)),
+                ModeSpecific(mode, Some(EditorViewMode::Preview)),
                 SpawnPositionIndicator,
                 Mesh3d(meshes.add(Capsule3d::new(
                     PLAYER_RADIUS,

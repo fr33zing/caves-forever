@@ -54,6 +54,25 @@ pub fn detect_additions(
     });
 }
 
+pub fn detect_removals(
+    state: Res<EditorState>,
+    mut commands: Commands,
+    parts: Query<(Entity, &RoomPartUuid)>,
+) {
+    let Some(data) = state.files.current_data() else {
+        return;
+    };
+    let FilePayload::Room(data) = data else {
+        return;
+    };
+
+    parts.iter().for_each(|(entity, uuid)| {
+        if data.parts.get(&uuid.0).is_none() {
+            commands.entity(entity).clear();
+        };
+    });
+}
+
 // Hook: update
 pub fn detect_world_changes(
     time: Res<Time>,
@@ -115,7 +134,7 @@ pub fn detect_hash_changes(
         let (ref uuid, ref mut world_hash) = (uuid_hash.0, uuid_hash.1);
 
         let Some(data_part) = data.parts.get(uuid) else {
-            todo!();
+            return;
         };
 
         match data_part.data {

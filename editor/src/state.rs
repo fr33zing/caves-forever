@@ -468,9 +468,7 @@ impl Default for EditorState {
 
 impl EditorState {
     // TODO maybe make this an Option?
-    pub fn mode(&self) -> EditorMode {
-        self.files
-            .current_file()
-            .map_or_else(|| EditorMode::Tunnels, |f| f.mode)
+    pub fn mode(&self) -> Option<EditorMode> {
+        self.files.current_file().map(|f| f.mode)
     }
 }

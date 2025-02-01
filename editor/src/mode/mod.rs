@@ -14,6 +14,7 @@ use common_macros::hash_map;
 use lib::{
     player::{consts::PLAYER_HEIGHT, DespawnPlayerCommand, SpawnPlayerCommand},
     render_layer,
+    worldgen::brush::TerrainBrush,
 };
 use nalgebra::Vector3;
 
@@ -46,6 +47,9 @@ impl Command for RevertCommand {
             });
 
             let (mode, view) = (state.mode(), state.view);
+            let Some(mode) = mode else {
+                return;
+            };
             if let Some(systems) = switcher.mode_systems.get(&mode) {
                 systems_to_run = vec![
                     systems.exit,
@@ -78,7 +82,8 @@ struct ModeSwitcher {
     pub prev_mode: Option<EditorMode>,
     pub prev_view: Option<EditorViewMode>,
     pub mode_systems: HashMap<EditorMode, ModeSystems>,
-    pub cleanup_system: SystemId,
+    pub cleanup_mode_specific_entities_system: SystemId,
+    pub cleanup_terrain_system: SystemId,
     pub camera_on_change_mode_system: SystemId,
     pub update_files_changed_status_system: SystemId,
     pub playtest_system: SystemId,
@@ -102,7 +107,9 @@ impl Plugin for EditorModesPlugin {
 
         let world = app.world_mut();
         let camera_on_change_mode_system = world.register_system(camera::on_change_mode);
-        let cleanup_system = world.register_system(cleanup);
+        let cleanup_mode_specific_entities_system =
+            world.register_system(cleanup_mode_specific_entities);
+        let cleanup_terrain_system = world.register_system(cleanup_terrain);
         let update_files_changed_status_system = world.register_system(update_files_changed_status);
         let playtest_system = world.register_system(playtest);
 
@@ -110,7 +117,8 @@ impl Plugin for EditorModesPlugin {
             prev_mode: default(),
             prev_view: default(),
             mode_systems: default(),
-            cleanup_system,
+            cleanup_mode_specific_entities_system,
+            cleanup_terrain_system,
             camera_on_change_mode_system,
             update_files_changed_status_system,
             playtest_system,
@@ -157,6 +165,7 @@ pub fn setup(world: &mut World) {
                 update: vec![
                     world.register_system(room::detect_world_changes),
                     world.register_system(room::detect_additions),
+                    world.register_system(room::detect_removals),
                     world.register_system(room::detect_hash_changes),
                     world.register_system(room::update_preview_brushes),
                     world.register_system(room::correct_portal_orientations),
@@ -167,7 +176,7 @@ pub fn setup(world: &mut World) {
     });
 }
 
-pub fn cleanup(
+pub fn cleanup_mode_specific_entities(
     mut commands: Commands,
     state: Res<EditorState>,
     mode_specific_entities: Query<(Entity, &ModeSpecific)>,
@@ -176,7 +185,7 @@ pub fn cleanup(
         .iter()
         .for_each(|(entity, ModeSpecific(mode, view))| {
             let mut remove = false;
-            if *mode != state.mode() {
+            if Some(*mode) != state.mode() {
                 remove = true;
             } else {
                 if let Some(view) = view {
@@ -189,6 +198,12 @@ pub fn cleanup(
         });
 }
 
+pub fn cleanup_terrain(mut commands: Commands, terrain_brushes: Query<Entity, With<TerrainBrush>>) {
+    terrain_brushes.iter().for_each(|brush| {
+        commands.entity(brush).clear();
+    });
+}
+
 fn switch_modes(world: &mut World) {
     let (curr_mode, curr_view) =
         world.resource_scope(|_, state: Mut<EditorState>| (state.mode(), state.view));
@@ -196,7 +211,7 @@ fn switch_modes(world: &mut World) {
     let systems: Vec<SystemId> = world.resource_scope(|_, mut switcher: Mut<ModeSwitcher>| {
         let mut systems = Vec::<Option<SystemId>>::new();
         let prev_mode = switcher.prev_mode;
-        let changed_mode = switcher.prev_mode != Some(curr_mode);
+        let changed_mode = switcher.prev_mode != curr_mode;
         let changed_view = switcher.prev_view != Some(curr_view);
 
         if changed_mode {
@@ -206,16 +221,22 @@ fn switch_modes(world: &mut World) {
                 }
             }
 
-            if let Some(curr_systems) = switcher.mode_systems.get(&curr_mode) {
-                systems.push(curr_systems.enter);
+            if let Some(curr_mode) = curr_mode {
+                if let Some(curr_systems) = switcher.mode_systems.get(&curr_mode) {
+                    systems.push(curr_systems.enter);
+                }
             }
 
-            switcher.prev_mode = Some(curr_mode);
+            switcher.prev_mode = curr_mode;
+
+            systems.push(Some(switcher.cleanup_terrain_system));
         }
 
         if changed_view {
-            if let Some(curr_systems) = switcher.mode_systems.get(&curr_mode) {
-                systems.push(curr_systems.enter_view.get(&curr_view).copied());
+            if let Some(curr_mode) = curr_mode {
+                if let Some(curr_systems) = switcher.mode_systems.get(&curr_mode) {
+                    systems.push(curr_systems.enter_view.get(&curr_view).copied());
+                }
             }
 
             switcher.prev_view = Some(curr_view);
@@ -223,7 +244,7 @@ fn switch_modes(world: &mut World) {
 
         if changed_mode || changed_view {
             systems.push(Some(switcher.camera_on_change_mode_system));
-            systems.push(Some(switcher.cleanup_system));
+            systems.push(Some(switcher.cleanup_mode_specific_entities_system));
         }
 
         systems.push(Some(switcher.update_files_changed_status_system));
@@ -243,6 +264,9 @@ fn switch_modes(world: &mut World) {
 fn update_curr_mode(world: &mut World) {
     let curr_mode = world.resource_scope(|_, state: Mut<EditorState>| state.mode());
     world.resource_scope(|world, switcher: Mut<ModeSwitcher>| {
+        let Some(curr_mode) = curr_mode else {
+            return;
+        };
         let Some(curr_systems) = switcher.mode_systems.get(&curr_mode) else {
             return;
         };
@@ -282,7 +306,6 @@ fn playtest(
     let Some(next_mode) = next_mode else {
         return;
     };
-
     let Some(single) = camera else {
         return;
     };
