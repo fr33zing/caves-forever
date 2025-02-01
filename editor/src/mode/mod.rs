@@ -79,6 +79,7 @@ struct ModeSystems {
 
 #[derive(Resource)]
 struct ModeSwitcher {
+    pub prev_file: Option<usize>,
     pub prev_mode: Option<EditorMode>,
     pub prev_view: Option<EditorViewMode>,
     pub mode_systems: HashMap<EditorMode, ModeSystems>,
@@ -114,6 +115,7 @@ impl Plugin for EditorModesPlugin {
         let playtest_system = world.register_system(playtest);
 
         app.insert_resource(ModeSwitcher {
+            prev_file: default(),
             prev_mode: default(),
             prev_view: default(),
             mode_systems: default(),
@@ -205,14 +207,22 @@ pub fn cleanup_terrain(mut commands: Commands, terrain_brushes: Query<Entity, Wi
 }
 
 fn switch_modes(world: &mut World) {
-    let (curr_mode, curr_view) =
-        world.resource_scope(|_, state: Mut<EditorState>| (state.mode(), state.view));
+    let (curr_file, curr_mode, curr_view) = world.resource_scope(|_, state: Mut<EditorState>| {
+        (state.files.current, state.mode(), state.view)
+    });
 
     let systems: Vec<SystemId> = world.resource_scope(|_, mut switcher: Mut<ModeSwitcher>| {
         let mut systems = Vec::<Option<SystemId>>::new();
         let prev_mode = switcher.prev_mode;
+        let changed_file = switcher.prev_file != curr_file;
         let changed_mode = switcher.prev_mode != curr_mode;
         let changed_view = switcher.prev_view != Some(curr_view);
+
+        if changed_file {
+            systems.push(Some(switcher.cleanup_terrain_system));
+
+            switcher.prev_file = curr_file;
+        }
 
         if changed_mode {
             if let Some(prev_mode) = prev_mode {
@@ -228,8 +238,6 @@ fn switch_modes(world: &mut World) {
             }
 
             switcher.prev_mode = curr_mode;
-
-            systems.push(Some(switcher.cleanup_terrain_system));
         }
 
         if changed_view {
