@@ -1,4 +1,11 @@
-use bevy::{pbr::wireframe::WireframeColor, picking::backend::ray::RayMap, prelude::*};
+use std::collections::HashMap;
+
+use bevy::{
+    ecs::system::SystemState, pbr::wireframe::WireframeColor, picking::backend::ray::RayMap,
+    prelude::*, window::PrimaryWindow,
+};
+use bevy_trackball::TrackballCamera;
+use strum::{EnumIter, IntoEnumIterator};
 use transform_gizmo_bevy::GizmoTarget;
 
 use crate::{
@@ -43,6 +50,82 @@ pub struct Selectable;
 #[derive(Component)]
 pub struct PrimarySelection;
 
+#[repr(u8)]
+#[derive(Debug, EnumIter, PartialEq, Eq, Hash, Clone)]
+pub enum PickingMode {
+    Selectable,
+    Terrain,
+    GroundPlane,
+}
+
+#[derive(Component)]
+pub struct Placing {
+    pub modes: Vec<PickingMode>,
+    pub spawned_time: f64,
+}
+
+pub struct PickingTarget {
+    pub point: Vec3,
+    pub normal: Vec3,
+    pub entity: Option<Entity>,
+}
+
+#[derive(Resource)]
+pub struct PickingTargets(pub HashMap<PickingMode, Option<PickingTarget>>);
+
+impl PickingTargets {
+    fn target(&self, mode: &PickingMode) -> &Option<PickingTarget> {
+        self.0.get(mode).unwrap()
+    }
+
+    fn targets(&self, modes: &[PickingMode]) -> Option<&PickingTarget> {
+        for mode in modes {
+            if let Some(target) = self.target(mode) {
+                return Some(target);
+            }
+        }
+        None
+    }
+}
+
+pub struct SpawnAndPlaceCommand<T>(pub Vec<PickingMode>, pub T)
+where
+    T: Bundle;
+
+impl<T> Command for SpawnAndPlaceCommand<T>
+where
+    T: Bundle,
+{
+    fn apply(self, world: &mut World) {
+        let mut system_state: SystemState<(
+            Res<Time>,
+            Commands,
+            Query<Entity, With<GizmoTarget>>,
+            Option<Single<Entity, With<PrimarySelection>>>,
+        )> = SystemState::new(world);
+        let (time, mut commands, selected, primary) = system_state.get_mut(world);
+
+        selected.iter().for_each(|selected| {
+            let mut commands = commands.entity(selected);
+            commands.remove::<GizmoTarget>();
+            commands.remove::<Placing>();
+        });
+
+        if let Some(primary) = primary {
+            commands.entity(*primary).remove::<PrimarySelection>();
+        }
+
+        let mut commands = commands.spawn(self.1);
+        commands.insert(Placing {
+            modes: self.0,
+            spawned_time: time.elapsed_secs_f64(),
+        });
+        commands.insert(PrimarySelection);
+
+        system_state.apply(world);
+    }
+}
+
 pub struct PickingPlugin;
 
 impl Plugin for PickingPlugin {
@@ -53,16 +136,19 @@ impl Plugin for PickingPlugin {
             ray_cast_visibility: RayCastVisibility::VisibleInView,
         });
 
+        app.insert_resource(PickingTargets(
+            PickingMode::iter().map(|mode| (mode, None)).collect(),
+        ));
+
         app.add_systems(Startup, setup_selection_indications);
         app.add_systems(
             Update,
             (
-                pick,
-                pick_spawn_position,
-                update_selection_indications
-                    .after(pick)
-                    .after(pick_spawn_position),
-            ),
+                update_picking_targets,
+                ((pick, pick_spawn_position).chain(), place_new_entity),
+                update_selection_indications,
+            )
+                .chain(),
         );
     }
 }
@@ -104,6 +190,82 @@ fn setup_selection_indications(
     });
 }
 
+fn update_picking_targets(
+    mut targets: ResMut<PickingTargets>,
+    mut ray_cast: MeshRayCast,
+    ray_map: Res<RayMap>,
+    window: Single<&Window, With<PrimaryWindow>>,
+    camera: Single<(&Camera, &GlobalTransform), With<TrackballCamera>>,
+    selectable: Query<Entity, With<Selectable>>,
+    chunks: Query<Entity, With<Chunk>>,
+    placing: Option<Single<Entity, With<Placing>>>,
+) {
+    PickingMode::iter().for_each(|mode| {
+        let target = match mode {
+            PickingMode::Selectable => ray_map.iter().find_map(|(_, ray)| {
+                let settings = RayCastSettings {
+                    filter: &|entity| -> bool {
+                        let not_placing = if let Some(ref placing) = placing {
+                            entity != **placing
+                        } else {
+                            false
+                        };
+                        selectable.get(entity).is_ok() && not_placing
+                    },
+                    ..default()
+                };
+                let Some((entity, hit)) = ray_cast.cast_ray(*ray, &settings).first() else {
+                    return None;
+                };
+                if selectable.get(*entity).is_ok() {
+                    return Some(PickingTarget {
+                        point: hit.point,
+                        normal: hit.normal,
+                        entity: Some(*entity),
+                    });
+                };
+                return None;
+            }),
+            PickingMode::Terrain => ray_map.iter().find_map(|(_, ray)| {
+                let settings = RayCastSettings {
+                    filter: &|entity| {
+                        let not_placing = if let Some(ref placing) = placing {
+                            entity != **placing
+                        } else {
+                            false
+                        };
+                        chunks.get(entity).is_ok() && not_placing
+                    },
+                    ..default()
+                };
+                let Some((entity, hit)) = ray_cast.cast_ray(*ray, &settings).first() else {
+                    return None;
+                };
+                if selectable.get(*entity).is_ok() {
+                    return Some(PickingTarget {
+                        point: hit.point,
+                        normal: hit.normal,
+                        entity: Some(*entity),
+                    });
+                };
+                return None;
+            }),
+            PickingMode::GroundPlane => {
+                if let Some(hit) = cursor_to_ground_plane(&window, *camera) {
+                    Some(PickingTarget {
+                        point: Vec3::new(hit.x, 0.0, hit.y),
+                        normal: Vec3::Y,
+                        entity: None,
+                    })
+                } else {
+                    None
+                }
+            }
+        };
+        targets.0.insert(mode, target);
+    });
+}
+
 fn pick(
     mut commands: Commands,
     mut ray_cast: MeshRayCast,
@@ -115,7 +277,11 @@ fn pick(
     selectable: Query<Entity, With<Selectable>>,
     gizmo_targets: Query<(Entity, &GizmoTarget)>,
     primary_selection: Query<Entity, With<PrimarySelection>>,
+    placing: Option<Single<&Placing>>,
 ) {
+    if placing.is_some() {
+        return;
+    };
     if cursor_over_egui_panel.0 {
         return;
     }
@@ -211,6 +377,37 @@ fn pick_spawn_position(
     }
 }
 
+fn place_new_entity(
+    time: Res<Time>,
+    mut commands: Commands,
+    mouse: Res<ButtonInput<MouseButton>>,
+    cursor_over_egui_panel: Res<CursorOverEguiPanel>,
+    picking_targets: Res<PickingTargets>,
+    placing: Option<Single<(Entity, &mut Transform, &Placing)>>,
+) {
+    let Some(placing) = placing else {
+        return;
+    };
+
+    let (entity, mut transform, placement) = placing.into_inner();
+    let Some(target) = picking_targets.targets(&placement.modes) else {
+        return;
+    };
+
+    transform.translation = target.point;
+    transform.look_at(target.point + target.normal, Vec3::Y);
+    transform.rotate_local_x(-90.0_f32.to_radians());
+
+    if mouse.just_released(MouseButton::Left)
+        && !cursor_over_egui_panel.0
+        && (time.elapsed_secs_f64() - placement.spawned_time >= 0.75)
+    {
+        let mut commands = commands.entity(entity);
+        commands.remove::<Placing>();
+        commands.insert(GizmoTarget::default());
+    }
+}
+
 fn update_selection_indications(
     mut commands: Commands,
     materials: Res<SelectionMaterials>,
@@ -259,4 +456,29 @@ fn update_selection_indications(
             commands.insert(MeshMaterial3d(materials.unselected.clone()));
         }
     });
+}
+
+//
+// Utility
+//
+
+/// Adapted from: https://bevy-cheatbook.github.io/cookbook/cursor2world.html
+pub fn cursor_to_ground_plane(
+    window: &Window,
+    (camera, camera_transform): (&Camera, &GlobalTransform),
+) -> Option<Vec2> {
+    let Some(cursor_position) = window.cursor_position() else {
+        return None;
+    };
+    let plane_origin = Vec3::ZERO;
+    let plane = InfinitePlane3d::new(Vec3::Y);
+    let Ok(ray) = camera.viewport_to_world(camera_transform, cursor_position) else {
+        return None;
+    };
+    let Some(distance) = ray.intersect_plane(plane_origin, plane) else {
+        return None;
+    };
+    let global_cursor = ray.get_point(distance);
+
+    Some(global_cursor.xz())
 }

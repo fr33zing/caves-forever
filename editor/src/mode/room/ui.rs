@@ -25,17 +25,19 @@ pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
 
     match state.view {
         EditorViewMode::Editor => {
+            // Add menu
+            let mut add: Option<RoomPart> = None;
             Frame::none().show(ui, |ui| {
                 ui.shrink_width_to_current();
                 menu::bar(ui, |ui| {
                     ui.menu_button("Add", |ui| {
                         if ui.selectable_label(false, "STL Import").clicked() {
                             ui.close_menu();
-                            data.push(RoomPart::default_stl(Transform::default()).unwrap());
+                            add = Some(RoomPart::default_stl(Transform::default()).unwrap());
                         };
                         if ui.selectable_label(false, "Portal").clicked() {
                             ui.close_menu();
-                            data.push(RoomPart::portal(
+                            add = Some(RoomPart::portal(
                                 Transform::from_scale(Vec3::new(10.0, 1.0, 10.0)).with_rotation(
                                     Quat::from_euler(
                                         EulerRot::YXZ,
@@ -49,6 +51,10 @@ pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
                     });
                 });
             });
+            if let Some(mut add) = add {
+                add.place_after_spawn = true;
+                data.push(add);
+            }
         }
         EditorViewMode::Preview => {}
     }

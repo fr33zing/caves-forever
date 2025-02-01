@@ -195,9 +195,9 @@ pub fn update_preview_brushes(
         if time.elapsed_secs_f64() - upb.time < TIMER_SECS {
             return;
         }
-
         let Some(part) = data.parts.get(&upb.uuid) else {
-            todo!();
+            // TODO make sure it doesnt last forever because of this
+            return;
         };
 
         clear_brushes.push(upb.uuid);

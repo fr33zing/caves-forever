@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 use strum::{EnumIter, EnumProperty};
 use uuid::Uuid;
 
+use crate::picking::PickingMode;
+
 use super::{Environment, Rarity};
 use lib::worldgen::{asset::PortalDirection, brush::TerrainBrushRequest, voxel::VoxelMaterial};
 
@@ -45,6 +47,9 @@ pub struct RoomPart {
     pub uuid: Uuid,
     pub transform: Transform,
     pub data: RoomPartPayload,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    pub place_after_spawn: bool,
 }
 
 #[derive(EnumProperty, EnumIter, Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -68,6 +73,7 @@ impl RoomPart {
             uuid,
             transform,
             data,
+            ..
         } = self;
 
         match data {
@@ -93,6 +99,16 @@ impl RoomPart {
         }
     }
 
+    /// Determines how the room part should be placed after spawning it in the editor.
+    pub fn placement(&self) -> Vec<PickingMode> {
+        match self.data {
+            RoomPartPayload::Stl { .. } => vec![PickingMode::GroundPlane],
+            RoomPartPayload::Portal { .. } => {
+                vec![PickingMode::Selectable, PickingMode::GroundPlane]
+            }
+        }
+    }
+
     //
     // Stl
     //
@@ -113,6 +129,7 @@ impl RoomPart {
                 geometry_hash,
                 vhacd_parameters,
             },
+            place_after_spawn: false,
         })
     }
 
@@ -171,6 +188,7 @@ impl RoomPart {
             data: RoomPartPayload::Portal {
                 direction: Default::default(),
             },
+            place_after_spawn: false,
         }
     }
 }

@@ -11,27 +11,6 @@ use crate::{
 };
 use lib::render_layer;
 
-/// Adapted from: https://bevy-cheatbook.github.io/cookbook/cursor2world.html
-pub fn cursor_to_ground_plane(
-    window: &Window,
-    (camera, camera_transform): (&Camera, &GlobalTransform),
-) -> Option<Vec2> {
-    let Some(cursor_position) = window.cursor_position() else {
-        return None;
-    };
-    let plane_origin = Vec3::ZERO;
-    let plane = InfinitePlane3d::new(Vec3::Y);
-    let Ok(ray) = camera.viewport_to_world(camera_transform, cursor_position) else {
-        return None;
-    };
-    let Some(distance) = ray.intersect_plane(plane_origin, plane) else {
-        return None;
-    };
-    let global_cursor = ray.get_point(distance);
-
-    Some(global_cursor.xz())
-}
-
 pub fn spawn_fake_portal(
     commands: &mut Commands,
     materials: &SelectionMaterials,

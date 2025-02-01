@@ -16,7 +16,7 @@ use crate::{
     mode::ModeSpecific,
     picking::{
         MaterialIndicatesSelection, Selectable, SelectionMaterials, SelectionWireframeColors,
-        WireframeIndicatesSelection,
+        SpawnAndPlaceCommand, WireframeIndicatesSelection,
     },
     state::{EditorMode, EditorState, FilePayload},
 };
@@ -44,10 +44,13 @@ impl Command for SpawnRoomPartEditorBundle {
         let Some(part) = data.parts.get(&self.0) else {
             return;
         };
+
+        let placement = part.placement();
         let RoomPart {
             uuid,
             transform,
             data,
+            place_after_spawn,
         } = part;
 
         match data {
@@ -60,8 +63,7 @@ impl Command for SpawnRoomPartEditorBundle {
                 let mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all())
                     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices.clone())
                     .with_inserted_indices(Indices::U32(indices.clone()));
-
-                commands.spawn((
+                let bundle = (
                     ModeSpecific(EditorMode::Rooms, None),
                     RenderLayers::from_layers(&[render_layer::EDITOR]),
                     RoomPartUuid(*uuid, Some(*geometry_hash)),
@@ -71,10 +73,15 @@ impl Command for SpawnRoomPartEditorBundle {
                     wireframes.unselected(),
                     Mesh3d(meshes.add(mesh)),
                     *transform,
-                ));
+                );
+                if *place_after_spawn {
+                    commands.queue(SpawnAndPlaceCommand(placement, bundle));
+                } else {
+                    commands.spawn(bundle);
+                }
             }
             RoomPartPayload::Portal { .. } => {
-                commands.spawn((
+                let bundle = (
                     ModeSpecific(EditorMode::Rooms, None),
                     RenderLayers::from_layers(&[render_layer::EDITOR]),
                     RoomPartUuid(*uuid, None),
@@ -84,7 +91,12 @@ impl Command for SpawnRoomPartEditorBundle {
                     MaterialIndicatesSelection,
                     Selectable,
                     *transform,
-                ));
+                );
+                if *place_after_spawn {
+                    commands.queue(SpawnAndPlaceCommand(placement, bundle));
+                } else {
+                    commands.spawn(bundle);
+                }
             }
         };
 

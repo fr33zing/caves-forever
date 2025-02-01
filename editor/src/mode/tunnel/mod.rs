@@ -17,7 +17,7 @@ use super::{EditorGizmos, ModeSpecific};
 use crate::{
     data::{Tunnel, TunnelMeshInfo},
     gizmos::{ConnectedPath, ConnectionPoint, PortalGizmos},
-    picking::{MaterialIndicatesSelection, Selectable, SelectionMaterials},
+    picking::{cursor_to_ground_plane, MaterialIndicatesSelection, Selectable, SelectionMaterials},
     state::{EditorMode, EditorState, EditorViewMode, FilePayload},
     ui::CursorOverEguiPanel,
     util::mesh_text,
@@ -35,7 +35,7 @@ use lib::{
 
 pub mod ui;
 mod utility;
-use utility::{cursor_to_ground_plane, spawn_fake_portal};
+use utility::spawn_fake_portal;
 
 #[derive(Component)]
 pub struct TunnelInfo(Tunnel, TunnelMeshInfo);
