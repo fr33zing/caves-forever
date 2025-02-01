@@ -6,7 +6,7 @@ use transform_gizmo_bevy::{
 use crate::{
     data::{RoomPartPayload, RoomPartUuid},
     mode::{EditorGizmos, ModeSpecific},
-    picking::{Placing, Selectable},
+    picking::{Placing, PrimarySelection, Selectable},
     state::{EditorState, EditorViewMode, FilePayload, SpawnPickerMode},
 };
 use lib::{
@@ -129,6 +129,7 @@ fn draw_portals(
         (
             Entity,
             &Transform,
+            Option<&PrimarySelection>,
             Option<&GizmoTarget>,
             Option<&RoomPartUuid>,
         ),
@@ -148,11 +149,17 @@ fn draw_portals(
                 rotation,
                 scale,
             },
+            primary,
             selected,
             uuid,
         )| {
+            // TODO add something like GizmoColorIndicatesSelection
             let color = if selected.is_some() {
-                Color::srgb(0.0, 1.0, 1.0)
+                if primary.is_some() {
+                    Color::srgb(0.0, 1.0, 1.0)
+                } else {
+                    Color::srgb(0.0, 0.4, 1.0)
+                }
             } else {
                 Color::srgb(1.0, 1.0, 1.0)
             };
