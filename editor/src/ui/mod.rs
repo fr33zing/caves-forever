@@ -322,7 +322,7 @@ fn top_panel(
                 }
                 SpawnPickerMode::Picking => {
                     if ui.button("Stop picking").clicked() {
-                        state.spawn.mode = SpawnPickerMode::Picking;
+                        state.spawn.mode = SpawnPickerMode::Inactive;
                     }
                     ui.add(
                         Label::new("Click on terrain to choose a spawn position.")
