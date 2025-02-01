@@ -11,7 +11,7 @@ use transform_gizmo_bevy::GizmoTarget;
 use crate::{
     data::RoomPartUuid,
     state::{EditorState, FilePayload, SpawnPickerMode},
-    ui::CursorOverEguiPanel,
+    ui::EguiHasPointer,
 };
 use lib::worldgen::terrain::Chunk;
 
@@ -267,7 +267,7 @@ fn pick(
     ray_map: Res<RayMap>,
     state: Res<EditorState>,
     mouse: Res<ButtonInput<MouseButton>>,
-    cursor_over_egui_panel: Res<CursorOverEguiPanel>,
+    egui_has_pointer: Res<EguiHasPointer>,
     keyboard: Res<ButtonInput<KeyCode>>,
     selectable: Query<Entity, With<Selectable>>,
     gizmo_targets: Query<(Entity, &GizmoTarget)>,
@@ -277,7 +277,7 @@ fn pick(
     if !placing.is_empty() {
         return;
     };
-    if cursor_over_egui_panel.0 {
+    if egui_has_pointer.0 {
         return;
     }
     if state.spawn.mode != SpawnPickerMode::Inactive {
@@ -340,9 +340,9 @@ fn pick_spawn_position(
     mut state: ResMut<EditorState>,
     mouse: Res<ButtonInput<MouseButton>>,
     chunks: Query<Entity, With<Chunk>>,
-    cursor_over_egui_panel: Res<CursorOverEguiPanel>,
+    egui_has_pointer: Res<EguiHasPointer>,
 ) {
-    if cursor_over_egui_panel.0 {
+    if egui_has_pointer.0 {
         return;
     }
     if state.spawn.mode != SpawnPickerMode::Picking {
@@ -377,7 +377,7 @@ fn place_new_entity(
     mut commands: Commands,
     mut state: ResMut<EditorState>,
     mouse: Res<ButtonInput<MouseButton>>,
-    cursor_over_egui_panel: Res<CursorOverEguiPanel>,
+    egui_has_pointer: Res<EguiHasPointer>,
     picking_targets: Res<PickingTargets>,
     placing: Option<Single<(Entity, &mut Transform, &RoomPartUuid, &Placing)>>,
 ) {
@@ -388,7 +388,7 @@ fn place_new_entity(
     let (entity, mut transform, uuid, placement) = placing.into_inner();
     let mut commands = commands.entity(entity);
     let finish = mouse.just_released(MouseButton::Left)
-        && !cursor_over_egui_panel.0
+        && !egui_has_pointer.0
         && (time.elapsed_secs_f64() - placement.spawned_time >= 0.75);
 
     if let Some(target) = picking_targets.targets(&placement.modes) {

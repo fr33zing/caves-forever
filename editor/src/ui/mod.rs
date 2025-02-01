@@ -1,7 +1,6 @@
 use bevy::{
     app::{App, Plugin, Update},
     prelude::{Commands, MouseButton, ResMut, Resource, Single, With},
-    window::{PrimaryWindow, Window},
 };
 use bevy_egui::{
     egui::{self, menu, Color32, Margin, Ui},
@@ -79,7 +78,7 @@ impl Default for SidePanelVisibility {
 }
 
 #[derive(Resource, Default)]
-pub struct CursorOverEguiPanel(pub bool);
+pub struct EguiHasPointer(pub bool);
 
 pub struct EditorUiPlugin;
 
@@ -88,7 +87,7 @@ impl Plugin for EditorUiPlugin {
         app.init_resource::<EditorDialogVisibility>();
         app.init_resource::<SidePanelVisibility>();
         app.init_resource::<FileActionDialogState>();
-        app.init_resource::<CursorOverEguiPanel>();
+        app.init_resource::<EguiHasPointer>();
         app.add_systems(Update, ui);
     }
 }
@@ -99,10 +98,9 @@ fn ui(
     mut side_panel_visibility: ResMut<SidePanelVisibility>,
     mut dialogs: ResMut<EditorDialogVisibility>,
     mut file_action_dialog_state: ResMut<FileActionDialogState>,
-    mut cursor_over_egui_panel: ResMut<CursorOverEguiPanel>,
+    mut egui_has_pointer: ResMut<EguiHasPointer>,
     mut contexts: EguiContexts,
     trackball: Option<Single<(&mut TrackballController, &mut TrackballCamera)>>,
-    window: Option<Single<&Window, With<PrimaryWindow>>>,
     room_mode_primary_selection: Option<Single<&RoomPartUuid, With<PrimarySelection>>>,
 ) {
     let ctx = contexts.ctx_mut();
@@ -126,17 +124,13 @@ fn ui(
         });
 
     // Left panel
-    let left_panel_width = if side_panel_visibility.left {
-        LEFT_PANEL_WIDTH
-    } else {
-        0.0
-    };
     if side_panel_visibility.left {
         let mut left_frame = Frame::side_top_panel(&ctx.style());
         left_frame.inner_margin = Margin::ZERO;
         SidePanel::left("file_browser")
             .frame(left_frame)
-            .default_width(left_panel_width)
+            .default_width(LEFT_PANEL_WIDTH)
+            .max_width(LEFT_PANEL_WIDTH)
             .resizable(false)
             .show(ctx, |ui| {
                 file_browser(&mut state, &mut dialogs, &mut file_action_dialog_state, ui);
@@ -145,18 +139,13 @@ fn ui(
     }
 
     // Right panel
-    let right_panel_width = if side_panel_visibility.right {
-        LEFT_PANEL_WIDTH
-    } else {
-        0.0
-    };
     if side_panel_visibility.right {
         let mut right_frame = Frame::side_top_panel(&ctx.style());
         right_frame.inner_margin = Margin::same(8.0);
         SidePanel::right("selection_editor")
             .frame(right_frame)
-            .default_width(right_panel_width)
-            .max_width(right_panel_width)
+            .default_width(RIGHT_PANEL_WIDTH)
+            .max_width(RIGHT_PANEL_WIDTH)
             .resizable(false)
             .show(ctx, |ui| {
                 match state.mode() {
@@ -170,31 +159,33 @@ fn ui(
             });
     }
 
-    cursor_over_egui_panel.0 = if let Some(ref window) = window {
-        if let Some(cursor) = window.cursor_position() {
-            (side_panel_visibility.right && cursor.x >= window.width() - RIGHT_PANEL_WIDTH)
-                || (side_panel_visibility.left && cursor.x <= LEFT_PANEL_WIDTH)
-                || (cursor.y <= TOP_PANEL_HEIGHT)
-        } else {
-            false
-        }
-    } else {
-        false
-    };
-
     // Panel toggles
     Area::new(Id::new("toggle_left_panel"))
         .anchor(
             Align2::LEFT_TOP,
-            vec2(left_panel_width + 8.0, TOP_PANEL_HEIGHT + 8.0),
+            vec2(
+                if side_panel_visibility.left {
+                    LEFT_PANEL_WIDTH
+                } else {
+                    0.0
+                } + 8.0,
+                TOP_PANEL_HEIGHT + 8.0,
+            ),
         )
         .show(ctx, |ui| {
             ui.checkbox(&mut side_panel_visibility.left, "File browser");
         });
-    let right_panel_toggle_hovered = Area::new(Id::new("toggle_right_panel"))
+    Area::new(Id::new("toggle_right_panel"))
         .anchor(
             Align2::RIGHT_TOP,
-            vec2(-right_panel_width - 8.0, TOP_PANEL_HEIGHT + 8.0),
+            vec2(
+                if side_panel_visibility.left {
+                    -RIGHT_PANEL_WIDTH
+                } else {
+                    0.0
+                } - 8.0,
+                TOP_PANEL_HEIGHT + 8.0,
+            ),
         )
         .show(ctx, |ui| {
             ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
@@ -204,7 +195,6 @@ fn ui(
         .inner
         .inner
         .contains_pointer();
-    cursor_over_egui_panel.0 = cursor_over_egui_panel.0 || right_panel_toggle_hovered;
 
     // No open files indicator
     if state.files.current.is_none() {
@@ -264,6 +254,8 @@ fn ui(
             );
         }
     }
+
+    egui_has_pointer.0 = ctx.wants_pointer_input();
 }
 
 fn top_panel(

@@ -19,7 +19,7 @@ use crate::{
     gizmos::{ConnectedPath, ConnectionPoint, PortalGizmos},
     picking::{cursor_to_ground_plane, MaterialIndicatesSelection, Selectable, SelectionMaterials},
     state::{EditorMode, EditorState, EditorViewMode, FilePayload},
-    ui::CursorOverEguiPanel,
+    ui::EguiHasPointer,
     util::mesh_text,
 };
 use lib::{
@@ -199,7 +199,7 @@ pub fn pick_profile_point(
     window: Single<&Window, With<PrimaryWindow>>,
     camera: Single<(&Camera, &GlobalTransform), With<TrackballCamera>>,
     mouse: Res<ButtonInput<MouseButton>>,
-    cursor_over_egui_panel: Res<CursorOverEguiPanel>,
+    egui_has_pointer: Res<EguiHasPointer>,
 ) {
     if state.view != EditorViewMode::Editor {
         return;
@@ -262,7 +262,7 @@ pub fn pick_profile_point(
                 state.tunnels_mode.drag_start = Some((data.points[picked], cursor));
                 state.tunnels_mode.selected_point = Some(picked);
             }
-        } else if !cursor_over_egui_panel.0 {
+        } else if !egui_has_pointer.0 {
             state.tunnels_mode.selected_point = None;
         }
     } else if mouse.just_released(MouseButton::Left) {
