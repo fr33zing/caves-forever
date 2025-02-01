@@ -63,8 +63,12 @@ pub enum RoomPartPayload {
         geometry_hash: u64,
         vhacd_parameters: VhacdParameters,
     },
+
     #[strum(props(name = "Portal"))]
     Portal { direction: PortalDirection },
+
+    #[strum(props(name = "Spawnpoint"))]
+    Spawnpoint,
 }
 
 impl RoomPart {
@@ -106,6 +110,7 @@ impl RoomPart {
             RoomPartPayload::Portal { .. } => {
                 vec![PickingMode::Selectable, PickingMode::GroundPlane]
             }
+            RoomPartPayload::Spawnpoint => vec![PickingMode::Terrain, PickingMode::GroundPlane],
         }
     }
 
@@ -186,6 +191,19 @@ impl RoomPart {
             uuid: Uuid::new_v4(),
             transform,
             data: RoomPartPayload::Portal { direction },
+            place_after_spawn: false,
+        }
+    }
+
+    //
+    // Spawnpoint
+    //
+
+    pub fn spawnpoint(transform: Transform) -> Self {
+        Self {
+            uuid: Uuid::new_v4(),
+            transform,
+            data: RoomPartPayload::Spawnpoint,
             place_after_spawn: false,
         }
     }

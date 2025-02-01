@@ -5,7 +5,7 @@ use transform_gizmo_bevy::{
 
 use crate::{
     data::{RoomPartPayload, RoomPartUuid},
-    mode::ModeSpecific,
+    mode::{EditorGizmos, ModeSpecific},
     picking::{Placing, Selectable},
     state::{EditorState, EditorViewMode, FilePayload, SpawnPickerMode},
 };
@@ -16,8 +16,12 @@ use lib::{
 
 pub struct EditorGizmosPlugin;
 
+/// This is used for the playtest function, not real spawnpoints.
 #[derive(Component)]
 pub struct SpawnPositionIndicator;
+
+#[derive(Component)]
+pub struct SpawnpointGizmos;
 
 #[derive(Component)]
 pub struct PortalGizmos;
@@ -48,12 +52,17 @@ impl Plugin for EditorGizmosPlugin {
 
         app.add_systems(
             Update,
-            (draw_spawn_position, draw_portals, draw_connection_points),
+            (
+                draw_playtest_spawn_position,
+                draw_spawnpoints,
+                draw_portals,
+                draw_connection_points,
+            ),
         );
     }
 }
 
-fn draw_spawn_position(
+fn draw_playtest_spawn_position(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -89,6 +98,28 @@ fn draw_spawn_position(
             commands.entity(*spawn_pos_indicator).clear();
         }
     }
+}
+
+fn draw_spawnpoints(
+    mut gizmos: Gizmos<EditorGizmos>,
+    spawnpoints: Query<&Transform, With<SpawnpointGizmos>>,
+) {
+    spawnpoints.iter().for_each(|spawnpoint| {
+        let color = Color::srgb(0.0, 0.75, 0.0);
+        gizmos.circle(
+            Isometry3d {
+                translation: spawnpoint.translation.into(),
+                rotation: spawnpoint.rotation
+                    * Quat::from_euler(EulerRot::XYZ, 90.0_f32.to_radians(), 0.0, 0.0),
+            },
+            PLAYER_RADIUS,
+            color,
+        );
+
+        let start = spawnpoint.translation;
+        let end = start + spawnpoint.forward() * PLAYER_RADIUS * 3.0;
+        gizmos.arrow(start, end, color);
+    });
 }
 
 fn draw_portals(

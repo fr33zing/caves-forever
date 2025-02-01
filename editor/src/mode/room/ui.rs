@@ -31,11 +31,13 @@ pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
                 ui.shrink_width_to_current();
                 menu::bar(ui, |ui| {
                     ui.menu_button("Add", |ui| {
+                        // Stl
                         if ui.selectable_label(false, "STL Import").clicked() {
                             ui.close_menu();
                             add = Some(RoomPart::default_stl(Transform::default()).unwrap());
                         };
 
+                        // Portal
                         ui.menu_button("Portal", |ui| {
                             let transform = Transform::from_scale(Vec3::new(10.0, 1.0, 10.0))
                                 .with_rotation(Quat::from_euler(
@@ -44,13 +46,19 @@ pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
                                     -90.0_f32.to_radians(),
                                     0.0,
                                 ));
-
                             PortalDirection::iter().for_each(|direction| {
                                 if ui.selectable_label(false, direction.to_string()).clicked() {
+                                    ui.close_menu();
                                     add = Some(RoomPart::portal(transform, direction));
                                 }
                             });
                         });
+
+                        // Spawnpoint
+                        if ui.selectable_label(false, "Spawnpoint").clicked() {
+                            ui.close_menu();
+                            add = Some(RoomPart::spawnpoint(Transform::default()));
+                        };
                     });
                 });
             });
@@ -175,6 +183,7 @@ pub fn sidebar(
                         });
                     });
             }
+            RoomPartPayload::Spawnpoint => {}
         }
     });
 }

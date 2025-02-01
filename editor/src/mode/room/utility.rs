@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use crate::{
     data::{RoomPart, RoomPartPayload, RoomPartUuid},
-    gizmos::PortalGizmos,
+    gizmos::{PortalGizmos, SpawnpointGizmos},
     mode::ModeSpecific,
     picking::{
         MaterialIndicatesSelection, Selectable, SelectionMaterials, SelectionWireframeColors,
@@ -20,7 +20,10 @@ use crate::{
     },
     state::{EditorMode, EditorState, FilePayload},
 };
-use lib::render_layer;
+use lib::{
+    player::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
+    render_layer,
+};
 
 pub struct SpawnRoomPartEditorBundle(pub Uuid);
 
@@ -75,7 +78,12 @@ impl Command for SpawnRoomPartEditorBundle {
                     *transform,
                 );
                 if *place_after_spawn {
-                    commands.queue(SpawnAndPlaceCommand(placement, bundle));
+                    commands.queue(SpawnAndPlaceCommand {
+                        modes: placement,
+                        offset: Vec3::ZERO,
+                        align_to_hit_normal: false,
+                        bundle,
+                    });
                 } else {
                     commands.spawn(bundle);
                 }
@@ -93,7 +101,38 @@ impl Command for SpawnRoomPartEditorBundle {
                     *transform,
                 );
                 if *place_after_spawn {
-                    commands.queue(SpawnAndPlaceCommand(placement, bundle));
+                    commands.queue(SpawnAndPlaceCommand {
+                        modes: placement,
+                        offset: Vec3::ZERO,
+                        align_to_hit_normal: true,
+                        bundle,
+                    });
+                } else {
+                    commands.spawn(bundle);
+                }
+            }
+            RoomPartPayload::Spawnpoint => {
+                let bundle = (
+                    ModeSpecific(EditorMode::Rooms, None),
+                    RenderLayers::from_layers(&[render_layer::EDITOR]),
+                    RoomPartUuid(*uuid, None),
+                    SpawnpointGizmos,
+                    Mesh3d(meshes.add(Capsule3d::new(
+                        PLAYER_RADIUS,
+                        (PLAYER_HEIGHT - PLAYER_RADIUS * 2.0) / 2.0,
+                    ))),
+                    materials.unselected(),
+                    MaterialIndicatesSelection,
+                    Selectable,
+                    *transform,
+                );
+                if *place_after_spawn {
+                    commands.queue(SpawnAndPlaceCommand {
+                        modes: placement,
+                        offset: Vec3::Y * PLAYER_HEIGHT / 2.0,
+                        align_to_hit_normal: false,
+                        bundle,
+                    });
                 } else {
                     commands.spawn(bundle);
                 }

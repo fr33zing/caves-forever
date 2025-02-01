@@ -11,7 +11,7 @@ use strum::IntoEnumIterator;
 
 use super::{Room, RoomPart, RoomPartPayload, Tunnel};
 use lib::worldgen::{
-    asset::{self, PortalDirection},
+    asset::{self, PortalDirection, Spawnpoint},
     utility::safe_vhacd,
 };
 
@@ -26,8 +26,7 @@ impl Tunnel {
 
 impl Room {
     pub fn build(&self) -> anyhow::Result<asset::Room> {
-        let mut cavities = Vec::new();
-        let mut portals = Vec::new();
+        let mut room = asset::Room::new(self.rarity.weight());
 
         // TODO adjust transform so everything is centered on world origin
         // each roompart must implement compute_aabb()
@@ -53,22 +52,21 @@ impl Room {
                     .transformed_by(transform);
 
                     let collider = safe_vhacd(&mesh, &vhacd_parameters)?;
-                    cavities.push(collider);
+                    room.cavities.push(collider);
                 }
                 RoomPartPayload::Portal { direction } => {
-                    portals.push(asset::Portal {
+                    room.portals.push(asset::Portal {
                         transform,
                         direction,
                     });
                 }
+                RoomPartPayload::Spawnpoint => room.spawnpoints.push(Spawnpoint {
+                    position: transform.translation,
+                    // TODO make sure this is right
+                    angle: transform.rotation.to_euler(EulerRot::YXZ).0,
+                }),
             }
         }
-
-        let room = asset::Room {
-            weight: self.rarity.weight(),
-            cavities,
-            portals,
-        };
 
         let problems = validate(&room);
         if problems.len() > 0 {

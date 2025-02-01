@@ -9,7 +9,8 @@ use strum::{EnumIter, IntoEnumIterator};
 use transform_gizmo_bevy::GizmoTarget;
 
 use crate::{
-    state::{EditorState, SpawnPickerMode},
+    data::RoomPartUuid,
+    state::{EditorState, FilePayload, SpawnPickerMode},
     ui::CursorOverEguiPanel,
 };
 use lib::worldgen::terrain::Chunk;
@@ -61,16 +62,19 @@ pub enum PickingMode {
 #[derive(Component)]
 pub struct Placing {
     pub modes: Vec<PickingMode>,
+    pub align_to_hit_normal: bool,
+    pub offset: Vec3,
     pub spawned_time: f64,
 }
 
+#[derive(Debug)]
 pub struct PickingTarget {
     pub point: Vec3,
     pub normal: Vec3,
     pub entity: Option<Entity>,
 }
 
-#[derive(Resource)]
+#[derive(Resource, Debug)]
 pub struct PickingTargets(pub HashMap<PickingMode, Option<PickingTarget>>);
 
 impl PickingTargets {
@@ -88,9 +92,15 @@ impl PickingTargets {
     }
 }
 
-pub struct SpawnAndPlaceCommand<T>(pub Vec<PickingMode>, pub T)
+pub struct SpawnAndPlaceCommand<T>
 where
-    T: Bundle;
+    T: Bundle,
+{
+    pub modes: Vec<PickingMode>,
+    pub align_to_hit_normal: bool,
+    pub offset: Vec3,
+    pub bundle: T,
+}
 
 impl<T> Command for SpawnAndPlaceCommand<T>
 where
@@ -115,9 +125,11 @@ where
             commands.entity(*primary).remove::<PrimarySelection>();
         }
 
-        let mut commands = commands.spawn(self.1);
+        let mut commands = commands.spawn(self.bundle);
         commands.insert(Placing {
-            modes: self.0,
+            modes: self.modes,
+            align_to_hit_normal: self.align_to_hit_normal,
+            offset: self.offset,
             spawned_time: time.elapsed_secs_f64(),
         });
         commands.insert(PrimarySelection);
@@ -214,52 +226,35 @@ fn update_picking_targets(
                     },
                     ..default()
                 };
-                let Some((entity, hit)) = ray_cast.cast_ray(*ray, &settings).first() else {
-                    return None;
-                };
-                if selectable.get(*entity).is_ok() {
-                    return Some(PickingTarget {
+                ray_cast
+                    .cast_ray(*ray, &settings)
+                    .first()
+                    .map(|(entity, hit)| PickingTarget {
                         point: hit.point,
                         normal: hit.normal,
                         entity: Some(*entity),
-                    });
-                };
-                return None;
+                    })
             }),
             PickingMode::Terrain => ray_map.iter().find_map(|(_, ray)| {
                 let settings = RayCastSettings {
-                    filter: &|entity| {
-                        let not_placing = if let Some(ref placing) = placing {
-                            entity != **placing
-                        } else {
-                            false
-                        };
-                        chunks.get(entity).is_ok() && not_placing
-                    },
+                    filter: &|entity| chunks.get(entity).is_ok(),
                     ..default()
                 };
-                let Some((entity, hit)) = ray_cast.cast_ray(*ray, &settings).first() else {
-                    return None;
-                };
-                if selectable.get(*entity).is_ok() {
-                    return Some(PickingTarget {
+                ray_cast
+                    .cast_ray(*ray, &settings)
+                    .first()
+                    .map(|(entity, hit)| PickingTarget {
                         point: hit.point,
                         normal: hit.normal,
                         entity: Some(*entity),
-                    });
-                };
-                return None;
+                    })
             }),
             PickingMode::GroundPlane => {
-                if let Some(hit) = cursor_to_ground_plane(&window, *camera) {
-                    Some(PickingTarget {
-                        point: Vec3::new(hit.x, 0.0, hit.y),
-                        normal: Vec3::Y,
-                        entity: None,
-                    })
-                } else {
-                    None
-                }
+                cursor_to_ground_plane(&window, *camera).map(|hit| PickingTarget {
+                    point: Vec3::new(hit.x, 0.0, hit.y),
+                    normal: Vec3::Y,
+                    entity: None,
+                })
             }
         };
         targets.0.insert(mode, target);
@@ -277,9 +272,9 @@ fn pick(
     selectable: Query<Entity, With<Selectable>>,
     gizmo_targets: Query<(Entity, &GizmoTarget)>,
     primary_selection: Query<Entity, With<PrimarySelection>>,
-    placing: Option<Single<&Placing>>,
+    placing: Query<&Placing>,
 ) {
-    if placing.is_some() {
+    if !placing.is_empty() {
         return;
     };
     if cursor_over_egui_panel.0 {
@@ -380,31 +375,44 @@ fn pick_spawn_position(
 fn place_new_entity(
     time: Res<Time>,
     mut commands: Commands,
+    mut state: ResMut<EditorState>,
     mouse: Res<ButtonInput<MouseButton>>,
     cursor_over_egui_panel: Res<CursorOverEguiPanel>,
     picking_targets: Res<PickingTargets>,
-    placing: Option<Single<(Entity, &mut Transform, &Placing)>>,
+    placing: Option<Single<(Entity, &mut Transform, &RoomPartUuid, &Placing)>>,
 ) {
     let Some(placing) = placing else {
         return;
     };
 
-    let (entity, mut transform, placement) = placing.into_inner();
-    let Some(target) = picking_targets.targets(&placement.modes) else {
-        return;
-    };
-
-    transform.translation = target.point;
-    transform.look_at(target.point + target.normal, Vec3::Y);
-    transform.rotate_local_x(-90.0_f32.to_radians());
-
-    if mouse.just_released(MouseButton::Left)
+    let (entity, mut transform, uuid, placement) = placing.into_inner();
+    let mut commands = commands.entity(entity);
+    let finish = mouse.just_released(MouseButton::Left)
         && !cursor_over_egui_panel.0
-        && (time.elapsed_secs_f64() - placement.spawned_time >= 0.75)
-    {
-        let mut commands = commands.entity(entity);
-        commands.remove::<Placing>();
-        commands.insert(GizmoTarget::default());
+        && (time.elapsed_secs_f64() - placement.spawned_time >= 0.75);
+
+    if let Some(target) = picking_targets.targets(&placement.modes) {
+        transform.translation = target.point + placement.offset;
+
+        if placement.align_to_hit_normal {
+            transform.look_at(target.point + target.normal, Vec3::Y);
+            transform.rotate_local_x(-90.0_f32.to_radians());
+        }
+
+        if finish {
+            commands.remove::<Placing>();
+            commands.insert(GizmoTarget::default());
+        }
+    } else if finish {
+        commands.despawn();
+
+        let Some(data) = state.files.current_data_mut() else {
+            return;
+        };
+        let FilePayload::Room(room) = data else {
+            return;
+        };
+        room.parts.remove(&uuid.0);
     }
 }
 

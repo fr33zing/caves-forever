@@ -64,11 +64,15 @@ fn main() {
         TerrainPlugin,
         PlayerPlugin,
         MaterialPlugin::<ExtendedMaterial<StandardMaterial, CaveMaterialExtension>>::default(),
-        PickingPlugin,
     ));
 
     app.init_resource::<EditorState>();
-    app.add_plugins((EditorUiPlugin, EditorModesPlugin, EditorGizmosPlugin));
+    app.add_plugins((
+        EditorUiPlugin,
+        EditorModesPlugin,
+        EditorGizmosPlugin,
+        PickingPlugin,
+    ));
 
     app.add_systems(Startup, setup);
 
