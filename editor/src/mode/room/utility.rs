@@ -12,11 +12,12 @@ use uuid::Uuid;
 
 use crate::{
     data::{RoomPart, RoomPartPayload, RoomPartUuid},
-    gizmos::{
-        MaterialIndicatesSelection, PortalGizmos, Selectable, SelectionMaterials,
-        SelectionWireframeColors, WireframeIndicatesSelection,
-    },
+    gizmos::PortalGizmos,
     mode::ModeSpecific,
+    picking::{
+        MaterialIndicatesSelection, Selectable, SelectionMaterials, SelectionWireframeColors,
+        WireframeIndicatesSelection,
+    },
     state::{EditorMode, EditorState, FilePayload},
 };
 use lib::render_layer;

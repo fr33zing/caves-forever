@@ -10,7 +10,7 @@ use strum::{EnumProperty, IntoEnumIterator};
 
 use crate::{
     data::{Environment, Rarity, RoomPart, RoomPartPayload, RoomPartUuid},
-    gizmos::PrimarySelection,
+    picking::PrimarySelection,
     state::{EditorState, EditorViewMode, FilePayload},
     ui::vhacd_parameters_sidebar,
 };

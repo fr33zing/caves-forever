@@ -15,7 +15,8 @@ use bevy_trackball::TrackballPlugin;
 use noisy_bevy::NoisyShaderPlugin;
 
 use editor_lib::{
-    gizmos::EditorGizmosPlugin, mode::EditorModesPlugin, state::EditorState, ui::EditorUiPlugin,
+    gizmos::EditorGizmosPlugin, mode::EditorModesPlugin, picking::PickingPlugin,
+    state::EditorState, ui::EditorUiPlugin,
 };
 use lib::{
     materials::{CaveMaterialExtension, LineMaterialPlugin},
@@ -63,6 +64,7 @@ fn main() {
         TerrainPlugin,
         PlayerPlugin,
         MaterialPlugin::<ExtendedMaterial<StandardMaterial, CaveMaterialExtension>>::default(),
+        PickingPlugin,
     ));
 
     app.init_resource::<EditorState>();

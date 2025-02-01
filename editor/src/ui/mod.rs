@@ -17,8 +17,8 @@ use strum::{EnumProperty, IntoEnumIterator};
 
 use crate::{
     data::RoomPartUuid,
-    gizmos::PrimarySelection,
     mode::{room, tunnel},
+    picking::PrimarySelection,
     state::{
         EditorMode, EditorState, EditorViewMode, FilePayload, FilePickerState, SpawnPickerMode,
     },

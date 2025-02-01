@@ -16,10 +16,8 @@ use uuid::Uuid;
 use super::{EditorGizmos, ModeSpecific};
 use crate::{
     data::{Tunnel, TunnelMeshInfo},
-    gizmos::{
-        ConnectedPath, ConnectionPoint, MaterialIndicatesSelection, PortalGizmos, Selectable,
-        SelectionMaterials,
-    },
+    gizmos::{ConnectedPath, ConnectionPoint, PortalGizmos},
+    picking::{MaterialIndicatesSelection, Selectable, SelectionMaterials},
     state::{EditorMode, EditorState, EditorViewMode, FilePayload},
     ui::CursorOverEguiPanel,
     util::mesh_text,

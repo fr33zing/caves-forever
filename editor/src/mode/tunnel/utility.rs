@@ -5,9 +5,8 @@ use bevy::{
 
 use super::ModeSpecific;
 use crate::{
-    gizmos::{
-        ConnectionPoint, MaterialIndicatesSelection, PortalGizmos, Selectable, SelectionMaterials,
-    },
+    gizmos::{ConnectionPoint, PortalGizmos},
+    picking::{MaterialIndicatesSelection, Selectable, SelectionMaterials},
     state::{EditorMode, EditorViewMode},
 };
 use lib::render_layer;
