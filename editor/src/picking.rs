@@ -46,7 +46,9 @@ pub struct MaterialIndicatesSelection;
 pub struct WireframeIndicatesSelection;
 
 #[derive(Component)]
-pub struct Selectable;
+pub struct Selectable {
+    pub order: u8,
+}
 
 #[derive(Component)]
 pub struct PrimarySelection;
@@ -208,7 +210,7 @@ fn update_picking_targets(
     ray_map: Res<RayMap>,
     window: Single<&Window, With<PrimaryWindow>>,
     camera: Single<(&Camera, &GlobalTransform), With<TrackballCamera>>,
-    selectable: Query<Entity, With<Selectable>>,
+    selectable: Query<(Entity, &Selectable)>,
     chunks: Query<Entity, With<Chunk>>,
     placing: Option<Single<Entity, With<Placing>>>,
     egui_has_pointer: Res<EguiHasPointer>,
@@ -235,14 +237,15 @@ fn update_picking_targets(
                     },
                     ..default()
                 };
-                ray_cast
-                    .cast_ray(*ray, &settings)
-                    .first()
-                    .map(|(entity, hit)| PickingTarget {
-                        point: hit.point,
-                        normal: hit.normal,
-                        entity: Some(*entity),
-                    })
+                let settings = settings.never_early_exit();
+
+                let mut hits = ray_cast.cast_ray(*ray, &settings).to_vec();
+                hits.sort_by_key(|hit| selectable.get(hit.0).unwrap().1.order);
+                hits.first().map(|(entity, hit)| PickingTarget {
+                    point: hit.point,
+                    normal: hit.normal,
+                    entity: Some(*entity),
+                })
             }),
             PickingMode::Terrain => ray_map.iter().find_map(|(_, ray)| {
                 let settings = RayCastSettings {

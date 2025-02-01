@@ -119,7 +119,7 @@ pub fn enter_preview(
         Mesh3d(meshes.add(Sphere::new(0.5))),
         materials.unselected(),
         MaterialIndicatesSelection,
-        Selectable,
+        Selectable { order: 0 },
     ));
 
     spawn_fake_portal(

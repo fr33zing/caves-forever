@@ -27,7 +27,7 @@ pub fn spawn_fake_portal(
             Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(1.0, 0.125, 1.0)))),
             materials.unselected(),
             MaterialIndicatesSelection,
-            Selectable,
+            Selectable { order: 0 },
         ))
         .with_child((
             ConnectionPoint,
@@ -47,6 +47,6 @@ pub fn spawn_fake_portal(
         Mesh3d(meshes.add(Sphere::new(0.5))),
         materials.unselected(),
         MaterialIndicatesSelection,
-        Selectable,
+        Selectable { order: 0 },
     ));
 }

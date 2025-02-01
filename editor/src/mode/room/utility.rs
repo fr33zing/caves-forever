@@ -70,7 +70,7 @@ impl Command for SpawnRoomPartEditorBundle {
                     ModeSpecific(EditorMode::Rooms, None),
                     RenderLayers::from_layers(&[render_layer::EDITOR]),
                     RoomPartUuid(*uuid, Some(*geometry_hash)),
-                    Selectable,
+                    Selectable { order: 1 },
                     WireframeIndicatesSelection,
                     Wireframe,
                     wireframes.unselected(),
@@ -97,7 +97,7 @@ impl Command for SpawnRoomPartEditorBundle {
                     Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(1.0, 1.0, 1.0)))),
                     materials.unselected(),
                     MaterialIndicatesSelection,
-                    Selectable,
+                    Selectable { order: 0 },
                     *transform,
                 );
                 if *place_after_spawn {
@@ -123,7 +123,7 @@ impl Command for SpawnRoomPartEditorBundle {
                     ))),
                     materials.unselected(),
                     MaterialIndicatesSelection,
-                    Selectable,
+                    Selectable { order: 0 },
                     *transform,
                 );
                 if *place_after_spawn {
