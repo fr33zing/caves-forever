@@ -181,13 +181,11 @@ impl RoomPart {
     // Portal
     //
 
-    pub fn portal(transform: Transform) -> Self {
+    pub fn portal(transform: Transform, direction: PortalDirection) -> Self {
         Self {
             uuid: Uuid::new_v4(),
             transform,
-            data: RoomPartPayload::Portal {
-                direction: Default::default(),
-            },
+            data: RoomPartPayload::Portal { direction },
             place_after_spawn: false,
         }
     }

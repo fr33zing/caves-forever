@@ -35,19 +35,22 @@ pub fn topbar(state: &mut EditorState, ui: &mut Ui) {
                             ui.close_menu();
                             add = Some(RoomPart::default_stl(Transform::default()).unwrap());
                         };
-                        if ui.selectable_label(false, "Portal").clicked() {
-                            ui.close_menu();
-                            add = Some(RoomPart::portal(
-                                Transform::from_scale(Vec3::new(10.0, 1.0, 10.0)).with_rotation(
-                                    Quat::from_euler(
-                                        EulerRot::YXZ,
-                                        -90.0_f32.to_radians(),
-                                        -90.0_f32.to_radians(),
-                                        0.0,
-                                    ),
-                                ),
-                            ));
-                        };
+
+                        ui.menu_button("Portal", |ui| {
+                            let transform = Transform::from_scale(Vec3::new(10.0, 1.0, 10.0))
+                                .with_rotation(Quat::from_euler(
+                                    EulerRot::YXZ,
+                                    -90.0_f32.to_radians(),
+                                    -90.0_f32.to_radians(),
+                                    0.0,
+                                ));
+
+                            PortalDirection::iter().for_each(|direction| {
+                                if ui.selectable_label(false, direction.to_string()).clicked() {
+                                    add = Some(RoomPart::portal(transform, direction));
+                                }
+                            });
+                        });
                     });
                 });
             });
