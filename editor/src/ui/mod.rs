@@ -255,7 +255,7 @@ fn ui(
         }
     }
 
-    egui_has_pointer.0 = ctx.wants_pointer_input();
+    egui_has_pointer.0 = ctx.is_pointer_over_area();
 }
 
 fn top_panel(

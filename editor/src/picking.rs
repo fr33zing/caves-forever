@@ -211,7 +211,16 @@ fn update_picking_targets(
     selectable: Query<Entity, With<Selectable>>,
     chunks: Query<Entity, With<Chunk>>,
     placing: Option<Single<Entity, With<Placing>>>,
+    egui_has_pointer: Res<EguiHasPointer>,
 ) {
+    if egui_has_pointer.0 {
+        targets.0.iter_mut().for_each(|(_, target)| {
+            *target = None;
+        });
+
+        return;
+    }
+
     PickingMode::iter().for_each(|mode| {
         let target = match mode {
             PickingMode::Selectable => ray_map.iter().find_map(|(_, ray)| {
@@ -220,7 +229,7 @@ fn update_picking_targets(
                         let not_placing = if let Some(ref placing) = placing {
                             entity != **placing
                         } else {
-                            false
+                            true
                         };
                         selectable.get(entity).is_ok() && not_placing
                     },
@@ -263,23 +272,17 @@ fn update_picking_targets(
 
 fn pick(
     mut commands: Commands,
-    mut ray_cast: MeshRayCast,
-    ray_map: Res<RayMap>,
     state: Res<EditorState>,
     mouse: Res<ButtonInput<MouseButton>>,
-    egui_has_pointer: Res<EguiHasPointer>,
     keyboard: Res<ButtonInput<KeyCode>>,
-    selectable: Query<Entity, With<Selectable>>,
     gizmo_targets: Query<(Entity, &GizmoTarget)>,
     primary_selection: Query<Entity, With<PrimarySelection>>,
     placing: Query<&Placing>,
+    picking_targets: Res<PickingTargets>,
 ) {
     if !placing.is_empty() {
         return;
     };
-    if egui_has_pointer.0 {
-        return;
-    }
     if state.spawn.mode != SpawnPickerMode::Inactive {
         return;
     }
@@ -291,55 +294,32 @@ fn pick(
     }
 
     let multiselect = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
-    let mut miss = true;
 
-    let deselect_all = |commands: &mut Commands| {
-        if multiselect {
-            return;
-        };
+    if !multiselect {
         gizmo_targets.iter().for_each(|(entity, _)| {
             commands.entity(entity).remove::<GizmoTarget>();
         });
+    }
+    let Some(target) = picking_targets.target(&PickingMode::Selectable) else {
+        return;
+    };
+    let Some(entity) = target.entity else {
+        return;
     };
 
-    for (_, ray) in ray_map.iter() {
-        let settings = RayCastSettings {
-            filter: &|entity| selectable.get(entity).is_ok(),
-            ..default()
-        };
+    primary_selection.iter().for_each(|not_primary| {
+        commands.entity(not_primary).remove::<PrimarySelection>();
+    });
 
-        let Some((entity, _)) = ray_cast.cast_ray(*ray, &settings).first() else {
-            continue;
-        };
-        if selectable.get(*entity).is_err() {
-            continue;
-        };
-
-        deselect_all(&mut commands);
-
-        primary_selection.iter().for_each(|not_primary| {
-            commands.entity(not_primary).remove::<PrimarySelection>();
-        });
-
-        let mut commands = commands.entity(*entity);
-        commands.insert(GizmoTarget::default());
-        commands.insert(PrimarySelection);
-
-        miss = false;
-        break;
-    }
-
-    if miss {
-        deselect_all(&mut commands);
-    }
+    let mut commands = commands.entity(entity);
+    commands.insert(GizmoTarget::default());
+    commands.insert(PrimarySelection);
 }
 
 fn pick_spawn_position(
-    mut ray_cast: MeshRayCast,
-    ray_map: Res<RayMap>,
     mut state: ResMut<EditorState>,
     mouse: Res<ButtonInput<MouseButton>>,
-    chunks: Query<Entity, With<Chunk>>,
+    picking_targets: Res<PickingTargets>,
     egui_has_pointer: Res<EguiHasPointer>,
 ) {
     if egui_has_pointer.0 {
@@ -349,26 +329,17 @@ fn pick_spawn_position(
         return;
     }
 
-    let mut spawn_pos: Option<Vec3> = None;
-
-    for (_, ray) in ray_map.iter() {
-        let settings = RayCastSettings {
-            filter: &|entity| chunks.get(entity).is_ok(),
-            ..default()
-        };
-
-        let Some((_, hit)) = ray_cast.cast_ray(*ray, &settings).first() else {
-            continue;
-        };
-
-        spawn_pos = Some(hit.point + hit.normal * 0.1);
-        break;
-    }
-
-    state.spawn.position = spawn_pos;
+    state.spawn.position = picking_targets
+        .target(&PickingMode::Terrain)
+        .as_ref()
+        .map(|target| target.point + target.normal * 0.1);
 
     if mouse.just_released(MouseButton::Left) {
-        state.spawn.mode = SpawnPickerMode::Spawning;
+        state.spawn.mode = if state.spawn.position.is_some() {
+            SpawnPickerMode::Spawning
+        } else {
+            SpawnPickerMode::Inactive
+        };
     }
 }
 
