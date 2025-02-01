@@ -6,7 +6,7 @@ use transform_gizmo_bevy::{
 use crate::{
     data::{RoomPartPayload, RoomPartUuid},
     mode::ModeSpecific,
-    picking::Selectable,
+    picking::{Placing, Selectable},
     state::{EditorState, EditorViewMode, FilePayload, SpawnPickerMode},
 };
 use lib::{
@@ -94,7 +94,16 @@ fn draw_spawn_position(
 fn draw_portals(
     mut gizmos: Gizmos,
     state: Res<EditorState>,
-    planes: Query<(&Transform, Option<&GizmoTarget>, Option<&RoomPartUuid>), With<PortalGizmos>>,
+    planes: Query<
+        (
+            Entity,
+            &Transform,
+            Option<&GizmoTarget>,
+            Option<&RoomPartUuid>,
+        ),
+        With<PortalGizmos>,
+    >,
+    placing: Query<Entity, With<Placing>>,
 ) {
     if state.spawn.mode == SpawnPickerMode::Playing {
         return;
@@ -102,6 +111,7 @@ fn draw_portals(
 
     planes.iter().for_each(
         |(
+            entity,
             Transform {
                 translation,
                 rotation,
@@ -122,6 +132,10 @@ fn draw_portals(
                     * Quat::from_euler(EulerRot::XYZ, 90.0_f32.to_radians(), 0.0, 0.0),
             };
             gizmos.rect(isometry, scale.xz(), color);
+
+            if placing.get(entity).is_ok() {
+                return;
+            }
 
             let bidirectional = 'bd: {
                 let Some(uuid) = uuid else {
