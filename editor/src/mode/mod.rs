@@ -20,6 +20,7 @@ use nalgebra::Vector3;
 
 use crate::{
     camera,
+    picking::{CancelEntityPlacement, Placing},
     state::{EditorMode, EditorState, EditorViewMode, SpawnPickerMode},
 };
 
@@ -198,6 +199,8 @@ pub fn cleanup_mode_specific_entities(
                 commands.entity(entity).despawn_recursive();
             }
         });
+
+    commands.queue(CancelEntityPlacement);
 }
 
 pub fn cleanup_terrain(mut commands: Commands, terrain_brushes: Query<Entity, With<TerrainBrush>>) {

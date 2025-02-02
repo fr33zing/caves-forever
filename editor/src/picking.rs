@@ -140,6 +140,33 @@ where
     }
 }
 
+pub struct CancelEntityPlacement;
+
+impl Command for CancelEntityPlacement {
+    fn apply(self, world: &mut World) {
+        let mut system_state: SystemState<(
+            Commands,
+            ResMut<EditorState>,
+            Query<(Entity, &RoomPartUuid), With<Placing>>,
+        )> = SystemState::new(world);
+        let (mut commands, mut state, placing) = system_state.get_mut(world);
+
+        placing.iter().for_each(|(entity, uuid)| {
+            commands.entity(entity).despawn();
+
+            let Some(data) = state.files.current_data_mut() else {
+                return;
+            };
+            let FilePayload::Room(room) = data else {
+                return;
+            };
+            room.parts.remove(&uuid.0);
+        });
+
+        system_state.apply(world);
+    }
+}
+
 pub struct PickingPlugin;
 
 impl Plugin for PickingPlugin {
@@ -349,18 +376,16 @@ fn pick_spawn_position(
 fn place_new_entity(
     time: Res<Time>,
     mut commands: Commands,
-    mut state: ResMut<EditorState>,
     mouse: Res<ButtonInput<MouseButton>>,
     egui_has_pointer: Res<EguiHasPointer>,
     picking_targets: Res<PickingTargets>,
-    placing: Option<Single<(Entity, &mut Transform, &RoomPartUuid, &Placing)>>,
+    placing: Option<Single<(Entity, &mut Transform, &Placing)>>,
 ) {
     let Some(placing) = placing else {
         return;
     };
 
-    let (entity, mut transform, uuid, placement) = placing.into_inner();
-    let mut commands = commands.entity(entity);
+    let (entity, mut transform, placement) = placing.into_inner();
     let finish = mouse.just_released(MouseButton::Left)
         && !egui_has_pointer.0
         && (time.elapsed_secs_f64() - placement.spawned_time >= 0.75);
@@ -374,19 +399,12 @@ fn place_new_entity(
         }
 
         if finish {
+            let mut commands = commands.entity(entity);
             commands.remove::<Placing>();
             commands.insert(GizmoTarget::default());
         }
     } else if finish {
-        commands.despawn();
-
-        let Some(data) = state.files.current_data_mut() else {
-            return;
-        };
-        let FilePayload::Room(room) = data else {
-            return;
-        };
-        room.parts.remove(&uuid.0);
+        commands.queue(CancelEntityPlacement);
     }
 }
 
