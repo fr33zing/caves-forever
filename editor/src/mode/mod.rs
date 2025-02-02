@@ -85,6 +85,7 @@ struct ModeSwitcher {
     pub mode_systems: HashMap<EditorMode, ModeSystems>,
     pub cleanup_mode_specific_entities_system: SystemId,
     pub cleanup_terrain_system: SystemId,
+    pub cancel_placement_and_playtest_system: SystemId,
     pub camera_on_change_mode_system: SystemId,
     pub update_files_changed_status_system: SystemId,
     pub playtest_system: SystemId,
@@ -111,6 +112,8 @@ impl Plugin for EditorModesPlugin {
         let cleanup_mode_specific_entities_system =
             world.register_system(cleanup_mode_specific_entities);
         let cleanup_terrain_system = world.register_system(cleanup_terrain);
+        let cancel_placement_and_playtest_system =
+            world.register_system(cancel_placement_and_playtest);
         let update_files_changed_status_system = world.register_system(update_files_changed_status);
         let playtest_system = world.register_system(playtest);
 
@@ -121,6 +124,7 @@ impl Plugin for EditorModesPlugin {
             mode_systems: default(),
             cleanup_mode_specific_entities_system,
             cleanup_terrain_system,
+            cancel_placement_and_playtest_system,
             camera_on_change_mode_system,
             update_files_changed_status_system,
             playtest_system,
@@ -180,7 +184,7 @@ pub fn setup(world: &mut World) {
 
 pub fn cleanup_mode_specific_entities(
     mut commands: Commands,
-    mut state: ResMut<EditorState>,
+    state: Res<EditorState>,
     mode_specific_entities: Query<(Entity, &ModeSpecific)>,
 ) {
     mode_specific_entities
@@ -198,11 +202,6 @@ pub fn cleanup_mode_specific_entities(
                 commands.entity(entity).despawn_recursive();
             }
         });
-
-    // TODO put this stuff in its own system
-    commands.queue(CancelEntityPlacement);
-    state.spawn.mode = SpawnPickerMode::Inactive;
-    state.spawn.position = None;
 }
 
 pub fn cleanup_terrain(mut commands: Commands, terrain_brushes: Query<Entity, With<TerrainBrush>>) {
@@ -260,6 +259,10 @@ fn switch_modes(world: &mut World) {
             systems.push(Some(switcher.cleanup_mode_specific_entities_system));
         }
 
+        if changed_file || changed_mode || changed_view {
+            systems.push(Some(switcher.cancel_placement_and_playtest_system));
+        }
+
         systems.push(Some(switcher.update_files_changed_status_system));
         systems.push(Some(switcher.playtest_system));
 
@@ -301,6 +304,28 @@ fn update_files_changed_status(world: &mut World) {
     });
 }
 
+fn cancel_placement_and_playtest(
+    mut commands: Commands,
+    mut state: ResMut<EditorState>,
+    camera: Option<Single<(&mut Camera, &mut TrackballCamera, &mut PointLight)>>,
+) {
+    commands.queue(CancelEntityPlacement);
+
+    let Some(camera) = camera else {
+        return;
+    };
+    let (mut camera, mut trackball, mut light) = camera.into_inner();
+
+    commands.queue(DespawnPlayerCommand);
+    camera.is_active = true;
+    light.range = 2048.0;
+    state.spawn.mode = SpawnPickerMode::Inactive;
+    state.spawn.position = None;
+
+    // Camera doesn't switch properly unless we change the frame.
+    trackball.frame.local_slide(&Vector3::new(0.0, 0.01, 0.0));
+}
+
 fn playtest(
     mut commands: Commands,
     mut state: ResMut<EditorState>,
@@ -319,11 +344,11 @@ fn playtest(
     let Some(next_mode) = next_mode else {
         return;
     };
-    let Some(single) = camera else {
+    let Some(camera) = camera else {
         return;
     };
 
-    let (mut camera, mut trackball, mut light) = single.into_inner();
+    let (mut camera, mut trackball, mut light) = camera.into_inner();
     let mut queue = CommandQueue::default();
 
     match next_mode {
@@ -334,9 +359,7 @@ fn playtest(
             state.spawn.position = None;
 
             // Camera doesn't switch properly unless we change the frame.
-            trackball
-                .frame
-                .local_slide(&Vector3::new(0.0, f32::EPSILON, 0.0));
+            trackball.frame.local_slide(&Vector3::new(0.0, 0.01, 0.0));
         }
         SpawnPickerMode::Playing => {
             camera.is_active = false;
