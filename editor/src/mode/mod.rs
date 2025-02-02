@@ -1,4 +1,3 @@
-use core::f32;
 use std::collections::HashMap;
 
 use bevy::{
@@ -20,7 +19,7 @@ use nalgebra::Vector3;
 
 use crate::{
     camera,
-    picking::{CancelEntityPlacement, Placing},
+    picking::CancelEntityPlacement,
     state::{EditorMode, EditorState, EditorViewMode, SpawnPickerMode},
 };
 
@@ -181,7 +180,7 @@ pub fn setup(world: &mut World) {
 
 pub fn cleanup_mode_specific_entities(
     mut commands: Commands,
-    state: Res<EditorState>,
+    mut state: ResMut<EditorState>,
     mode_specific_entities: Query<(Entity, &ModeSpecific)>,
 ) {
     mode_specific_entities
@@ -200,7 +199,10 @@ pub fn cleanup_mode_specific_entities(
             }
         });
 
+    // TODO put this stuff in its own system
     commands.queue(CancelEntityPlacement);
+    state.spawn.mode = SpawnPickerMode::Inactive;
+    state.spawn.position = None;
 }
 
 pub fn cleanup_terrain(mut commands: Commands, terrain_brushes: Query<Entity, With<TerrainBrush>>) {
