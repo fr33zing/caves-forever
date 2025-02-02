@@ -179,7 +179,7 @@ fn ui(
         .anchor(
             Align2::RIGHT_TOP,
             vec2(
-                if side_panel_visibility.left {
+                if side_panel_visibility.right {
                     -RIGHT_PANEL_WIDTH
                 } else {
                     0.0
