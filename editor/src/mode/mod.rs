@@ -83,12 +83,12 @@ struct ModeSwitcher {
     pub prev_mode: Option<EditorMode>,
     pub prev_view: Option<EditorViewMode>,
     pub mode_systems: HashMap<EditorMode, ModeSystems>,
-    pub cleanup_mode_specific_entities_system: SystemId,
-    pub cleanup_terrain_system: SystemId,
-    pub cancel_placement_and_playtest_system: SystemId,
-    pub camera_on_change_mode_system: SystemId,
-    pub update_files_changed_status_system: SystemId,
-    pub playtest_system: SystemId,
+    pub cleanup_mode_specific_entities: SystemId,
+    pub cleanup_terrain: SystemId,
+    pub cancel_placement_and_playtest: SystemId,
+    pub camera_on_change_mode: SystemId,
+    pub update_files_changed_status: SystemId,
+    pub playtest: SystemId,
 }
 
 #[derive(Component)]
@@ -108,26 +108,24 @@ impl Plugin for EditorModesPlugin {
         app.init_gizmo_group::<EditorPreviewGizmos>();
 
         let world = app.world_mut();
-        let camera_on_change_mode_system = world.register_system(camera::on_change_mode);
-        let cleanup_mode_specific_entities_system =
-            world.register_system(cleanup_mode_specific_entities);
-        let cleanup_terrain_system = world.register_system(cleanup_terrain);
-        let cancel_placement_and_playtest_system =
-            world.register_system(cancel_placement_and_playtest);
-        let update_files_changed_status_system = world.register_system(update_files_changed_status);
-        let playtest_system = world.register_system(playtest);
+        let camera_on_change_mode = world.register_system(camera::on_change_mode);
+        let cleanup_mode_specific_entities = world.register_system(cleanup_mode_specific_entities);
+        let cleanup_terrain = world.register_system(cleanup_terrain);
+        let cancel_placement_and_playtest = world.register_system(cancel_placement_and_playtest);
+        let update_files_changed_status = world.register_system(update_files_changed_status);
+        let playtest = world.register_system(playtest);
 
         app.insert_resource(ModeSwitcher {
             prev_file: default(),
             prev_mode: default(),
             prev_view: default(),
             mode_systems: default(),
-            cleanup_mode_specific_entities_system,
-            cleanup_terrain_system,
-            cancel_placement_and_playtest_system,
-            camera_on_change_mode_system,
-            update_files_changed_status_system,
-            playtest_system,
+            cleanup_mode_specific_entities,
+            cleanup_terrain,
+            cancel_placement_and_playtest,
+            camera_on_change_mode,
+            update_files_changed_status,
+            playtest,
         });
 
         app.add_systems(Startup, (camera::setup, setup).chain());
@@ -223,7 +221,7 @@ fn switch_modes(world: &mut World) {
         let changed_view = switcher.prev_view != Some(curr_view);
 
         if changed_file {
-            systems.push(Some(switcher.cleanup_terrain_system));
+            systems.push(Some(switcher.cleanup_terrain));
 
             switcher.prev_file = curr_file;
         }
@@ -255,16 +253,16 @@ fn switch_modes(world: &mut World) {
         }
 
         if changed_mode || changed_view {
-            systems.push(Some(switcher.camera_on_change_mode_system));
-            systems.push(Some(switcher.cleanup_mode_specific_entities_system));
+            systems.push(Some(switcher.camera_on_change_mode));
+            systems.push(Some(switcher.cleanup_mode_specific_entities));
         }
 
         if changed_file || changed_mode || changed_view {
-            systems.push(Some(switcher.cancel_placement_and_playtest_system));
+            systems.push(Some(switcher.cancel_placement_and_playtest));
         }
 
-        systems.push(Some(switcher.update_files_changed_status_system));
-        systems.push(Some(switcher.playtest_system));
+        systems.push(Some(switcher.update_files_changed_status));
+        systems.push(Some(switcher.playtest));
 
         systems
             .into_iter()
