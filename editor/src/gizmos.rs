@@ -5,9 +5,9 @@ use transform_gizmo_bevy::{
 
 use crate::{
     data::{RoomPartPayload, RoomPartUuid},
-    mode::{EditorGizmos, ModeSpecific},
+    mode::EditorGizmos,
     picking::{Placing, PrimarySelection, Selectable},
-    state::{EditorState, EditorViewMode, FilePayload, SpawnPickerMode},
+    state::{EditorState, FilePayload, SpawnPickerMode},
 };
 use lib::{
     player::consts::{PLAYER_HEIGHT, PLAYER_RADIUS},
