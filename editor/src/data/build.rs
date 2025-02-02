@@ -16,17 +16,18 @@ use lib::worldgen::{
 };
 
 impl Tunnel {
-    pub fn build(&self) -> asset::Tunnel {
-        asset::Tunnel {
+    pub fn build(&self, source: String) -> anyhow::Result<asset::Tunnel> {
+        Ok(asset::Tunnel {
+            source,
             weight: self.rarity.weight(),
             points: self.points,
-        }
+        })
     }
 }
 
 impl Room {
-    pub fn build(&self) -> anyhow::Result<asset::Room> {
-        let mut room = asset::Room::new(self.rarity.weight());
+    pub fn build(&self, source: String) -> anyhow::Result<asset::Room> {
+        let mut room = asset::Room::new(self.rarity.weight(), source)?;
 
         // TODO adjust transform so everything is centered on world origin
         // each roompart must implement compute_aabb()

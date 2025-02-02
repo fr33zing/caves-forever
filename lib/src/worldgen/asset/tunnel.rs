@@ -6,6 +6,7 @@ pub const TUNNEL_POINTS: usize = 16;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Tunnel {
+    pub source: String,
     pub weight: f32,
     pub points: [Point2<f32>; TUNNEL_POINTS],
 }

@@ -263,11 +263,17 @@ fn build_asset_collection(
 
                 let mut assets = assets.lock().unwrap();
                 let success = match data {
-                    FilePayload::Tunnel(tunnel) => {
-                        assets.tunnels.push(tunnel.build());
-                        true
-                    }
-                    FilePayload::Room(room) => match room.build() {
+                    FilePayload::Tunnel(tunnel) => match tunnel.build(file_name.clone()) {
+                        Ok(tunnel) => {
+                            assets.tunnels.push(tunnel);
+                            true
+                        }
+                        Err(err) => {
+                            tracing::warn!(file = file_name, "{err}\n");
+                            false
+                        }
+                    },
+                    FilePayload::Room(room) => match room.build(file_name.clone()) {
                         Ok(room) => {
                             assets.rooms.push(room);
                             true

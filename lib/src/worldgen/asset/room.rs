@@ -5,6 +5,7 @@ use strum::EnumIter;
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Room {
+    pub source: String,
     pub weight: f32,
     pub cavities: Vec<Collider>,
     pub portals: Vec<Portal>,
@@ -12,11 +13,12 @@ pub struct Room {
 }
 
 impl Room {
-    pub fn new(weight: f32) -> Room {
-        Self {
+    pub fn new(weight: f32, source: String) -> anyhow::Result<Room> {
+        Ok(Self {
+            source,
             weight,
             ..default()
-        }
+        })
     }
 }
 
