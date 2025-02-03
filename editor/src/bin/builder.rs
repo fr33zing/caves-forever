@@ -279,7 +279,9 @@ fn build_asset_collection(
                             true
                         }
                         Err(err) => {
-                            tracing::warn!(file = file_name, "{err}\n");
+                            tracing::warn!{
+                                "validation failed for room \"{file_name}\", problems:\n{err}"
+                            };
                             false
                         }
                     },

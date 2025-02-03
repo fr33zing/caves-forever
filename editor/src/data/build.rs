@@ -77,7 +77,7 @@ impl Room {
                 .collect::<Vec<_>>()
                 .join("\n");
 
-            return Err(anyhow!("room validation failed, problems:\n{problems}"));
+            return Err(anyhow!(problems));
         }
 
         Ok(room)
@@ -86,7 +86,10 @@ impl Room {
 
 fn validate(
     asset::Room {
-        cavities, portals, ..
+        cavities,
+        portals,
+        spawnpoints,
+        ..
     }: &asset::Room,
 ) -> Vec<String> {
     let mut problems = Vec::<String>::new();
@@ -162,6 +165,20 @@ fn validate(
         problems.push("no valid entrance".into());
     } else if entrances == 1 && exits == 0 && bidirectionals == 0 {
         problems.push("no valid exit".into());
+    }
+
+    // Spawnpoints
+    let out_of_bounds_spawnpoints = spawnpoints.iter().any(|spawnpoint| {
+        !cavities.iter().any(|cavity| {
+            cavity.contains_point(
+                Position::default(),
+                Rotation::default(),
+                spawnpoint.position,
+            )
+        })
+    });
+    if out_of_bounds_spawnpoints {
+        problems.push("out-of-bounds spawnpoint(s)".into());
     }
 
     problems
