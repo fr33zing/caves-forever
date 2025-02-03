@@ -1,6 +1,7 @@
 pub mod asset;
 pub mod brush;
 pub mod chunk;
+pub mod layout;
 pub mod terrain;
 pub mod voxel;
 

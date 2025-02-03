@@ -1,13 +1,13 @@
 use avian3d::prelude::*;
-use bevy::{pbr::ExtendedMaterial, prelude::*, window::PresentMode};
+use bevy::{prelude::*, window::PresentMode};
 use bevy_egui::EguiPlugin;
 use noisy_bevy::NoisyShaderPlugin;
 
 use lib::{
     debug_aim::DebugAimPlugin,
-    materials::{CaveMaterialExtension, LineMaterialPlugin},
+    materials::{CaveMaterial, LineMaterialPlugin},
     player::PlayerPlugin,
-    worldgen::terrain::TerrainPlugin,
+    worldgen::{layout::LayoutPlugin, terrain::TerrainPlugin},
 };
 
 fn main() {
@@ -36,8 +36,9 @@ fn main() {
     ));
 
     app.add_plugins((
+        LayoutPlugin,
         TerrainPlugin,
-        MaterialPlugin::<ExtendedMaterial<StandardMaterial, CaveMaterialExtension>>::default(),
+        MaterialPlugin::<CaveMaterial>::default(),
         PlayerPlugin,
         // debug
         DebugAimPlugin,
