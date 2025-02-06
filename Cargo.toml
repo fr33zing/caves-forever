@@ -22,6 +22,10 @@ strum = { version = "0.26.3", features = ["derive", "strum_macros"] }
 strum_macros = "0.26.4"
 uuid = { version = "1.12.1", features = ["fast-rng", "serde", "v4"] }
 rayon = "1.10.0"
+rand = "0.8.0"
+bevy_rand = { version = "0.9.0", features = ["wyrand"] }
+pathfinding = "4.14.0"
+itertools = "0.14.0"
 
 [profile.dev]
 opt-level = 1

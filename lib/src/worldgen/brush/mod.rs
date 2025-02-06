@@ -26,18 +26,21 @@ struct TerrainBrushTask(Task<TerrainBrush>);
 pub enum TerrainBrushRequest {
     Curve {
         uuid: String,
+        sequence: usize,
         material: VoxelMaterial,
         points: Vec<Point3<f32>>,
         radius: f32,
     },
     Sweep {
         uuid: String,
+        sequence: usize,
         material: VoxelMaterial,
         rail: Vec<Point3<f32>>,
         profile: ProfileRamp,
     },
     Mesh {
         uuid: String,
+        sequence: usize,
         material: VoxelMaterial,
         mesh: Mesh,
         transform: Transform,
@@ -49,6 +52,7 @@ pub enum TerrainBrushRequest {
 pub enum TerrainBrush {
     Curve {
         uuid: String,
+        sequence: usize,
         curve: NurbsCurve3D<f32>,
         radius: f32,
         material: VoxelMaterial,
@@ -56,6 +60,7 @@ pub enum TerrainBrush {
     },
     Collider {
         uuid: String,
+        sequence: usize,
         collider: Collider,
         material: VoxelMaterial,
         chunks: ChunksAABB,
@@ -68,35 +73,48 @@ impl TerrainBrushRequest {
         match self {
             TerrainBrushRequest::Curve {
                 uuid,
+                sequence,
                 material,
                 points,
                 radius,
-            } => TerrainBrush::curve(&uuid, material, &points, radius),
+            } => TerrainBrush::curve(&uuid, sequence, material, &points, radius),
             TerrainBrushRequest::Sweep {
                 uuid,
+                sequence,
                 material,
                 rail,
                 profile,
-            } => TerrainBrush::sweep(&uuid, material, &rail, &profile).unwrap_or_else(|_| {
-                // TODO dynamic fallback curve radius
-                TerrainBrush::curve(&uuid, VoxelMaterial::Invalid, &rail, 4.0)
-            }),
+            } => TerrainBrush::sweep(&uuid, sequence, material, &rail, &profile).unwrap_or_else(
+                |_| {
+                    // TODO dynamic fallback curve radius
+                    TerrainBrush::curve(&uuid, sequence, VoxelMaterial::Invalid, &rail, 4.0)
+                },
+            ),
             TerrainBrushRequest::Mesh {
                 uuid,
+                sequence,
                 material,
                 mesh,
                 transform,
                 vhacd_parameters,
-            } => TerrainBrush::mesh(&uuid, material, &mesh, Some(transform), &vhacd_parameters)
-                .unwrap_or_else(|_| {
-                    // TODO dynamic fallback sphere radius
-                    TerrainBrush::collider(
-                        &uuid,
-                        VoxelMaterial::Invalid,
-                        Collider::sphere(2.0 * transform.scale.max_element()),
-                        transform,
-                    )
-                }),
+            } => TerrainBrush::mesh(
+                &uuid,
+                sequence,
+                material,
+                &mesh,
+                Some(transform),
+                &vhacd_parameters,
+            )
+            .unwrap_or_else(|_| {
+                // TODO dynamic fallback sphere radius
+                TerrainBrush::collider(
+                    &uuid,
+                    sequence,
+                    VoxelMaterial::Invalid,
+                    Collider::sphere(2.0 * transform.scale.max_element()),
+                    transform,
+                )
+            }),
         }
     }
 }
@@ -106,6 +124,13 @@ impl TerrainBrush {
         match self {
             TerrainBrush::Curve { uuid, .. } => uuid,
             TerrainBrush::Collider { uuid, .. } => uuid,
+        }
+    }
+
+    pub fn sequence(&self) -> usize {
+        match self {
+            TerrainBrush::Curve { sequence, .. } => *sequence,
+            TerrainBrush::Collider { sequence, .. } => *sequence,
         }
     }
 
@@ -127,7 +152,13 @@ impl TerrainBrush {
     // Spawning
     //
 
-    pub fn curve(uuid: &str, material: VoxelMaterial, points: &[Point3<f32>], radius: f32) -> Self {
+    pub fn curve(
+        uuid: &str,
+        sequence: usize,
+        material: VoxelMaterial,
+        points: &[Point3<f32>],
+        radius: f32,
+    ) -> Self {
         let curve = NurbsCurve3D::<f32>::try_interpolate(points, 3).unwrap();
         let samples = curve.tessellate(Some(1e-8));
         let aabb = curve_bounding_box(&samples);
@@ -135,6 +166,7 @@ impl TerrainBrush {
 
         Self::Curve {
             uuid: uuid.to_owned(),
+            sequence,
             curve,
             radius,
             material,
@@ -144,6 +176,7 @@ impl TerrainBrush {
 
     pub fn sweep(
         uuid: &str,
+        sequence: usize,
         material: VoxelMaterial,
         rail: &[Point3<f32>],
         profile: &ProfileRamp,
@@ -151,11 +184,19 @@ impl TerrainBrush {
         let rail = NurbsCurve3D::<f32>::try_interpolate(rail, 3)?;
         let mesh = sweep_zero_twist_filled::<Const<4>>(profile, &rail, Some(4))?;
 
-        Self::mesh(uuid, material, &mesh, None, &TUNNEL_VHACD_PARAMETERS)
+        Self::mesh(
+            uuid,
+            sequence,
+            material,
+            &mesh,
+            None,
+            &TUNNEL_VHACD_PARAMETERS,
+        )
     }
 
     pub fn mesh(
         uuid: &str,
+        sequence: usize,
         material: VoxelMaterial,
         mesh: &Mesh,
         transform: Option<Transform>,
@@ -170,6 +211,7 @@ impl TerrainBrush {
 
         Ok(Self::collider(
             uuid,
+            sequence,
             material,
             collider,
             transform.unwrap_or_else(|| Transform::default()),
@@ -178,6 +220,7 @@ impl TerrainBrush {
 
     pub fn collider(
         uuid: &str,
+        sequence: usize,
         material: VoxelMaterial,
         collider: Collider,
         transform: Transform,
@@ -185,10 +228,17 @@ impl TerrainBrush {
         let aabb = collider
             .aabb(Vec3::ZERO, Rotation::default())
             .grow(Vec3::splat(VOXEL_REAL_SIZE));
-        let chunks = ChunksAABB::from_world_aabb((aabb.min, aabb.max), 0);
+        let chunks = ChunksAABB::from_world_aabb(
+            (
+                aabb.min + transform.translation,
+                aabb.max + transform.translation,
+            ),
+            0,
+        );
 
         Self::Collider {
             uuid: uuid.to_owned(),
+            sequence,
             collider,
             material,
             chunks,
@@ -262,27 +312,45 @@ impl Plugin for TerrainBrushPlugin {
     }
 }
 
-fn process_brushes(mut commands: Commands, requests: Query<(Entity, &TerrainBrushRequest)>) {
+fn process_brushes(
+    mut commands: Commands,
+    requests: Query<(Option<&Parent>, Entity, &TerrainBrushRequest)>,
+) {
     let task_pool = AsyncComputeTaskPool::get();
 
-    requests.iter().for_each(|(request_entity, request)| {
-        let request = request.clone();
-        let task = task_pool.spawn(async move { request.process() });
+    requests
+        .iter()
+        .for_each(|(parent, request_entity, request)| {
+            let request = request.clone();
+            let task = task_pool.spawn(async move { request.process() });
 
-        commands.entity(request_entity).clear();
-        commands.spawn(TerrainBrushTask(task));
-    });
+            let task_entity = commands.spawn(TerrainBrushTask(task)).id();
+            if let Some(parent) = parent {
+                let mut commands = commands.entity(parent.get());
+                commands.remove_children(&[request_entity]);
+                commands.add_child(task_entity);
+            }
+            commands.entity(request_entity).despawn();
+        });
 }
 
-fn receive_brushes(mut commands: Commands, mut tasks: Query<(Entity, &mut TerrainBrushTask)>) {
-    for (task_entity, mut task) in tasks.iter_mut() {
+fn receive_brushes(
+    mut commands: Commands,
+    mut tasks: Query<(Option<&Parent>, Entity, &mut TerrainBrushTask)>,
+) {
+    for (parent, task_entity, mut task) in tasks.iter_mut() {
         let status = block_on(future::poll_once(&mut task.0));
 
         let Some(brush) = status else {
             continue;
         };
 
-        commands.entity(task_entity).clear();
-        commands.spawn(brush);
+        let brush_entity = commands.spawn(brush).id();
+        if let Some(parent) = parent {
+            let mut commands = commands.entity(parent.get());
+            commands.remove_children(&[task_entity]);
+            commands.add_child(brush_entity);
+        }
+        commands.entity(task_entity).despawn();
     }
 }

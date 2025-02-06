@@ -1,4 +1,6 @@
 use bevy::prelude::Resource;
+use bevy_rand::prelude::*;
+use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 
 mod room;
@@ -10,4 +12,19 @@ pub use tunnel::*;
 pub struct AssetCollection {
     pub tunnels: Vec<Tunnel>,
     pub rooms: Vec<Room>,
+}
+
+impl AssetCollection {
+    pub fn random_tunnel<R>(&self, rng: &mut R) -> &Tunnel
+    where
+        R: Rng + ?Sized,
+    {
+        self.tunnels
+            .choose_weighted(rng, |tunnel| tunnel.weight)
+            .unwrap()
+    }
+
+    pub fn random_room(&self, rng: &mut Entropy<WyRand>) -> &Room {
+        self.rooms.choose_weighted(rng, |room| room.weight).unwrap()
+    }
 }

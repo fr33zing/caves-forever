@@ -113,17 +113,17 @@ where
 }
 
 pub fn postprocess_sample(sample: &mut VoxelSample) {
-    if sample.distance > 50.0 {
-        if sample.distance > 100.0 {
-            if sample.distance > 104.0 {
-                sample.material = VoxelMaterial::Boundary;
-            } else {
-                sample.material = VoxelMaterial::FakeBoundary;
-            }
-        } else {
-            sample.material = VoxelMaterial::ShinyGreenRock;
-        }
-    }
+    // if sample.distance > 50.0 {
+    //     if sample.distance > 100.0 {
+    //         if sample.distance > 104.0 {
+    //             sample.material = VoxelMaterial::Boundary;
+    //         } else {
+    //             sample.material = VoxelMaterial::FakeBoundary;
+    //         }
+    //     } else {
+    //         sample.material = VoxelMaterial::ShinyGreenRock;
+    //     }
+    // }
 }
 
 pub fn mesh_chunk(data: &ChunkData) -> Option<(Mesh, Collider)> {

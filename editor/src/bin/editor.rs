@@ -11,6 +11,7 @@ use bevy::{
 };
 use bevy_egui::EguiPlugin;
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
+use bevy_rand::{plugin::EntropyPlugin, prelude::WyRand};
 use bevy_trackball::TrackballPlugin;
 use noisy_bevy::NoisyShaderPlugin;
 
@@ -22,7 +23,7 @@ use lib::{
     materials::{CaveMaterialExtension, LineMaterialPlugin},
     player::PlayerPlugin,
     render_layer,
-    worldgen::terrain::TerrainPlugin,
+    worldgen::{layout::LayoutPlugin, terrain::TerrainPlugin},
 };
 
 fn main() {
@@ -73,6 +74,11 @@ fn main() {
         EditorGizmosPlugin,
         PickingPlugin,
     ));
+
+    // DEBUG
+    app.add_plugins(LayoutPlugin);
+    app.add_plugins(EntropyPlugin::<WyRand>::default());
+    // DEBUG
 
     app.add_systems(Startup, setup);
 

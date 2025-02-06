@@ -163,6 +163,13 @@ fn spawn_chunks(params: ChunkSpawnParams) -> Option<ChunkSpawnResult> {
     let mut data = ChunkData::new(params.request.chunk_pos);
     let world_pos = data.world_pos();
 
+    let brushes = params
+        .source
+        .brushes
+        .values()
+        .filter(|brush| brush.chunks().inflated(1).chunks.contains(&data.chunk_pos))
+        .collect::<Vec<_>>();
+
     data.sdf
         .par_iter_mut()
         .zip(&mut data.materials)
@@ -171,7 +178,7 @@ fn spawn_chunks(params: ChunkSpawnParams) -> Option<ChunkSpawnResult> {
             let pos = delinearize_to_world_pos(world_pos, i as u32);
 
             // Sample brushes
-            for brush in params.source.brushes.values() {
+            for brush in brushes.iter() {
                 let mut sample = brush.sample(pos);
                 if sample.distance < *distance {
                     postprocess_sample(&mut sample);

@@ -87,7 +87,7 @@ impl Command for SpawnPlayerCommand {
                 ..Default::default()
             },
             jump: TnuaBuiltinJump {
-                height: 2.25,
+                height: 6.25,               // TODO change this back to 2.25 or maybe 2.75
                 shorten_extra_gravity: 0.0, // Disable variable height jumps
                 ..Default::default()
             },

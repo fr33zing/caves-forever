@@ -523,5 +523,6 @@ pub fn update_preview_brush(
         material: VoxelMaterial::BrownRock,
         rail: upb.rail.clone(),
         profile: upb.profile.clone(),
+        sequence: 0, // TODO
     });
 }

@@ -22,6 +22,9 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 uuid = { workspace = true }
 rayon = { workspace = true }
+rand = { workspace = true }
+bevy_rand = { workspace = true }
+pathfinding = { workspace = true }
 
 bevy-tnua = "0.21.0"
 bevy-tnua-avian3d = "0.2.0"

@@ -276,7 +276,9 @@ pub fn correct_portal_orientations(
         }
 
         let flip = match (direction, inside.0, inside.1) {
-            (PortalDirection::Entrance, false, true) | (PortalDirection::Exit, true, false) => true,
+            (PortalDirection::Entrance, false, true)
+            | (PortalDirection::Exit, true, false)
+            | (PortalDirection::Bidirectional, true, false) => true,
             _ => false,
         };
 

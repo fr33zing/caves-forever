@@ -1,4 +1,4 @@
-use avian3d::prelude::Collider;
+use avian3d::prelude::{AnyCollider, Collider, Rotation};
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 use strum::EnumIter;
@@ -19,6 +19,28 @@ impl Room {
             weight,
             ..default()
         })
+    }
+
+    pub fn aabb(&self) -> (Vec3, Vec3) {
+        let (mut min, mut max) = (Vec3::MAX, Vec3::MIN);
+        self.cavities.iter().for_each(|cavity| {
+            let aabb = cavity.aabb(Vec3::ZERO, Rotation::default());
+            min.x = min.x.min(aabb.min.x);
+            min.y = min.y.min(aabb.min.y);
+            min.z = min.z.min(aabb.min.z);
+            max.x = max.x.max(aabb.max.x);
+            max.y = max.y.max(aabb.max.y);
+            max.z = max.z.max(aabb.max.z);
+        });
+
+        (min, max)
+    }
+
+    pub fn inverse_world_origin_offset(&self) -> Vec3 {
+        let aabb = self.aabb();
+        let center = aabb.1 - aabb.0 + aabb.1 / 2.0;
+
+        -center
     }
 }
 
@@ -47,6 +69,14 @@ pub enum PortalDirection {
 pub struct Portal {
     pub transform: Transform,
     pub direction: PortalDirection,
+}
+impl Portal {
+    pub fn inward(&self) -> Vec3 {
+        if self.direction == PortalDirection::Entrance {
+            return *self.transform.up();
+        }
+        -*self.transform.up()
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

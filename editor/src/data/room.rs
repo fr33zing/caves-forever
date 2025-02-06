@@ -98,6 +98,7 @@ impl RoomPart {
                 .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices.clone())
                 .with_inserted_indices(Indices::U32(indices.clone())),
                 vhacd_parameters: vhacd_parameters.clone(),
+                sequence: 0, // TODO
             }),
             _ => None,
         }

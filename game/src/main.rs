@@ -1,6 +1,7 @@
 use avian3d::prelude::*;
 use bevy::{prelude::*, window::PresentMode};
 use bevy_egui::EguiPlugin;
+use bevy_rand::{plugin::EntropyPlugin, prelude::WyRand};
 use noisy_bevy::NoisyShaderPlugin;
 
 use lib::{
@@ -33,6 +34,7 @@ fn main() {
         PhysicsPlugins::default(),
         LineMaterialPlugin,
         NoisyShaderPlugin,
+        EntropyPlugin::<WyRand>::default(),
     ));
 
     app.add_plugins((
