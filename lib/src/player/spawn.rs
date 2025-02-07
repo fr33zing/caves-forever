@@ -9,6 +9,9 @@ use bevy_tnua::{
     prelude::{TnuaBuiltinJump, TnuaBuiltinWalk, TnuaController},
 };
 use bevy_tnua_avian3d::TnuaAvian3dSensorShape;
+use rand::seq::SliceRandom;
+
+use crate::worldgen::layout::{LayoutState, Spawnpoint};
 
 use super::{
     camera::{Flashlight, PlayerCamera},
@@ -17,6 +20,12 @@ use super::{
 };
 
 pub struct DespawnPlayerCommand;
+
+#[derive(Default)]
+pub struct SpawnPlayerCommand {
+    /// If no position is provided, a random spawnpoint entity will be selected.
+    pub position: Option<Vec3>,
+}
 
 impl Command for DespawnPlayerCommand {
     fn apply(self, world: &mut World) {
@@ -38,14 +47,27 @@ impl Command for DespawnPlayerCommand {
     }
 }
 
-pub struct SpawnPlayerCommand {
-    pub position: Vec3,
-}
-
 impl Command for SpawnPlayerCommand {
     fn apply(self, world: &mut World) {
+        let mut system_state: SystemState<(
+            Commands,
+            ResMut<LayoutState>,
+            Query<&GlobalTransform, With<Spawnpoint>>,
+        )> = SystemState::new(world);
+        let (mut commands, mut layout_state, spawnpoints) = system_state.get_mut(world);
+
+        let position = self.position.unwrap_or_else(|| {
+            let spawnpoints = spawnpoints
+                .iter()
+                .map(|s| s.translation())
+                .collect::<Vec<_>>();
+            *spawnpoints
+                .choose(&mut layout_state.rng)
+                .expect("no spawnpoints")
+        });
+
         // Camera
-        world.spawn((
+        commands.spawn((
             PlayerCamera,
             Camera3d::default(),
             Camera {
@@ -70,8 +92,8 @@ impl Command for SpawnPlayerCommand {
         ));
 
         // Player
-        let mut commands = world.spawn(IsPlayer);
-        commands.insert(Transform::from_translation(self.position));
+        let mut commands = commands.spawn(IsPlayer);
+        commands.insert(Transform::from_translation(position));
         commands.insert(RigidBody::Dynamic);
         commands.insert(LockedAxes::new().lock_rotation_x().lock_rotation_z());
         commands.insert(PLAYER_COLLIDER);
@@ -111,5 +133,7 @@ impl Command for SpawnPlayerCommand {
         // commands.insert(Sleeping);
         // commands.insert(TnuaToggle::Disabled);
         // commands.insert(GravityScale(0.0));
+
+        system_state.apply(world);
     }
 }

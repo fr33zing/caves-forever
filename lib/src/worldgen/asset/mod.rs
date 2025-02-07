@@ -27,4 +27,17 @@ impl AssetCollection {
     pub fn random_room(&self, rng: &mut Entropy<WyRand>) -> &Room {
         self.rooms.choose_weighted(rng, |room| room.weight).unwrap()
     }
+
+    pub fn random_room_with_flags<R>(&self, flags: RoomFlags, rng: &mut R) -> &Room
+    where
+        R: Rng + ?Sized,
+    {
+        let rooms = self
+            .rooms
+            .iter()
+            .filter(|room| room.flags.contains(flags.clone()))
+            .collect::<Vec<_>>();
+
+        rooms.choose_weighted(rng, |room| room.weight).unwrap()
+    }
 }

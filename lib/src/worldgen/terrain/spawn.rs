@@ -72,7 +72,7 @@ pub fn begin_spawn_chunks(
         return;
     }
 
-    let mut max_tasks: usize = 128;
+    let mut max_tasks: usize = 8;
     if let Some(player) = player {
         let player_chunk = player.translation / CHUNK_SIZE_F;
         let player_chunk_ivec = player_chunk.as_ivec3();
@@ -90,7 +90,9 @@ pub fn begin_spawn_chunks(
             max_tasks = 4;
         }
     };
-    let n = (max_tasks - spawn_tasks.iter().count()).clamp(0, state.spawn_requests.len());
+    let n = max_tasks
+        .saturating_sub(spawn_tasks.iter().count())
+        .clamp(0, state.spawn_requests.len());
     let requests = state.spawn_requests.drain(0..n);
 
     let task_pool = AsyncComputeTaskPool::get();

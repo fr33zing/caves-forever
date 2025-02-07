@@ -3455,6 +3455,7 @@ dependencies = [
  "bevy-tnua-avian3d",
  "bevy_egui 0.32.0",
  "bevy_rand",
+ "bitflags 2.8.0",
  "cbor4ii",
  "common_macros",
  "curvo",

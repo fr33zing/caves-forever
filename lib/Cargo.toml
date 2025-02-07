@@ -26,6 +26,7 @@ rand = { workspace = true }
 bevy_rand = { workspace = true }
 pathfinding = { workspace = true }
 
+bitflags = "2.8.0"
 bevy-tnua = "0.21.0"
 bevy-tnua-avian3d = "0.2.0"
 earclip = "1.1.0"

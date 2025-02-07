@@ -11,7 +11,7 @@ use strum::IntoEnumIterator;
 
 use super::{Room, RoomPart, RoomPartPayload, Tunnel};
 use lib::worldgen::{
-    asset::{self, PortalDirection, Spawnpoint},
+    asset::{self, PortalDirection, RoomFlags, Spawnpoint},
     utility::safe_vhacd,
 };
 
@@ -61,11 +61,14 @@ impl Room {
                         direction,
                     });
                 }
-                RoomPartPayload::Spawnpoint => room.spawnpoints.push(Spawnpoint {
-                    position: transform.translation,
-                    // TODO make sure this is right
-                    angle: transform.rotation.to_euler(EulerRot::YXZ).0,
-                }),
+                RoomPartPayload::Spawnpoint => {
+                    room.flags |= RoomFlags::Spawnable;
+                    room.spawnpoints.push(Spawnpoint {
+                        position: transform.translation,
+                        // TODO make sure this is right
+                        angle: transform.rotation.to_euler(EulerRot::YXZ).0,
+                    })
+                }
             }
         }
 

@@ -1,5 +1,9 @@
 use avian3d::prelude::*;
-use bevy::{prelude::*, window::PresentMode};
+use bevy::{
+    ecs::{system::SystemBuffer, world::CommandQueue},
+    prelude::*,
+    window::PresentMode,
+};
 use bevy_egui::EguiPlugin;
 use bevy_rand::{plugin::EntropyPlugin, prelude::WyRand};
 use noisy_bevy::NoisyShaderPlugin;
@@ -7,8 +11,11 @@ use noisy_bevy::NoisyShaderPlugin;
 use lib::{
     debug_aim::DebugAimPlugin,
     materials::{CaveMaterial, LineMaterialPlugin},
-    player::PlayerPlugin,
-    worldgen::{layout::LayoutPlugin, terrain::TerrainPlugin},
+    player::{PlayerPlugin, SpawnPlayerCommand},
+    worldgen::{
+        layout::{self, InitLayoutCommand, LayoutPlugin},
+        terrain::TerrainPlugin,
+    },
 };
 
 fn main() {
@@ -46,7 +53,7 @@ fn main() {
         DebugAimPlugin,
     ));
 
-    app.add_systems(Startup, setup);
+    app.add_systems(Startup, setup.after(layout::setup_state));
 
     app.run();
 }
@@ -55,5 +62,13 @@ fn setup(mut commands: Commands) {
     commands.insert_resource(AmbientLight {
         color: Color::srgb(1.0, 1.0, 1.0).into(),
         brightness: 35.0,
+    });
+
+    commands.queue(InitLayoutCommand {
+        after: {
+            let mut queue = CommandQueue::default();
+            queue.push(SpawnPlayerCommand::default());
+            queue
+        },
     });
 }

@@ -1,10 +1,21 @@
 use avian3d::prelude::{AnyCollider, Collider, Rotation};
 use bevy::prelude::*;
+use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 use strum::EnumIter;
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct RoomFlags(u8);
+
+bitflags! {
+    impl RoomFlags: u8 {
+        const Spawnable = 1;
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Room {
+    pub flags: RoomFlags,
     pub source: String,
     pub weight: f32,
     pub cavities: Vec<Collider>,
@@ -38,9 +49,14 @@ impl Room {
 
     pub fn inverse_world_origin_offset(&self) -> Vec3 {
         let aabb = self.aabb();
-        let center = aabb.1 - aabb.0 + aabb.1 / 2.0;
+        let center = aabb.0 + ((aabb.1 - aabb.0) / 2.0);
 
         -center
+    }
+
+    pub fn radius(&self) -> f32 {
+        let (min, max) = self.aabb();
+        max.distance(min) / 2.0
     }
 }
 
@@ -64,19 +80,28 @@ pub enum PortalDirection {
     Exit = 1,
     Bidirectional = 2,
 }
+impl PortalDirection {
+    pub fn is_entrance(&self) -> bool {
+        match self {
+            PortalDirection::Entrance => true,
+            PortalDirection::Exit => false,
+            PortalDirection::Bidirectional => true,
+        }
+    }
+
+    pub fn is_exit(&self) -> bool {
+        match self {
+            PortalDirection::Entrance => false,
+            PortalDirection::Exit => true,
+            PortalDirection::Bidirectional => true,
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Portal {
     pub transform: Transform,
     pub direction: PortalDirection,
-}
-impl Portal {
-    pub fn inward(&self) -> Vec3 {
-        if self.direction == PortalDirection::Entrance {
-            return *self.transform.up();
-        }
-        -*self.transform.up()
-    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
