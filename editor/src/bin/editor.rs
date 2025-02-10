@@ -23,7 +23,10 @@ use lib::{
     materials::{CaveMaterialExtension, LineMaterialPlugin},
     player::PlayerPlugin,
     render_layer,
-    worldgen::{layout::LayoutPlugin, terrain::TerrainPlugin},
+    worldgen::{
+        layout::{self, InitLayoutCommand, LayoutPlugin},
+        terrain::TerrainPlugin,
+    },
 };
 
 fn main() {
@@ -55,6 +58,7 @@ fn main() {
         WireframePlugin,
         EguiPlugin,
         PhysicsPlugins::default(),
+        PhysicsDebugPlugin::default(),
         LineMaterialPlugin,
         NoisyShaderPlugin,
         InfiniteGridPlugin,
@@ -81,6 +85,7 @@ fn main() {
     // DEBUG
 
     app.add_systems(Startup, setup);
+    app.add_systems(Startup, init_layout.after(layout::setup_state)); //TEMP
 
     app.run();
 }
@@ -95,4 +100,8 @@ fn setup(mut commands: Commands) {
         color: Color::srgb(1.0, 1.0, 1.0).into(),
         brightness: 100.0,
     });
+}
+
+fn init_layout(mut commands: Commands) {
+    commands.queue(InitLayoutCommand { after: default() });
 }

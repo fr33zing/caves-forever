@@ -1,6 +1,6 @@
 use std::{f32::consts::PI, fs::File, io::Read};
 
-use avian3d::prelude::Collider;
+use avian3d::prelude::{Collider, Collision};
 use bevy::{
     ecs::{system::SystemState, world::CommandQueue},
     prelude::*,
@@ -13,8 +13,10 @@ use bevy_rand::{
 use consts::{ROOM_SHYNESS, SEQUENCE_DISTANCE};
 use rand::Rng;
 use room::{Portal, Room, SpawnRoomCommand};
-use tunnel::connect_portals;
+use tunnel::{connect_portals, LayoutTrigger, PortalConnection};
 use utility::{arrange_by_depenetration, Arrangement};
+
+use crate::player::IsPlayer;
 
 use super::asset::{AssetCollection, PortalDirection, RoomFlags};
 
@@ -40,7 +42,7 @@ pub struct LayoutPlugin;
 impl Plugin for LayoutPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (load_asset_collection, setup_state).chain());
-        app.add_systems(Update, (debug, connect_portals));
+        app.add_systems(Update, (debug, connect_portals, triggers));
     }
 }
 
@@ -95,6 +97,165 @@ fn debug(
     });
 }
 
+fn triggers(
+    mut commands: Commands,
+    mut collision_event_reader: EventReader<Collision>,
+    state: Res<LayoutState>,
+    player: Query<&IsPlayer>,
+    trigger: Query<(&Parent, &LayoutTrigger)>,
+    connections: Query<(Entity, &PortalConnection)>,
+    portals: Query<(&Parent, &Portal)>,
+    rooms: Query<(Entity, &Room)>,
+) {
+    for Collision(contacts) in collision_event_reader.read() {
+        if player.get(contacts.entity1).is_err() && player.get(contacts.entity2).is_err() {
+            continue;
+        }
+        let (trigger_entity, (trigger_parent, trigger)) = {
+            if let Ok(trigger) = trigger.get(contacts.entity1) {
+                (contacts.entity1, trigger)
+            } else if let Ok(trigger) = trigger.get(contacts.entity2) {
+                commands.entity(contacts.entity2).despawn();
+                (contacts.entity2, trigger)
+            } else {
+                continue;
+            }
+        };
+
+        let Ok((connection_entity, connection)) = connections.get(**trigger_parent) else {
+            continue;
+        };
+
+        match trigger {
+            LayoutTrigger::GenerateNextSequence => {
+                println!("{} {}", connection.sequence, state.sequence);
+                if connection.sequence == state.sequence {
+                    //commands.queue(StepLayoutCommand);
+                }
+            }
+            LayoutTrigger::UnloadPreviousSequence => {
+                let Ok((to_portal_parent, to_portal)) = portals.get(connection.to_portal) else {
+                    continue;
+                };
+                let Ok(to_room) = rooms.get(**to_portal_parent) else {
+                    continue;
+                };
+                let Ok((from_portal_parent, from_portal)) = portals.get(connection.from_portal)
+                else {
+                    continue;
+                };
+                let Ok(from_room) = rooms.get(**from_portal_parent) else {
+                    continue;
+                };
+
+                let mut entity_distances = vec![(connection_entity, 0)];
+                // walk_room(
+                //     &mut entity_distances,
+                //     &connections,
+                //     &portals,
+                //     &rooms,
+                //     to_room,
+                //     1,
+                // );
+                walk_room(
+                    &mut entity_distances,
+                    &connections,
+                    &portals,
+                    &rooms,
+                    from_room,
+                    -1,
+                );
+
+                println!("{entity_distances:?}");
+
+                for (entity, distance) in entity_distances.into_iter() {
+                    if distance < 0 {
+                        commands.entity(entity).despawn_recursive();
+                    }
+                }
+
+                commands.queue(StepLayoutCommand);
+            }
+        }
+
+        commands.entity(trigger_entity).despawn();
+    }
+}
+
+fn walk_room(
+    entity_distances: &mut Vec<(Entity, isize)>,
+    connections: &Query<(Entity, &PortalConnection)>,
+    portals: &Query<(&Parent, &Portal)>,
+    rooms: &Query<(Entity, &Room)>,
+    room: (Entity, &Room),
+    depth: isize,
+) {
+    entity_distances.push((room.0, depth));
+
+    for portal_entity in room.1.portals.iter() {
+        let Ok(portal) = portals.get(*portal_entity) else {
+            continue;
+        };
+
+        let Some(connection_entity) = portal.1.connection else {
+            continue;
+        };
+        if entity_distances
+            .iter()
+            .any(|(entity, _)| *entity == connection_entity)
+        {
+            continue;
+        }
+        let Ok(connection) = connections.get(connection_entity) else {
+            continue;
+        };
+
+        walk_connection(
+            entity_distances,
+            connections,
+            portals,
+            rooms,
+            connection,
+            depth + if depth > 0 { 1 } else { -1 },
+        );
+    }
+}
+
+fn walk_connection(
+    entity_distances: &mut Vec<(Entity, isize)>,
+    connections: &Query<(Entity, &PortalConnection)>,
+    portals: &Query<(&Parent, &Portal)>,
+    rooms: &Query<(Entity, &Room)>,
+    connection: (Entity, &PortalConnection),
+    depth: isize,
+) {
+    entity_distances.push((connection.0, depth));
+
+    for portal_entity in vec![connection.1.from_portal, connection.1.to_portal].into_iter() {
+        let Ok((portal_parent, _)) = portals.get(portal_entity) else {
+            continue;
+        };
+        if entity_distances
+            .iter()
+            .any(|(entity, _)| *entity == **portal_parent)
+        {
+            continue;
+        }
+        let Ok(room) = rooms.get(**portal_parent) else {
+            continue;
+        };
+
+        walk_room(
+            entity_distances,
+            connections,
+            portals,
+            rooms,
+            room,
+            depth + if depth > 0 { 1 } else { -1 },
+        );
+    }
+}
+
 impl Command for InitLayoutCommand {
     fn apply(mut self, world: &mut World) {
         let mut system_state: SystemState<(Commands, ResMut<LayoutState>, Res<AssetCollection>)> =
@@ -111,6 +272,7 @@ impl Command for InitLayoutCommand {
         commands.queue(SpawnRoomCommand {
             sequence: 0,
             arrangement: Arrangement {
+                spherical: true,
                 collider: Collider::sphere(room.radius() + ROOM_SHYNESS),
                 position: (state.rng.gen::<Vec3>() - Vec3::splat(0.5)).into(),
                 rotation: Quat::from_euler(
@@ -156,7 +318,7 @@ impl Command for StepLayoutCommand {
             .into_iter()
             .filter_map(|portal| {
                 if let Ok(portal) = portals.get(portal) {
-                    if !portal.0.connected && portal.0.direction.is_exit() {
+                    if portal.0.connection.is_none() && portal.0.direction.is_exit() {
                         return Some(portal);
                     }
                 }
@@ -170,7 +332,7 @@ impl Command for StepLayoutCommand {
         let next_room_count = match prev_portals.len() {
             0 => panic!("no unconnected exits"),
             1 => 1,
-            _ => state.rng.gen_range(1..=prev_portals.len().min(2)),
+            _ => state.rng.gen_range(1..=prev_portals.len()),
         };
         let next_rooms = (0..next_room_count)
             .map(|_| assets.random_room(&mut state.rng).clone())
@@ -192,16 +354,20 @@ impl Command for StepLayoutCommand {
         let start_position = avg_position + bias_direction * SEQUENCE_DISTANCE;
         let mut next_room_arrangeables = next_rooms
             .iter()
-            .map(|room| Arrangement {
-                collider: Collider::sphere(room.radius() + ROOM_SHYNESS),
-                position: (start_position + state.rng.gen::<Vec3>() - Vec3::splat(0.5)).into(),
-                rotation: Quat::from_euler(
-                    EulerRot::YXZ,
-                    state.rng.gen_range(0.0..(2.0 * PI)),
-                    0.0,
-                    0.0,
-                )
-                .into(),
+            .map(|room| {
+                let spherical = true;
+                Arrangement {
+                    spherical,
+                    collider: Collider::sphere(room.radius() + ROOM_SHYNESS),
+                    position: (start_position + state.rng.gen::<Vec3>() - Vec3::splat(0.5)).into(),
+                    rotation: Quat::from_euler(
+                        EulerRot::YXZ,
+                        state.rng.gen_range(0.0..(2.0 * PI)),
+                        0.0,
+                        0.0,
+                    )
+                    .into(),
+                }
             })
             .collect::<Vec<Arrangement>>();
         let static_arrangeables = arrangeables
@@ -217,7 +383,7 @@ impl Command for StepLayoutCommand {
                 let exit_index = match prev_portals.len() {
                     0 => panic!("no unconnected exits"),
                     1 => 0,
-                    _ => state.rng.gen_range(0..prev_portals.len()), // TEMP
+                    _ => state.rng.gen_range(0..prev_portals.len()),
                 };
                 let from_portal = prev_portals.remove(exit_index);
 

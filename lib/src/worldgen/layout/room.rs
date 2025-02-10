@@ -20,9 +20,16 @@ pub struct Room {
 pub struct Portal {
     pub sequence: usize,
     pub direction: PortalDirection,
-    pub connected: bool,
+    pub connection: Option<Entity>,
 }
 impl Portal {
+    pub fn inward_local(&self) -> Vec3 {
+        if self.direction == PortalDirection::Entrance {
+            return Vec3::Y;
+        }
+        Vec3::NEG_Y
+    }
+
     pub fn inward(&self, transform: &GlobalTransform) -> Vec3 {
         if self.direction == PortalDirection::Entrance {
             return *transform.up();
@@ -90,7 +97,7 @@ impl Command for SpawnRoomCommand {
                                 Portal {
                                     sequence: self.sequence,
                                     direction: portal.direction,
-                                    connected: false,
+                                    connection: None,
                                 },
                             ))
                             .id()

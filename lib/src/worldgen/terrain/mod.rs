@@ -116,7 +116,7 @@ impl Plugin for TerrainPlugin {
             .add_plugins((TerrainChangeDetectionPlugin, TerrainBrushPlugin))
             .add_systems(Startup, (setup, setup_material))
             .add_systems(Update, draw_debug)
-            .add_systems(Update, enforce_loading_chunk_boundaries)
+            //.add_systems(Update, enforce_loading_chunk_boundaries)
             .add_systems(
                 Update,
                 (

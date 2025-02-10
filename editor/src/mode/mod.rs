@@ -363,7 +363,7 @@ fn playtest(
             camera.is_active = false;
             light.range = 0.0;
             queue.push(SpawnPlayerCommand {
-                position: spawn_pos + Vec3::Y * PLAYER_HEIGHT / 2.0,
+                position: Some(spawn_pos + Vec3::Y * PLAYER_HEIGHT / 2.0),
             });
         }
         _ => {}

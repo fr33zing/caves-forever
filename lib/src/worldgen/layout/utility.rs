@@ -12,6 +12,7 @@ use super::consts::{HULL_DENSITY, ROOM_SHYNESS, TUNNEL_SHYNESS};
 
 #[derive(Component, Clone)]
 pub struct Arrangement {
+    pub spherical: bool,
     pub collider: Collider,
     pub position: Position,
     pub rotation: Rotation,
@@ -44,10 +45,16 @@ pub fn arrange_by_depenetration(
             return true;
         };
 
-        // Prefer horizontal depenetration to avoid steep paths
-        let y_scale = 0.05;
-        let xz_scale = 1.0 + (1.0 - y_scale) / 2.0;
-        let direction = contact.normal1 * Vec3::new(xz_scale, y_scale, xz_scale);
+        let direction = if dynamic_collider.spherical && static_collider.spherical {
+            (static_collider.position.0 - dynamic_collider.position.0).normalize()
+        } else {
+            /*
+            Prefer horizontal depenetration to minimize steep paths
+            */
+            let y_scale = 0.05;
+            let xz_scale = 1.0 + (1.0 - y_scale) / 2.0;
+            contact.normal1 * Vec3::new(xz_scale, y_scale, xz_scale)
+        };
 
         *dynamic_collider.position -= direction * DEPENETRATION_DISTANCE * desperation;
 
@@ -142,6 +149,7 @@ where
 }
 
 pub fn find_path_between_portals(
+    fail_on_intersection: bool,
     real_start: Vec3,
     real_end: Vec3,
     pathfinding_start: IVec3,
@@ -164,8 +172,11 @@ pub fn find_path_between_portals(
                     cost += penalize_steep_angles(&p1f, &p0f);
 
                     if !is_line_navigable(&p0f, &p1f, arrangements) {
-                        // return None;
-                        cost += 65536;
+                        if fail_on_intersection {
+                            return None;
+                        } else {
+                            cost += 80960;
+                        }
                     }
 
                     if *p0 == pathfinding_start {
@@ -209,6 +220,22 @@ fn is_line_navigable(start: &Vec3, end: &Vec3, arrangements: &[Arrangement]) -> 
             (end - start).normalize(),
             start.distance(*end),
         )
+    })
+}
+
+fn is_line_navigable2(start: &Vec3, end: &Vec3, arrangements: &[Arrangement]) -> bool {
+    let c = Collider::capsule_endpoints(TUNNEL_SHYNESS, *start, *end);
+    !arrangements.iter().any(|arrangement| {
+        contact(
+            &c,
+            Position::default(),
+            Rotation::default(),
+            &arrangement.collider,
+            arrangement.position,
+            arrangement.rotation,
+            TUNNEL_SHYNESS * 2.0,
+        )
+        .is_ok_and(|x| x.is_some())
     })
 }
 

@@ -51,10 +51,10 @@ impl Command for SpawnPlayerCommand {
     fn apply(self, world: &mut World) {
         let mut system_state: SystemState<(
             Commands,
-            ResMut<LayoutState>,
+            Option<ResMut<LayoutState>>,
             Query<&GlobalTransform, With<Spawnpoint>>,
         )> = SystemState::new(world);
-        let (mut commands, mut layout_state, spawnpoints) = system_state.get_mut(world);
+        let (mut commands, layout_state, spawnpoints) = system_state.get_mut(world);
 
         let position = self.position.unwrap_or_else(|| {
             let spawnpoints = spawnpoints
@@ -62,7 +62,7 @@ impl Command for SpawnPlayerCommand {
                 .map(|s| s.translation())
                 .collect::<Vec<_>>();
             *spawnpoints
-                .choose(&mut layout_state.rng)
+                .choose(&mut layout_state.unwrap().rng)
                 .expect("no spawnpoints")
         });
 
@@ -99,17 +99,17 @@ impl Command for SpawnPlayerCommand {
         commands.insert(PLAYER_COLLIDER);
         commands.insert(TnuaController::default());
         commands.insert(PlayerMotionConfig {
-            speed: 6.0,
+            speed: 16.0,
             sprint_speed_multiplier: 1.75,
             crouch_speed_multiplier: 0.75,
             walk: TnuaBuiltinWalk {
                 float_height: PLAYER_FLOAT_HEIGHT_FROM_CENTER,
-                max_slope: FRAC_PI_4,
+                max_slope: 80.0_f32.to_radians(),
                 turning_angvel: Float::INFINITY,
                 ..Default::default()
             },
             jump: TnuaBuiltinJump {
-                height: 6.25,               // TODO change this back to 2.25 or maybe 2.75
+                height: 25.0,               // TODO change this back to 2.25 or maybe 2.75
                 shorten_extra_gravity: 0.0, // Disable variable height jumps
                 ..Default::default()
             },
