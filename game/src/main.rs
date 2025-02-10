@@ -1,5 +1,6 @@
 use avian3d::prelude::*;
 use bevy::{
+    audio::{AudioPlugin, SpatialScale},
     ecs::{system::SystemBuffer, world::CommandQueue},
     prelude::*,
     window::PresentMode,

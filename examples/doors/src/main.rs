@@ -1,6 +1,7 @@
 use avian3d::prelude::*;
 use bevy::{
     asset::{processor::LoadTransformAndSave, transformer::IdentityAssetTransformer},
+    audio::{AudioPlugin, SpatialScale},
     image::{CompressedImageSaver, ImageAddressMode, ImageFilterMode, ImageLoader},
     pbr::wireframe::{WireframeConfig, WireframePlugin},
     prelude::*,
@@ -40,6 +41,10 @@ fn main() {
                 file_path: "../../assets".to_owned(),
                 processed_file_path: "../../imported_assets".to_owned(),
                 mode: AssetMode::Processed,
+                ..default()
+            })
+            .set(AudioPlugin {
+                default_spatial_scale: SpatialScale::new(1.0 / 16.0),
                 ..default()
             }),
         WireframePlugin,
@@ -110,7 +115,7 @@ fn setup_world(
     let door_width = 2.75;
     let door_height = 2.25;
     let door_offset = (0.6, 0.15);
-    let doorway = commands.spawn_empty().id();
+    let doorway = commands.spawn(Transform::default()).id();
     commands.queue(AddDoorwayToEntity {
         spec: DoorwaySpec {
             frame: Rect {

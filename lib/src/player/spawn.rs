@@ -1,6 +1,4 @@
-use std::f32::consts::FRAC_PI_4;
-
-use avian3d::prelude::{Collider, LockedAxes, RigidBody};
+use avian3d::prelude::{Collider, DebugRender, LockedAxes, RigidBody};
 use bevy::{ecs::system::SystemState, prelude::*};
 use bevy_tnua::{
     builtins::TnuaBuiltinCrouch,
@@ -16,7 +14,7 @@ use crate::worldgen::layout::{LayoutState, Spawnpoint};
 use super::{
     camera::{Flashlight, PlayerCamera},
     controls::PlayerMotionConfig,
-    ForwardFromCamera, IsPlayer, PLAYER_COLLIDER, PLAYER_FLOAT_HEIGHT_FROM_CENTER,
+    ForwardFromCamera, IsPlayer, PLAYER_COLLIDER, PLAYER_FLOAT_HEIGHT_FROM_CENTER, PLAYER_RADIUS,
 };
 
 pub struct DespawnPlayerCommand;
@@ -78,6 +76,7 @@ impl Command for SpawnPlayerCommand {
                 fov: 45.0_f32.to_radians(),
                 ..default()
             }),
+            SpatialListener::new(-PLAYER_RADIUS * 2.0),
             Flashlight(10_000_000.0),
             SpotLight {
                 intensity: 10_000_000.0,
@@ -95,6 +94,7 @@ impl Command for SpawnPlayerCommand {
         let mut commands = commands.spawn(IsPlayer);
         commands.insert(Transform::from_translation(position));
         commands.insert(RigidBody::Dynamic);
+        commands.insert(DebugRender::none());
         commands.insert(LockedAxes::new().lock_rotation_x().lock_rotation_z());
         commands.insert(PLAYER_COLLIDER);
         commands.insert(TnuaController::default());

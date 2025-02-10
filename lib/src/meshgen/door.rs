@@ -2,6 +2,7 @@ use std::{f32::consts::PI, mem::take};
 
 use avian3d::prelude::*;
 use bevy::{
+    asset::RenderAssetUsages,
     ecs::system::SystemState,
     prelude::*,
     render::mesh::{Indices, PrimitiveTopology},
@@ -10,7 +11,7 @@ use bevy::{
 use crate::player::IsPlayer;
 
 const DOOR_MAX_ANGLE: f32 = 90.0 * PI / 180.0;
-const DOOR_ANIMATION_SECS: f64 = 2.0;
+const DOOR_ANIMATION_SECS: f64 = 2.5;
 const DOOR_AUTOCLOSE_SECS: f64 = 4.0;
 
 #[derive(Clone, Copy)]
@@ -36,16 +37,17 @@ pub struct Doorway {
     animation_start_secs: f64,
     animating: bool,
     doors: [Entity; 2], // [left, right]
+    sfx_position: Vec3,
 }
 
 impl Doorway {
-    pub fn set_open(&mut self, open: bool, inward: Option<bool>, time: &Res<Time>) {
+    pub fn set_open(&mut self, open: bool, inward: Option<bool>, time: &Res<Time>) -> bool {
         if self.open == open {
-            return;
+            return false;
         }
         let elapsed = time.elapsed_secs_f64() - self.animation_start_secs;
         if elapsed < DOOR_ANIMATION_SECS {
-            return;
+            return false;
         }
 
         self.open = open;
@@ -55,14 +57,16 @@ impl Doorway {
         if let Some(inward) = inward {
             self.open_inward = inward;
         }
+
+        true
     }
 
-    pub fn open(&mut self, inward: bool, time: &Res<Time>) {
-        self.set_open(true, Some(inward), time);
+    pub fn open(&mut self, inward: bool, time: &Res<Time>) -> bool {
+        self.set_open(true, Some(inward), time)
     }
 
-    pub fn close(&mut self, time: &Res<Time>) {
-        self.set_open(false, None, time);
+    pub fn close(&mut self, time: &Res<Time>) -> bool {
+        self.set_open(false, None, time)
     }
 }
 
@@ -83,15 +87,37 @@ impl Default for DoorAnimationCurves {
     }
 }
 
+#[derive(Resource)]
+pub struct DoorSfx {
+    pub open: Handle<AudioSource>,
+    pub close_start: Handle<AudioSource>,
+    pub close_end: Handle<AudioSource>,
+    pub locked: Handle<AudioSource>,
+    pub unlock: Handle<AudioSource>,
+}
+
 #[derive(Component)]
 pub struct Door;
 
+pub fn init_resources(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.init_resource::<DoorAnimationCurves>();
+    commands.insert_resource(DoorSfx {
+        open: asset_server.load("sfx/door/open.ogg"),
+        close_start: asset_server.load("sfx/door/close_start.ogg"),
+        close_end: asset_server.load("sfx/door/close_end.ogg"),
+        locked: asset_server.load("sfx/door/locked.ogg"),
+        unlock: asset_server.load("sfx/door/unlock.ogg"),
+    });
+}
+
 pub fn open_doors_on_contact(
     time: Res<Time>,
+    mut commands: Commands,
     mut collision_event_reader: EventReader<Collision>,
-    mut doorways: Query<&mut Doorway>,
+    mut doorways: Query<(&GlobalTransform, &mut Doorway)>,
     sensors: Query<(&Parent, &DoorSensor)>,
     player: Query<&IsPlayer>,
+    door_sfx: Res<DoorSfx>,
 ) {
     for Collision(contacts) in collision_event_reader.read() {
         let (mut doorway, open_inward) = {
@@ -114,58 +140,83 @@ pub fn open_doors_on_contact(
             (doorway, open_inward)
         };
 
-        if doorway.locked {
+        if doorway.1.locked {
             // TODO make a noise
             continue;
         }
 
-        doorway.open(open_inward, &time);
+        if doorway.1.open(open_inward, &time) {
+            commands.spawn((
+                Transform::from_translation(doorway.0.translation() + doorway.1.sfx_position),
+                AudioPlayer::new(door_sfx.open.clone()),
+                PlaybackSettings::DESPAWN.with_spatial(true),
+            ));
+        }
     }
 }
 
 pub fn animate_doors(
+    mut commands: Commands,
+    door_sfx: Res<DoorSfx>,
     time: Res<Time>,
     curves: Res<DoorAnimationCurves>,
-    mut doorways: Query<&mut Doorway>,
+    mut doorways: Query<(&GlobalTransform, &mut Doorway)>,
     mut doors: Query<&mut Transform, With<Door>>,
 ) {
-    doorways.iter_mut().for_each(|mut doorway| {
-        if !doorway.animating {
-            return;
-        }
+    doorways
+        .iter_mut()
+        .for_each(|(doorway_transform, mut doorway)| {
+            if !doorway.animating {
+                return;
+            }
 
-        let mut elapsed = time.elapsed_secs_f64() - doorway.animation_start_secs;
+            let mut elapsed = time.elapsed_secs_f64() - doorway.animation_start_secs;
 
-        if doorway.open && elapsed >= DOOR_AUTOCLOSE_SECS {
-            doorway.close(&time);
-            elapsed = 0.0;
-        }
+            if doorway.open && elapsed >= DOOR_AUTOCLOSE_SECS {
+                doorway.close(&time);
+                elapsed = 0.0;
 
-        let Ok([mut left_door, mut right_door]) = doors.get_many_mut(doorway.doors) else {
-            return;
-        };
+                commands.spawn((
+                    Transform::from_translation(
+                        doorway_transform.translation() + doorway.sfx_position,
+                    ),
+                    AudioPlayer::new(door_sfx.close_start.clone()),
+                    PlaybackSettings::DESPAWN.with_spatial(true),
+                ));
+            }
 
-        let curve = if doorway.open {
-            &curves.open
-        } else {
-            &curves.close
-        };
-        let progress = (elapsed / DOOR_ANIMATION_SECS).clamp(0.0, 1.0);
-        let progress = curve.sample(progress as f32).unwrap();
-        let direction = if doorway.open_inward { 1.0 } else { -1.0 };
-        let angle = if doorway.open {
-            progress * DOOR_MAX_ANGLE * direction
-        } else {
-            (DOOR_MAX_ANGLE - progress * DOOR_MAX_ANGLE) * direction
-        };
+            let Ok([mut left_door, mut right_door]) = doors.get_many_mut(doorway.doors) else {
+                return;
+            };
 
-        left_door.rotation = Quat::from_euler(EulerRot::YXZ, angle, 0.0, 0.0);
-        right_door.rotation = Quat::from_euler(EulerRot::YXZ, -angle, 0.0, 0.0);
+            let curve = if doorway.open {
+                &curves.open
+            } else {
+                &curves.close
+            };
+            let progress = (elapsed / DOOR_ANIMATION_SECS).clamp(0.0, 1.0);
+            let progress = curve.sample(progress as f32).unwrap();
+            let direction = if doorway.open_inward { 1.0 } else { -1.0 };
+            let angle = if doorway.open {
+                progress * DOOR_MAX_ANGLE * direction
+            } else {
+                (DOOR_MAX_ANGLE - progress * DOOR_MAX_ANGLE) * direction
+            };
 
-        if elapsed >= DOOR_AUTOCLOSE_SECS {
-            doorway.animating = false;
-        }
-    });
+            left_door.rotation = Quat::from_euler(EulerRot::YXZ, angle, 0.0, 0.0);
+            right_door.rotation = Quat::from_euler(EulerRot::YXZ, -angle, 0.0, 0.0);
+
+            if elapsed >= DOOR_ANIMATION_SECS && !doorway.open {
+                doorway.animating = false;
+                commands.spawn((
+                    Transform::from_translation(
+                        doorway_transform.translation() + doorway.sfx_position,
+                    ),
+                    AudioPlayer::new(door_sfx.close_end.clone()),
+                    PlaybackSettings::DESPAWN.with_spatial(true),
+                ));
+            }
+        });
 }
 
 pub struct AddDoorwayToEntity {
@@ -223,30 +274,45 @@ impl Command for AddDoorwayToEntity {
             .into_iter()
             .map(|(collider, open_inward)| {
                 commands
-                    .spawn((DoorSensor(open_inward), collider, Sensor))
+                    .spawn((
+                        DoorSensor(open_inward),
+                        collider,
+                        Sensor,
+                        DebugRender::default().with_collider_color(Color::srgb(0.1, 0.9, 0.1)),
+                    ))
                     .id()
             })
             .collect::<Vec<_>>();
 
         // Doorway
-        let mut doorway_entity = commands.spawn((
-            Doorway {
-                locked: false,
-                open: false,
-                open_inward: false,
-                animation_start_secs: -DOOR_ANIMATION_SECS,
-                animating: false,
-                doors: [door_entities[0], door_entities[1]],
-            },
-            Transform::default(),
-            RigidBody::Static,
-            generate_door_frame_collider(self.spec),
-            Mesh3d(meshes.add(frame_mesh)),
-            MeshMaterial3d(frame_material),
-        ));
+        let doorway_entity = {
+            let mut doorway_entity = commands.spawn((
+                Doorway {
+                    locked: false,
+                    open: false,
+                    open_inward: false,
+                    animation_start_secs: -DOOR_ANIMATION_SECS,
+                    animating: false,
+                    doors: [door_entities[0], door_entities[1]],
+                    sfx_position: Vec3::new(
+                        self.spec.door.center().x,
+                        self.spec.door.center().y,
+                        0.0,
+                    ),
+                },
+                Transform::default(),
+                RigidBody::Static,
+                generate_door_frame_collider(self.spec),
+                Mesh3d(meshes.add(frame_mesh)),
+                MeshMaterial3d(frame_material),
+            ));
 
-        doorway_entity.add_children(&door_entities);
-        doorway_entity.add_children(&trigger_entities);
+            doorway_entity.add_children(&door_entities);
+            doorway_entity.add_children(&trigger_entities);
+
+            doorway_entity.id()
+        };
+        commands.entity(self.entity).add_child(doorway_entity);
 
         system_state.apply(world);
     }
@@ -493,12 +559,15 @@ pub fn generate_door_meshes(
 
 fn finish_mesh(mesh_parts: &mut MeshParts) -> Mesh {
     mesh_parts.curr_idx = 0;
-    Mesh::new(PrimitiveTopology::TriangleList, default())
-        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, take(&mut mesh_parts.positions))
-        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, take(&mut mesh_parts.normals))
-        .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, take(&mut mesh_parts.colors))
-        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, take(&mut mesh_parts.uvs))
-        .with_inserted_indices(Indices::U16(take(&mut mesh_parts.indices)))
+    Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::RENDER_WORLD,
+    )
+    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, take(&mut mesh_parts.positions))
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, take(&mut mesh_parts.normals))
+    .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, take(&mut mesh_parts.colors))
+    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, take(&mut mesh_parts.uvs))
+    .with_inserted_indices(Indices::U16(take(&mut mesh_parts.indices)))
 }
 
 fn vert(
