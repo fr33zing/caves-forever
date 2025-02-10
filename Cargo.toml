@@ -1,15 +1,16 @@
 [workspace]
+resolver = "2"
 members = [
   "lib",
   "game",
-  "editor"
+  "editor",
+  "examples/*"
 ]
-resolver = "2"
 
 [workspace.dependencies]
 anyhow = "1.0.95"
 avian3d = { version = "^0.2", features = ["serialize"] }
-bevy = { version = "0.15.0", features = ["bevy_mesh_picking_backend", "wayland"] }
+bevy = { version = "0.15.0", features = ["bevy_mesh_picking_backend", "wayland", "tga", "embedded_watcher", "file_watcher", "basis-universal"] }
 bevy_egui = "0.32.0"
 common_macros = "0.1.1"
 cbor4ii = { version = "1.0.0", features = ["serde1"] }

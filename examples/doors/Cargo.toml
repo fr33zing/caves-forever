@@ -1,0 +1,14 @@
+[package]
+name = "doors"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lib = { path = "../../lib" }
+
+avian3d = { workspace = true }
+bevy = { workspace = true }
+bevy_egui = { workspace = true }
+noisy_bevy = { workspace = true }
+rand = { workspace = true }
+bevy_rand = { workspace = true }
