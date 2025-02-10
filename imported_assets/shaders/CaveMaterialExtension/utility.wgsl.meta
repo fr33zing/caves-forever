@@ -1,0 +1,12 @@
+(
+    meta_format_version: "1.0",
+    processed_info: Some((
+        hash: (148, 14, 226, 200, 44, 69, 31, 40, 119, 28, 223, 78, 40, 67, 111, 239, 244, 252, 228, 66, 83, 56, 245, 207, 203, 183, 248, 9, 13, 163, 248, 64),
+        full_hash: (148, 14, 226, 200, 44, 69, 31, 40, 119, 28, 223, 78, 40, 67, 111, 239, 244, 252, 228, 66, 83, 56, 245, 207, 203, 183, 248, 9, 13, 163, 248, 64),
+        process_dependencies: [],
+    )),
+    asset: Load(
+        loader: "bevy_render::render_resource::shader::ShaderLoader",
+        settings: (),
+    ),
+)

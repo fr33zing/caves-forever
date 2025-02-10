@@ -1,0 +1,15 @@
+Room((
+    environment: Development,
+    rarity: Uncommon,
+    parts: {
+        "08657f2f-27a3-4a6e-b6e3-5665b475d296": (
+            uuid: "08657f2f-27a3-4a6e-b6e3-5665b475d296",
+            transform: (
+                translation: (-0.19448471, 0.9144, -3.4953613),
+                rotation: (0.0, 0.0, 0.0, 1.0),
+                scale: (1.0, 1.0, 1.0),
+            ),
+            data: Spawnpoint,
+        ),
+    },
+))

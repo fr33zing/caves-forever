@@ -1,0 +1,155 @@
+Room((
+    environment: Production,
+    rarity: Uncommon,
+    parts: {
+        "b6210d39-13ea-4fc2-a808-1c819307302f": (
+            uuid: "b6210d39-13ea-4fc2-a808-1c819307302f",
+            transform: (
+                translation: (34.267147, -34.434967, 42.766483),
+                rotation: (0.000000063071, 0.70710677, 0.70710677, -0.000000063071),
+                scale: (10.0, 1.0, 10.0),
+            ),
+            data: Portal(
+                direction: Exit,
+            ),
+        ),
+        "a50a8080-e2b2-413b-ba7c-1f2019e8d8ec": (
+            uuid: "a50a8080-e2b2-413b-ba7c-1f2019e8d8ec",
+            transform: (
+                translation: (1.6690674, -41.907997, -1.0891724),
+                rotation: (0.0, 0.0, 0.0, 1.0),
+                scale: (1.0, 1.0, 1.0),
+            ),
+            data: Spawnpoint,
+        ),
+        "07f5dbda-0d4d-4f98-9fa6-a9b07a15e68f": (
+            uuid: "07f5dbda-0d4d-4f98-9fa6-a9b07a15e68f",
+            transform: (
+                translation: (43.039753, -34.607346, -0.6254288),
+                rotation: (-0.49999997, -0.49999997, -0.49999997, 0.49999997),
+                scale: (10.0, 1.0, 10.0),
+            ),
+            data: Portal(
+                direction: Bidirectional,
+            ),
+        ),
+        "bd1cac94-3739-4688-9dc0-81c4b009ea63": (
+            uuid: "bd1cac94-3739-4688-9dc0-81c4b009ea63",
+            transform: (
+                translation: (28.708292, -34.15663, -42.76878),
+                rotation: (0.0000000006268799, 0.7071067, 0.7071068, -0.000000062444116),
+                scale: (10.0, 1.0, 10.0),
+            ),
+            data: Portal(
+                direction: Entrance,
+            ),
+        ),
+        "e3167b6f-817a-4c4b-a125-2bf1243c2180": (
+            uuid: "e3167b6f-817a-4c4b-a125-2bf1243c2180",
+            transform: (
+                translation: (-33.447224, -35.104115, 42.766495),
+                rotation: (0.00000006307101, 0.70710677, 0.70710677, -0.00000006307101),
+                scale: (10.0, 1.0, 10.0),
+            ),
+            data: Portal(
+                direction: Exit,
+            ),
+        ),
+        "df76b649-5aaa-4c33-b6a3-d9be7908aaaf": (
+            uuid: "df76b649-5aaa-4c33-b6a3-d9be7908aaaf",
+            transform: (
+                translation: (0.2720871, 0.0, -0.0011520386),
+                rotation: (0.0, 0.0, 0.0, 1.0),
+                scale: (21.383823, 21.383823, 21.383823),
+            ),
+            data: Stl(
+                path: "assets/stl/default.stl",
+                material: BrownRock,
+                vertices: [
+                    (1.9999998, -1.9999999, -2.0),
+                    (1.9999998, 1.9999999, -2.0),
+                    (2.0, 1.9999998, 1.9999995),
+                    (2.0, -1.9999999, 1.9999996),
+                    (-1.9999998, 1.9999999, 2.0),
+                    (-1.9999998, -1.9999999, 2.0),
+                    (-2.0, 1.9999999, -1.9999996),
+                    (-2.0, -1.9999998, -1.9999995),
+                ],
+                indices: [
+                    0,
+                    1,
+                    2,
+                    0,
+                    2,
+                    3,
+                    3,
+                    2,
+                    4,
+                    3,
+                    4,
+                    5,
+                    5,
+                    4,
+                    6,
+                    5,
+                    6,
+                    7,
+                    7,
+                    6,
+                    1,
+                    7,
+                    1,
+                    0,
+                    3,
+                    5,
+                    7,
+                    3,
+                    7,
+                    0,
+                    4,
+                    2,
+                    1,
+                    4,
+                    1,
+                    6,
+                ],
+                geometry_hash: 16571611132450098372,
+                vhacd_parameters: (
+                    concavity: 0.01,
+                    alpha: 0.05,
+                    beta: 0.05,
+                    resolution: 64,
+                    plane_downsampling: 4,
+                    convex_hull_downsampling: 4,
+                    fill_mode: FloodFill(
+                        detect_cavities: false,
+                    ),
+                    convex_hull_approximation: true,
+                    max_convex_hulls: 1024,
+                ),
+            ),
+        ),
+        "c0e0bbbe-d7fa-4c79-9ac1-f5130573756e": (
+            uuid: "c0e0bbbe-d7fa-4c79-9ac1-f5130573756e",
+            transform: (
+                translation: (-31.944216, -34.18037, -42.76878),
+                rotation: (0.0000000006268799, 0.7071067, 0.7071068, -0.000000062444116),
+                scale: (10.0, 1.0, 10.0),
+            ),
+            data: Portal(
+                direction: Entrance,
+            ),
+        ),
+        "21a537d2-320e-4c1a-8421-c8c5480ff3dc": (
+            uuid: "21a537d2-320e-4c1a-8421-c8c5480ff3dc",
+            transform: (
+                translation: (-42.49558, -33.076298, -1.1190462),
+                rotation: (-0.49999994, 0.49999997, 0.49999997, 0.49999994),
+                scale: (10.0, 1.0, 10.0),
+            ),
+            data: Portal(
+                direction: Bidirectional,
+            ),
+        ),
+    },
+))
