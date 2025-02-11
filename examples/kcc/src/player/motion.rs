@@ -7,7 +7,9 @@
 use avian3d::prelude::*;
 use bevy::prelude::*;
 
-use super::{PlayerCamera, PlayerKeybinds, Section};
+use crate::player::quakeish::air_move;
+
+use super::{quakeish::ground_move, PlayerCamera, PlayerKeybinds, Section};
 
 const MAX_SLOPE_DEGREES: f32 = 55.0;
 const GROUND_DISTANCE: f32 = 0.15;
@@ -20,7 +22,8 @@ const JUMP_FORCE: f32 = 10.0;
 pub struct PlayerMotion {
     pub grounded: bool,
     pub ground_normal: Option<Vec3>,
-    pub velocity: Vec3,
+    pub gravity: Vec3,
+    pub movement: Vec3,
 }
 
 impl Default for PlayerMotion {
@@ -28,7 +31,8 @@ impl Default for PlayerMotion {
         Self {
             grounded: true,
             ground_normal: None,
-            velocity: Vec3::ZERO,
+            gravity: Vec3::ZERO,
+            movement: Vec3::ZERO,
         }
     }
 }
@@ -136,7 +140,7 @@ fn jump(input: Res<PlayerInput>, state: Option<Single<&mut PlayerMotion>>) {
         return;
     };
 
-    state.velocity.y += JUMP_FORCE;
+    state.gravity.y += JUMP_FORCE;
 }
 
 fn snap_to_ground(
@@ -168,11 +172,11 @@ fn snap_to_ground(
     state.ground_normal = Some(hit.normal1);
 
     if state.grounded {
-        if state.velocity.y <= 0.0 {
+        if state.gravity.y <= 0.0 {
             transform.translation.y -= hit.distance - SKIN;
         }
 
-        state.velocity.y = state.velocity.y.max(0.0);
+        state.gravity.y = state.gravity.y.max(0.0);
     }
 }
 
@@ -180,7 +184,7 @@ fn movement_pass(
     time: Res<Time>,
     input: Res<PlayerInput>,
     spatial_query: SpatialQuery,
-    player: Option<Single<(Entity, &mut Transform, &Section, &PlayerMotion)>>,
+    player: Option<Single<(Entity, &mut Transform, &Section, &mut PlayerMotion)>>,
     camera: Option<Single<&GlobalTransform, With<PlayerCamera>>>,
 ) {
     let Some(player) = player else {
@@ -190,19 +194,24 @@ fn movement_pass(
         return;
     };
 
-    let (entity, mut transform, section, state) = player.into_inner();
+    let (entity, mut transform, section, mut state) = player.into_inner();
 
-    let mut velocity = Vec3::new(input.direction.x, 0.0, input.direction.y);
-    velocity *= 32.0 * time.delta_secs();
+    let mut wishdir = Vec3::new(input.direction.x, 0.0, input.direction.y);
 
     let yaw = camera.rotation().to_euler(EulerRot::YXZ).0;
     let rotation = Transform::from_rotation(Quat::from_euler(EulerRot::YXZ, yaw, 0.0, 0.0));
-    velocity = rotation.transform_point(velocity);
+    wishdir = rotation.transform_point(wishdir);
+
+    if state.grounded {
+        ground_move(wishdir, &mut state.movement, &time);
+    } else {
+        air_move(wishdir, &mut state.movement, &time);
+    }
 
     collide_and_slide(
         Pass::Movement,
         section,
-        velocity,
+        state.movement * time.delta_secs(),
         &mut transform.translation,
         state.grounded,
         &spatial_query,
@@ -227,12 +236,12 @@ fn gravity_pass(
     if state.grounded {
         gravity *= 0.01;
     }
-    state.velocity += gravity;
+    state.gravity += gravity;
 
     collide_and_slide(
         Pass::Gravity,
         section,
-        state.velocity * time.delta_secs(),
+        state.gravity * time.delta_secs(),
         &mut transform.translation,
         state.grounded,
         &spatial_query,
@@ -240,19 +249,6 @@ fn gravity_pass(
     );
 
     depenetrate(&spatial_query, &filter, &section.collider(), &mut transform);
-}
-
-fn calculate_sliding_velocity(planes: &mut Vec<Vec3>, normal: Vec3, velocity: Vec3) -> Vec3 {
-    planes.push(normal);
-    let mut result = velocity.reject_from(normal);
-
-    if planes.len() > 1 {
-        result = planes.windows(2).fold(result, |acc, plane_pair| {
-            acc.project_onto(plane_pair[0].cross(plane_pair[1]))
-        });
-    }
-
-    result
 }
 
 fn collide_and_slide(

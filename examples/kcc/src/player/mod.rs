@@ -5,6 +5,7 @@ mod camera;
 mod config;
 mod motion;
 mod utility;
+mod quakeish;
 
 use camera::PlayerCameraPlugin;
 use config::PlayerCameraConfig;
