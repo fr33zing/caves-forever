@@ -3478,6 +3478,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "kcc"
+version = "0.1.0"
+dependencies = [
+ "avian3d",
+ "bevy",
+ "bevy_egui 0.32.0",
+ "bevy_rand",
+ "lib",
+ "noisy_bevy",
+ "rand",
+]
+
+[[package]]
 name = "khronos-egl"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
