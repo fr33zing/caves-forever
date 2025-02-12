@@ -14,7 +14,7 @@ use bevy::{
     window::PresentMode,
 };
 use bevy_egui::EguiPlugin;
-use player::{Player, PlayerPlugin};
+use player::{Player, PlayerCamera, PlayerPlugin};
 
 fn main() {
     let mut app = App::new();
@@ -106,4 +106,5 @@ fn setup_collider(
 
 fn setup_player(mut commands: Commands) {
     commands.spawn((Player, Transform::from_translation(Vec3::Y * 1.0)));
+    commands.spawn(PlayerCamera);
 }

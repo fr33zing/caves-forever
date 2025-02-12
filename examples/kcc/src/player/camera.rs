@@ -1,5 +1,6 @@
 use std::f32::consts::FRAC_PI_2;
 
+use avian3d::prelude::*;
 use bevy::{
     input::mouse::AccumulatedMouseMotion,
     prelude::*,
@@ -8,7 +9,7 @@ use bevy::{
 
 use super::{
     config::{PlayerCameraConfig, PlayerCameraMode},
-    PlayerConfig, PlayerKeybinds,
+    Player, PlayerConfig, PlayerKeybinds, Section,
 };
 
 const MOUSE_MOTION_SCALE: f32 = 0.00015;
@@ -33,6 +34,12 @@ impl Plugin for PlayerCameraPlugin {
                 (switch_camera_mode, transition_camera_mode).chain(),
             ),
         );
+        app.add_systems(
+            PostUpdate,
+            attach_to_player
+                .after(PhysicsSet::Sync)
+                .before(TransformSystem::TransformPropagate),
+        );
     }
 }
 
@@ -49,7 +56,7 @@ fn add_required_components(
             .insert_if_new(Visibility::Visible)
             .insert_if_new(Transform::from_translation(Vec3::new(
                 0.0,
-                player_config.height - player_config.eye_offset,
+                player_config.height - camera_config.eye_offset,
                 0.0,
             )));
 
@@ -175,4 +182,21 @@ fn transition_camera_mode(
 
         child.translation.z = child.translation.z.lerp(target, fac);
     });
+}
+
+fn attach_to_player(
+    config: Res<PlayerCameraConfig>,
+    camera: Option<Single<&mut Transform, With<PlayerCamera>>>,
+    player: Option<Single<(&GlobalTransform, &Section), With<Player>>>,
+) {
+    let Some(player) = player else {
+        return;
+    };
+    let Some(mut camera) = camera else {
+        return;
+    };
+
+    let (player, section) = player.into_inner();
+
+    camera.translation = player.translation() + Vec3::Y * (section.height - config.eye_offset);
 }

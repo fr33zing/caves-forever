@@ -13,12 +13,13 @@ use super::{
 };
 
 const MAX_SLOPE_DEGREES: f32 = 55.0;
-const GROUND_DISTANCE: f32 = 0.15;
+const GROUND_DISTANCE: f32 = 0.1;
 const MAX_BOUNCES: u32 = 4;
+const MIN_VELOCITY: f32 = 1.0;
 const SKIN: f32 = 0.01;
-const JUMP_FORCE: f32 = 16.0;
+const JUMP_FORCE: f32 = 12.0;
 const JUMP_BUFFER_DISTANCE: f32 = 1.0;
-const GRAVITY: f32 = 64.0;
+const GRAVITY: f32 = 48.0;
 
 #[derive(Default, Component)]
 pub struct PlayerMotion {
@@ -300,6 +301,10 @@ fn collide_and_slide(
     filter: &SpatialQueryFilter,
     time: &Res<Time>,
 ) {
+    if velocity.length() < MIN_VELOCITY {
+        return;
+    };
+
     let mut time_velocity = *velocity * time.delta_secs();
     let initial_velocity = time_velocity * time.delta_secs();
 

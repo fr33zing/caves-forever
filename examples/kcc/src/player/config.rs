@@ -4,7 +4,6 @@ use bevy::prelude::*;
 pub struct PlayerConfig {
     pub height: f32,
     pub radius: f32,
-    pub eye_offset: f32,
 }
 
 #[derive(Resource)]
@@ -27,6 +26,7 @@ pub enum Keybind {
 #[derive(Resource)]
 pub struct PlayerCameraConfig {
     pub mode: PlayerCameraMode,
+    pub eye_offset: f32,
     pub sensitivity: f32,
     pub fov_degrees: f32,
     pub third_person_distance: f32,
@@ -42,9 +42,8 @@ pub enum PlayerCameraMode {
 impl Default for PlayerConfig {
     fn default() -> Self {
         Self {
-            height: 1.8288,     // 6'
-            radius: 0.4572,     // 1'6"
-            eye_offset: 0.1524, // 6"
+            height: 1.8288, // 6'
+            radius: 0.4572, // 1'6"
         }
     }
 }
@@ -103,6 +102,7 @@ impl Default for PlayerCameraConfig {
     fn default() -> Self {
         Self {
             mode: default(),
+            eye_offset: 0.1524, // 6"
             sensitivity: 1.0,
             fov_degrees: 45.0,
             third_person_distance: 8.0,
