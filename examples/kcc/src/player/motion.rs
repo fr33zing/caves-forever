@@ -68,7 +68,6 @@ impl Plugin for PlayerMotionPlugin {
             Update,
             (
                 process_input,
-                drag,
                 perform_actions,
                 snap_to_ground,
                 movement_pass,
@@ -133,14 +132,6 @@ fn process_input(
             input.sprint = true;
         }
     }
-}
-
-fn drag(state: Option<Single<&mut PlayerMotion>>) {
-    let Some(mut state) = state else {
-        return;
-    };
-
-    //state.velocity *= 0.999 / ;
 }
 
 fn perform_actions(mut input: ResMut<PlayerInput>, state: Option<Single<&mut PlayerMotion>>) {
