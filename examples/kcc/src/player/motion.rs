@@ -17,12 +17,14 @@ const GROUND_DISTANCE: f32 = 0.15;
 const MAX_BOUNCES: u32 = 4;
 const SKIN: f32 = 0.01;
 const JUMP_FORCE: f32 = 16.0;
+const JUMP_BUFFER_DISTANCE: f32 = 1.0;
 const GRAVITY: f32 = 64.0;
 
 #[derive(Default, Component)]
 pub struct PlayerMotion {
     pub grounded: bool,
     pub ground_normal: Option<Vec3>,
+    pub ground_distance: Option<f32>,
     pub landed_time: f64,
     pub gravity: Vec3,
     pub movement: Vec3,
@@ -32,9 +34,22 @@ pub struct PlayerMotion {
 pub struct PlayerInput {
     /// Commanded movement direction, local XZ plane.
     direction: Vec2,
-    jump: bool,
     crouch: bool,
     sprint: bool,
+
+    actions: Vec<PlayerAction>,
+}
+impl PlayerInput {
+    pub fn action(&mut self, action: PlayerAction) {
+        if !self.actions.contains(&action) {
+            self.actions.push(action);
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum PlayerAction {
+    Jump,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -53,7 +68,7 @@ impl Plugin for PlayerMotionPlugin {
             (
                 process_input,
                 drag,
-                jump,
+                perform_actions,
                 snap_to_ground,
                 movement_pass,
                 gravity_pass,
@@ -68,6 +83,7 @@ fn process_input(
     binds: Res<PlayerKeybinds>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
+    state: Option<Single<&PlayerMotion>>,
 ) {
     input.direction = Vec2::ZERO;
 
@@ -96,10 +112,14 @@ fn process_input(
         input.direction = input.direction.normalize();
     }
 
-    input.jump = if let Some(jump) = &binds.jump {
-        jump.just_pressed(&keyboard, &mouse)
-    } else {
-        false
+    if let Some(jump) = &binds.jump {
+        if let Some(state) = state {
+            if let Some(ground_distance) = state.ground_distance {
+                if jump.just_pressed(&keyboard, &mouse) && ground_distance <= JUMP_BUFFER_DISTANCE {
+                    input.action(PlayerAction::Jump);
+                }
+            }
+        }
     };
 
     if let Some(crouch) = &binds.crouch {
@@ -122,16 +142,26 @@ fn drag(state: Option<Single<&mut PlayerMotion>>) {
     //state.velocity *= 0.999 / ;
 }
 
-fn jump(input: Res<PlayerInput>, state: Option<Single<&mut PlayerMotion>>) {
-    if !input.jump {
-        return;
-    }
-
+fn perform_actions(mut input: ResMut<PlayerInput>, state: Option<Single<&mut PlayerMotion>>) {
     let Some(mut state) = state else {
         return;
     };
 
-    state.gravity.y += JUMP_FORCE;
+    input.actions.retain(|action| {
+        let mut consumed = false;
+        let mut consume = || consumed = true;
+
+        match action {
+            PlayerAction::Jump => {
+                if state.grounded {
+                    state.gravity.y += JUMP_FORCE;
+                    consume();
+                }
+            }
+        };
+
+        !consumed
+    });
 }
 
 fn snap_to_ground(
@@ -151,13 +181,21 @@ fn snap_to_ground(
         bottom,
         default(),
         Dir3::NEG_Y,
-        &ShapeCastConfig::from_max_distance(GROUND_DISTANCE),
+        &ShapeCastConfig::from_max_distance(JUMP_BUFFER_DISTANCE),
         &SpatialQueryFilter::from_excluded_entities(vec![entity]),
     );
     let Some(hit) = shapecast else {
         state.grounded = false;
+        state.ground_distance = None;
         return;
     };
+
+    state.ground_distance = Some(hit.distance);
+
+    if hit.distance > GROUND_DISTANCE {
+        state.grounded = false;
+        return;
+    }
 
     let prev_grounded = state.grounded;
 
