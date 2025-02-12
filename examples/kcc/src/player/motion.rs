@@ -7,34 +7,25 @@
 use avian3d::prelude::*;
 use bevy::prelude::*;
 
-use crate::player::quakeish::air_move;
-
-use super::{quakeish::ground_move, PlayerCamera, PlayerKeybinds, Section};
+use super::{
+    quakeish::{air_move, ground_move},
+    PlayerCamera, PlayerKeybinds, Section,
+};
 
 const MAX_SLOPE_DEGREES: f32 = 55.0;
 const GROUND_DISTANCE: f32 = 0.15;
-const MAX_BOUNCES: u32 = 1;
-const G: f32 = 9.81 * 4.0;
+const MAX_BOUNCES: u32 = 4;
 const SKIN: f32 = 0.01;
-const JUMP_FORCE: f32 = 10.0;
+const JUMP_FORCE: f32 = 16.0;
+const GRAVITY: f32 = 64.0;
 
-#[derive(Component)]
+#[derive(Default, Component)]
 pub struct PlayerMotion {
     pub grounded: bool,
     pub ground_normal: Option<Vec3>,
+    pub landed_time: f64,
     pub gravity: Vec3,
     pub movement: Vec3,
-}
-
-impl Default for PlayerMotion {
-    fn default() -> Self {
-        Self {
-            grounded: true,
-            ground_normal: None,
-            gravity: Vec3::ZERO,
-            movement: Vec3::ZERO,
-        }
-    }
 }
 
 #[derive(Resource, Default)]
@@ -144,6 +135,7 @@ fn jump(input: Res<PlayerInput>, state: Option<Single<&mut PlayerMotion>>) {
 }
 
 fn snap_to_ground(
+    time: Res<Time>,
     spatial_query: SpatialQuery,
     player: Option<Single<(Entity, &mut Transform, &Section, &mut PlayerMotion)>>,
 ) {
@@ -167,16 +159,23 @@ fn snap_to_ground(
         return;
     };
 
+    let prev_grounded = state.grounded;
+
     let angle = hit.normal1.angle_between(Vec3::Y);
     state.grounded = angle < MAX_SLOPE_DEGREES.to_radians();
     state.ground_normal = Some(hit.normal1);
 
-    if state.grounded {
-        if state.gravity.y <= 0.0 {
-            transform.translation.y -= hit.distance - SKIN;
-        }
+    if !state.grounded {
+        return;
+    }
 
-        state.gravity.y = state.gravity.y.max(0.0);
+    if state.gravity.y <= 0.0 {
+        transform.translation.y -= hit.distance - SKIN;
+    }
+    state.gravity.y = state.gravity.y.max(0.0);
+
+    if !prev_grounded {
+        state.landed_time = time.elapsed_secs_f64();
     }
 }
 
@@ -203,7 +202,7 @@ fn movement_pass(
     wishdir = rotation.transform_point(wishdir);
 
     if state.grounded {
-        ground_move(wishdir, &mut state.movement, &time);
+        ground_move(wishdir, state.landed_time, &mut state.movement, &time);
     } else {
         air_move(wishdir, &mut state.movement, &time);
     }
@@ -211,11 +210,12 @@ fn movement_pass(
     collide_and_slide(
         Pass::Movement,
         section,
-        state.movement * time.delta_secs(),
-        &mut transform.translation,
         state.grounded,
+        &mut state.movement,
+        &mut transform.translation,
         &spatial_query,
         &SpatialQueryFilter::from_excluded_entities(vec![entity]),
+        &time,
     );
 }
 
@@ -232,7 +232,7 @@ fn gravity_pass(
 
     let filter = SpatialQueryFilter::from_excluded_entities(vec![entity]);
 
-    let mut gravity = Vec3::NEG_Y * G * time.delta_secs();
+    let mut gravity = Vec3::NEG_Y * GRAVITY * time.delta_secs();
     if state.grounded {
         gravity *= 0.01;
     }
@@ -241,11 +241,12 @@ fn gravity_pass(
     collide_and_slide(
         Pass::Gravity,
         section,
-        state.gravity * time.delta_secs(),
-        &mut transform.translation,
         state.grounded,
+        &mut state.gravity,
+        &mut transform.translation,
         &spatial_query,
         &filter,
+        &time,
     );
 
     depenetrate(&spatial_query, &filter, &section.collider(), &mut transform);
@@ -254,17 +255,18 @@ fn gravity_pass(
 fn collide_and_slide(
     pass: Pass,
     section: &Section,
-    velocity: Vec3,
-    position: &mut Vec3,
     grounded: bool,
+    velocity: &mut Vec3,
+    position: &mut Vec3,
     spatial_query: &SpatialQuery,
     filter: &SpatialQueryFilter,
+    time: &Res<Time>,
 ) {
-    let initial_velocity = velocity;
-    let mut velocity = velocity;
+    let mut time_velocity = *velocity * time.delta_secs();
+    let initial_velocity = time_velocity * time.delta_secs();
 
     for _ in 0..MAX_BOUNCES {
-        let Ok((direction, distance)) = Dir3::new_and_length(velocity) else {
+        let Ok((direction, distance)) = Dir3::new_and_length(time_velocity) else {
             break;
         };
 
@@ -282,7 +284,7 @@ fn collide_and_slide(
             filter,
         );
         let Some(hit) = shapecast else {
-            *position += velocity;
+            *position += time_velocity;
             break;
         };
 
@@ -290,27 +292,30 @@ fn collide_and_slide(
         let angle_of_normal = hit.normal1.angle_between(Vec3::Y);
 
         if snap_to_surface.length() <= SKIN {
-            velocity = Vec3::ZERO;
+            time_velocity = Vec3::ZERO;
+            *velocity = Vec3::ZERO;
         }
 
-        velocity = if angle_of_normal <= MAX_SLOPE_DEGREES.to_radians() {
+        time_velocity = if angle_of_normal <= MAX_SLOPE_DEGREES.to_radians() {
             if pass == Pass::Gravity {
                 snap_to_surface
             } else {
-                velocity.length() * velocity.project_onto_normalized(hit.normal1)
+                time_velocity.length() * time_velocity.project_onto_normalized(hit.normal1)
             }
         } else {
             let horizontal = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
             let scale = 1.0 - horizontal(hit.normal1).dot(-horizontal(initial_velocity));
 
+            *velocity *= scale;
+
             if grounded && pass != Pass::Gravity {
-                horizontal(velocity).project_onto_normalized(horizontal(hit.normal1)) * scale
+                horizontal(time_velocity).project_onto_normalized(horizontal(hit.normal1)) * scale
             } else {
-                velocity.length() * velocity.project_onto_normalized(hit.normal1) * scale
+                time_velocity.length() * time_velocity.project_onto_normalized(hit.normal1) * scale
             }
         };
 
-        *position += velocity;
+        *position += time_velocity;
     }
 }
 
