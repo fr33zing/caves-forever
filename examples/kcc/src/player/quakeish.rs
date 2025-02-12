@@ -5,13 +5,14 @@
 use bevy::prelude::{Vec3, *};
 
 // Ratios based on Quake/QW/server/sv_phys.c
+// Not sure how 1:1 this is with Quake.
 const FRICTION: f32 = 6.0;
 const FRICTION_DELAY_SECS: f64 = 1.0 / 20.0;
-const QUAKE_UNITS_PER_METER: f32 = 16.0; // Just guessing.
+const QUAKE_UNITS_PER_METER: f32 = 16.0;
 const GROUND_ACCELERATE: f32 = 10.0 * QUAKE_UNITS_PER_METER;
 const AIR_ACCELERATE: f32 = 0.7 * QUAKE_UNITS_PER_METER;
-const MAX_VELOCITY_GROUND: f32 = 320.0 * QUAKE_UNITS_PER_METER;
-const MAX_VELOCITY_AIR: f32 = 320.0 * QUAKE_UNITS_PER_METER;
+const MAX_VELOCITY_GROUND: f32 = 320.0 / QUAKE_UNITS_PER_METER;
+const MAX_VELOCITY_AIR: f32 = 320.0 / QUAKE_UNITS_PER_METER;
 
 pub fn accelerate(
     direction: Vec3,
