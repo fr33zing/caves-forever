@@ -215,6 +215,7 @@ fn movement_pass(
     spatial_query: SpatialQuery,
     player: Option<Single<(Entity, &mut Transform, &Section, &mut PlayerMotion)>>,
     camera: Option<Single<&GlobalTransform, With<PlayerCamera>>>,
+    sensors: Query<Entity, With<Sensor>>,
 ) {
     let Some(player) = player else {
         return;
@@ -237,6 +238,9 @@ fn movement_pass(
         air_move(wishdir, &mut state.movement, &time);
     }
 
+    let mut filter_entities: Vec<Entity> = sensors.iter().collect();
+    filter_entities.push(entity);
+
     collide_and_slide(
         Pass::Movement,
         section,
@@ -244,7 +248,7 @@ fn movement_pass(
         &mut state.movement,
         &mut transform.translation,
         &spatial_query,
-        &SpatialQueryFilter::from_excluded_entities(vec![entity]),
+        &SpatialQueryFilter::from_excluded_entities(filter_entities),
         &time,
     );
 }
@@ -253,6 +257,7 @@ fn gravity_pass(
     time: Res<Time>,
     spatial_query: SpatialQuery,
     player: Option<Single<(Entity, &mut Transform, &Section, &mut PlayerMotion)>>,
+    sensors: Query<Entity, With<Sensor>>,
 ) {
     let Some(player) = player else {
         return;
@@ -260,13 +265,16 @@ fn gravity_pass(
 
     let (entity, mut transform, section, mut state) = player.into_inner();
 
-    let filter = SpatialQueryFilter::from_excluded_entities(vec![entity]);
-
     let mut gravity = Vec3::NEG_Y * GRAVITY * time.delta_secs();
     if state.grounded {
         gravity *= 0.01;
     }
     state.gravity += gravity;
+
+    let mut filter_entities: Vec<Entity> = sensors.iter().collect();
+    filter_entities.push(entity);
+
+    let filter = SpatialQueryFilter::from_excluded_entities(filter_entities);
 
     collide_and_slide(
         Pass::Gravity,
