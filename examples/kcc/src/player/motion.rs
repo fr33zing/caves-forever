@@ -4,6 +4,8 @@
 // - https://github.com/nicholas-maltbie/OpenKCC/blob/a1a30ed7f7722ea82a1df6bd01849e0bfde6abf4/Assets/Samples/SimplifiedDemoKCC/Scripts/SimplifiedKCC.cs
 // - https://github.com/Desine-Unity/collide-and-slide/blob/main/Runtime/CollideAndSlide.cs
 
+// TODO add an expiration time to buffered actions
+
 use avian3d::prelude::*;
 use bevy::prelude::*;
 
@@ -22,16 +24,21 @@ const GRAVITY: f32 = 64.0;
 const PLAYER_PUSH_FORCE: f32 = 28.0;
 // const TERMINAL_VELOCITY: f32 = TODO
 
+#[derive(Default)]
+pub struct PlayerForces {
+    pub movement: Vec3,
+    pub external: Vec3,
+    pub gravity: Vec3,
+}
+
 #[derive(Default, Component)]
 pub struct PlayerMotion {
     pub grounded: bool,
     pub ground_normal: Option<Vec3>,
     pub ground_distance: Option<f32>,
     pub landed_time: f64,
-    pub gravity: Vec3,
-    pub movement: Vec3,
-    pub external_force: Vec3,
     pub no_gravity_this_frame: bool,
+    pub forces: PlayerForces,
 }
 
 #[derive(Resource, Default)]
@@ -136,7 +143,7 @@ fn perform_actions(mut input: ResMut<PlayerInput>, state: Option<Single<&mut Pla
         match action {
             PlayerAction::Jump => {
                 if state.grounded {
-                    state.gravity.y += JUMP_FORCE;
+                    state.forces.gravity.y += JUMP_FORCE;
                     consume();
                 }
             }
@@ -189,10 +196,10 @@ fn snap_to_ground(
         return;
     }
 
-    if state.gravity.y <= 0.0 {
+    if state.forces.gravity.y <= 0.0 {
         transform.translation.y -= hit.distance - SKIN;
     }
-    state.gravity.y = state.gravity.y.max(0.0);
+    state.forces.gravity.y = state.forces.gravity.y.max(0.0);
 
     if !prev_grounded {
         state.landed_time = time.elapsed_secs_f64();
@@ -236,8 +243,8 @@ fn motion(
 
     // External force
     {
-        state.external_force *= 1.0 - time.delta_secs() * 4.0;
-        collide_and_slide(&mut state.external_force);
+        state.forces.external *= 1.0 - time.delta_secs() * 4.0;
+        collide_and_slide(&mut state.forces.external);
     }
 
     // Movement
@@ -247,11 +254,16 @@ fn motion(
         let rotation = Transform::from_rotation(Quat::from_euler(EulerRot::YXZ, yaw, 0.0, 0.0));
         wishdir = rotation.transform_point(wishdir);
         if state.grounded {
-            ground_move(wishdir, state.landed_time, &mut state.movement, &time);
+            ground_move(
+                wishdir,
+                state.landed_time,
+                &mut state.forces.movement,
+                &time,
+            );
         } else {
-            air_move(wishdir, &mut state.movement, &time);
+            air_move(wishdir, &mut state.forces.movement, &time);
         }
-        collide_and_slide(&mut state.movement);
+        collide_and_slide(&mut state.forces.movement);
     };
 
     // Gravity
@@ -264,8 +276,8 @@ fn motion(
         if state.grounded {
             gravity *= 0.01;
         }
-        state.gravity += gravity;
-        collide_and_slide(&mut state.gravity)
+        state.forces.gravity += gravity;
+        collide_and_slide(&mut state.forces.gravity)
     };
 
     // Just in case

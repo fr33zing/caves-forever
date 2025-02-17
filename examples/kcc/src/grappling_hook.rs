@@ -246,5 +246,5 @@ fn accelerate(
     let force = SPRING_CONSTANT * distance;
 
     player_motion.no_gravity_this_frame = true;
-    player_motion.external_force += direction * 512.0 * time.delta_secs();
+    player_motion.forces.external += direction * 512.0 * time.delta_secs();
 }
