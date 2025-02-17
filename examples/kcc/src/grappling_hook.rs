@@ -5,9 +5,10 @@ use crate::player::{Player, PlayerCamera, PlayerMotion, Section};
 
 // TODO make sure grappling hook shoots from/to center of screen
 
-const GRAPPLING_HOOK_VELOCITY: f32 = 256.0;
 const MISS_TIME: f64 = 1.0;
-const SPRING_CONSTANT: f32 = 24.0;
+const GRAPPLING_HOOK_VELOCITY: f32 = 256.0;
+const PLAYER_ACCELERATION: f32 = 512.0;
+const DETACH_DISTANCE: f32 = 2.0;
 
 #[derive(Component)]
 pub struct HasGrapplingHook;
@@ -36,6 +37,7 @@ impl Plugin for GrapplingHookPlugin {
                 fire_or_remove.run_if(resource_changed::<ButtonInput<KeyCode>>),
                 despawn_missed_hooks,
                 attach_to_surface,
+                detach_when_close,
                 debug,
                 accelerate,
             ),
@@ -64,9 +66,7 @@ fn fire_or_remove(
             return;
         }
 
-        let mut commands = commands.entity(entity);
-        commands.remove_parent();
-        commands.despawn();
+        commands.entity(entity).despawn();
 
         return;
     }
@@ -198,6 +198,36 @@ fn attach_to_surface(
     }
 }
 
+fn detach_when_close(
+    mut commands: Commands,
+    grappling_hook: Option<Single<(&GlobalTransform, Entity, &GrapplingHook)>>,
+    player: Option<Single<(&Transform, &Section), With<Player>>>,
+) {
+    let Some(player) = player else {
+        return;
+    };
+    let Some(grappling_hook) = grappling_hook else {
+        return;
+    };
+
+    let (grappling_hook_transform, grappling_hook_entity, grappling_hook) =
+        grappling_hook.into_inner();
+
+    if !grappling_hook.hooked {
+        return;
+    }
+
+    let (player_transform, section) = player.into_inner();
+
+    let distance = grappling_hook_transform
+        .translation()
+        .distance(section.center(player_transform.translation));
+
+    if distance < DETACH_DISTANCE {
+        commands.entity(grappling_hook_entity).despawn();
+    }
+}
+
 fn debug(
     mut gizmos: Gizmos,
     grappling_hook: Option<Single<(&GlobalTransform, &GrapplingHook)>>,
@@ -244,14 +274,9 @@ fn accelerate(
 
     let (player_transform, mut player_motion) = player.into_inner();
 
-    let distance = grappling_hook_transform
-        .translation()
-        .distance(player_transform.translation);
     let direction =
-        (grappling_hook_transform.translation() - player_transform.translation) / distance;
-
-    let force = SPRING_CONSTANT * distance;
+        (grappling_hook_transform.translation() - player_transform.translation).normalize();
 
     player_motion.no_gravity_this_frame = true;
-    player_motion.forces.external += direction * 512.0 * time.delta_secs();
+    player_motion.forces.external += direction * PLAYER_ACCELERATION * time.delta_secs();
 }
