@@ -241,9 +241,7 @@ fn movement_pass(
     filter_entities.push(entity);
 
     collide_and_slide(
-        Pass::Movement,
         section,
-        state.grounded,
         &mut state.movement,
         &mut transform.translation,
         &spatial_query,
@@ -266,7 +264,7 @@ fn gravity_pass(
 
     let mut gravity = Vec3::NEG_Y * GRAVITY * time.delta_secs();
     if state.grounded {
-        gravity *= 0.00;
+        gravity *= 0.01;
     }
     state.gravity += gravity;
 
@@ -276,9 +274,7 @@ fn gravity_pass(
     let filter = SpatialQueryFilter::from_excluded_entities(filter_entities);
 
     collide_and_slide(
-        Pass::Gravity,
         section,
-        state.grounded,
         &mut state.gravity,
         &mut transform.translation,
         &spatial_query,
@@ -290,21 +286,17 @@ fn gravity_pass(
 }
 
 fn collide_and_slide(
-    pass: Pass,
     section: &Section,
-    grounded: bool,
     velocity: &mut Vec3,
     position: &mut Vec3,
     spatial_query: &SpatialQuery,
     filter: &SpatialQueryFilter,
     time: &Res<Time>,
 ) {
-    let mut time_velocity = *velocity * time.delta_secs();
-    let initial_velocity = *velocity;
-    let mut traveled = 0.0;
-
     for _ in 0..MAX_BOUNCES {
-        let Ok((direction, distance)) = Dir3::new_and_length(time_velocity) else {
+        let timescaled_velocity = *velocity * time.delta_secs();
+
+        let Ok((direction, distance)) = Dir3::new_and_length(timescaled_velocity) else {
             break;
         };
 
@@ -322,18 +314,13 @@ fn collide_and_slide(
             filter,
         );
         let Some(hit) = shapecast else {
-            *position += time_velocity;
+            *position += timescaled_velocity;
             break;
         };
 
-        let ratio = hit.distance / time_velocity.length();
-        let scaled_velocity = time_velocity * ratio + hit.normal1 * SKIN;
-        *position += scaled_velocity;
-        time_velocity -= scaled_velocity;
-
-        *velocity += -(*velocity * hit.normal1) * hit.normal1;
-
-        time_velocity = *velocity * time.delta_secs();
+        let ratio = hit.distance / timescaled_velocity.length();
+        *position += timescaled_velocity * ratio + hit.normal1 * SKIN;
+        *velocity -= *velocity * hit.normal1 * hit.normal1;
     }
 }
 
