@@ -63,15 +63,7 @@ impl Plugin for PlayerMotionPlugin {
         app.init_resource::<PlayerInput>();
         app.add_systems(
             Update,
-            (
-                process_input,
-                perform_actions,
-                snap_to_ground,
-                external_force_pass,
-                movement_pass,
-                gravity_pass,
-            )
-                .chain(),
+            (process_input, perform_actions, snap_to_ground, motion).chain(),
         );
     }
 }
@@ -207,7 +199,7 @@ fn snap_to_ground(
     }
 }
 
-fn movement_pass(
+fn motion(
     mut commands: Commands,
     centers: Query<(&Position, &ComputedCenterOfMass)>,
     time: Res<Time>,
@@ -225,109 +217,64 @@ fn movement_pass(
     };
 
     let (entity, mut transform, section, mut state) = player.into_inner();
-
-    let mut wishdir = Vec3::new(input.direction.x, 0.0, input.direction.y);
-
-    let yaw = camera.rotation().to_euler(EulerRot::YXZ).0;
-    let rotation = Transform::from_rotation(Quat::from_euler(EulerRot::YXZ, yaw, 0.0, 0.0));
-    wishdir = rotation.transform_point(wishdir);
-
-    if state.grounded {
-        ground_move(wishdir, state.landed_time, &mut state.movement, &time);
-    } else {
-        air_move(wishdir, &mut state.movement, &time);
-    }
-
-    let mut filter_entities: Vec<Entity> = sensors.iter().collect();
-    filter_entities.push(entity);
-
-    collide_and_slide(
-        &mut commands,
-        &centers,
-        section,
-        &mut state.movement,
-        &mut transform.translation,
-        &spatial_query,
-        &SpatialQueryFilter::from_excluded_entities(filter_entities),
-        &time,
-    );
-}
-
-fn gravity_pass(
-    mut commands: Commands,
-    centers: Query<(&Position, &ComputedCenterOfMass)>,
-    time: Res<Time>,
-    spatial_query: SpatialQuery,
-    player: Option<Single<(Entity, &mut Transform, &Section, &mut PlayerMotion)>>,
-    sensors: Query<Entity, With<Sensor>>,
-) {
-    let Some(player) = player else {
-        return;
-    };
-
-    let (entity, mut transform, section, mut state) = player.into_inner();
-
-    if state.no_gravity_this_frame {
-        state.no_gravity_this_frame = false;
-        return;
-    }
-
-    let mut gravity = Vec3::NEG_Y * GRAVITY * time.delta_secs();
-    if state.grounded {
-        gravity *= 0.01;
-    }
-    state.gravity += gravity;
-
-    let mut filter_entities: Vec<Entity> = sensors.iter().collect();
-    filter_entities.push(entity);
-
-    let filter = SpatialQueryFilter::from_excluded_entities(filter_entities);
-
-    collide_and_slide(
-        &mut commands,
-        &centers,
-        section,
-        &mut state.gravity,
-        &mut transform.translation,
-        &spatial_query,
-        &filter,
-        &time,
-    );
-}
-
-fn external_force_pass(
-    mut commands: Commands,
-    centers: Query<(&Position, &ComputedCenterOfMass)>,
-    time: Res<Time>,
-    spatial_query: SpatialQuery,
-    player: Option<Single<(Entity, &mut Transform, &Section, &mut PlayerMotion)>>,
-    sensors: Query<Entity, With<Sensor>>,
-) {
-    let Some(player) = player else {
-        return;
-    };
-
-    let (entity, mut transform, section, mut state) = player.into_inner();
-
-    state.external_force *= 1.0 - time.delta_secs() * 4.0; // damping
-
     let mut filter_entities: Vec<Entity> = sensors.iter().collect();
     filter_entities.push(entity);
     let filter = SpatialQueryFilter::from_excluded_entities(filter_entities);
 
-    collide_and_slide(
-        &mut commands,
-        &centers,
-        section,
-        &mut state.external_force,
-        &mut transform.translation,
-        &spatial_query,
-        &filter,
-        &time,
-    );
+    let mut collide_and_slide = |velocity: &mut Vec3| {
+        collide_and_slide(
+            &mut commands,
+            &centers,
+            section,
+            velocity,
+            &mut transform.translation,
+            &spatial_query,
+            &filter,
+            &time,
+        );
+    };
 
+    // External force
+    {
+        state.external_force *= 1.0 - time.delta_secs() * 4.0;
+        collide_and_slide(&mut state.external_force);
+    }
+
+    // Movement
+    {
+        let mut wishdir = Vec3::new(input.direction.x, 0.0, input.direction.y);
+        let yaw = camera.rotation().to_euler(EulerRot::YXZ).0;
+        let rotation = Transform::from_rotation(Quat::from_euler(EulerRot::YXZ, yaw, 0.0, 0.0));
+        wishdir = rotation.transform_point(wishdir);
+        if state.grounded {
+            ground_move(wishdir, state.landed_time, &mut state.movement, &time);
+        } else {
+            air_move(wishdir, &mut state.movement, &time);
+        }
+        collide_and_slide(&mut state.movement);
+    };
+
+    // Gravity
+    'gravity: {
+        if state.no_gravity_this_frame {
+            state.no_gravity_this_frame = false;
+            break 'gravity;
+        }
+        let mut gravity = Vec3::NEG_Y * GRAVITY * time.delta_secs();
+        if state.grounded {
+            gravity *= 0.01;
+        }
+        state.gravity += gravity;
+        collide_and_slide(&mut state.gravity)
+    };
+
+    // Just in case
     depenetrate(&spatial_query, &filter, &section.collider(), &mut transform);
 }
+
+//
+// Utility
+//
 
 fn collide_and_slide(
     commands: &mut Commands,
