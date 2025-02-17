@@ -12,7 +12,8 @@ use config::PlayerCameraConfig;
 
 pub use camera::PlayerCamera;
 pub use config::{PlayerConfig, PlayerKeybinds};
-use motion::{PlayerMotion, PlayerMotionPlugin};
+pub use motion::PlayerMotion;
+use motion::PlayerMotionPlugin;
 pub use utility::{Section, SectionShape};
 
 #[derive(Component)]

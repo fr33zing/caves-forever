@@ -1,3 +1,4 @@
+mod grappling_hook;
 pub mod player;
 
 use avian3d::prelude::*;
@@ -15,6 +16,7 @@ use bevy::{
     window::PresentMode,
 };
 use bevy_egui::EguiPlugin;
+use grappling_hook::GrapplingHookPlugin;
 use lib::{
     render_layer,
     weapon::{weapons, PlayerWeapons, ViewModelCamera, WeaponPickup, WeaponPlugin, WeaponSlots},
@@ -63,7 +65,7 @@ fn main() {
         //PhysicsDebugPlugin::default(),
     ));
 
-    app.add_plugins((PlayerPlugin, WeaponPlugin));
+    app.add_plugins((PlayerPlugin, WeaponPlugin, GrapplingHookPlugin));
 
     app.add_systems(Startup, (setup_world, setup_player).chain());
     app.add_systems(Update, setup_collider);
@@ -90,6 +92,12 @@ fn setup_world(mut commands: Commands, asset_server: Res<AssetServer>) {
             ..default()
         },
         Transform::from_translation(Vec3::ONE * 512.0).looking_at(Vec3::ZERO, Vec3::Y),
+    ));
+
+    commands.spawn((
+        Transform::from_translation(Vec3::ONE),
+        Collider::cuboid(1.0, 1.0, 1.0),
+        RigidBody::Dynamic,
     ));
 
     commands.spawn((

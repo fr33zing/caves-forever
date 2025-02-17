@@ -16,10 +16,11 @@ const MAX_SLOPE_DEGREES: f32 = 55.0;
 const GROUND_DISTANCE: f32 = 0.1;
 const MAX_BOUNCES: u32 = 3;
 const SKIN: f32 = 0.005;
-const JUMP_FORCE: f32 = 14.0;
+const JUMP_FORCE: f32 = 16.0;
 const JUMP_BUFFER_DISTANCE: f32 = 1.5;
-const GRAVITY: f32 = 48.0;
+const GRAVITY: f32 = 64.0;
 const PLAYER_PUSH_FORCE: f32 = 28.0;
+// const TERMINAL_VELOCITY: f32 = TODO
 
 #[derive(Default, Component)]
 pub struct PlayerMotion {
@@ -29,6 +30,8 @@ pub struct PlayerMotion {
     pub landed_time: f64,
     pub gravity: Vec3,
     pub movement: Vec3,
+    pub external_force: Vec3,
+    pub no_gravity_this_frame: bool,
 }
 
 #[derive(Resource, Default)]
@@ -53,12 +56,6 @@ pub enum PlayerAction {
     Jump,
 }
 
-#[derive(Clone, Copy, PartialEq)]
-enum Pass {
-    Movement,
-    Gravity,
-}
-
 pub struct PlayerMotionPlugin;
 
 impl Plugin for PlayerMotionPlugin {
@@ -70,6 +67,7 @@ impl Plugin for PlayerMotionPlugin {
                 process_input,
                 perform_actions,
                 snap_to_ground,
+                external_force_pass,
                 movement_pass,
                 gravity_pass,
             )
@@ -269,6 +267,11 @@ fn gravity_pass(
 
     let (entity, mut transform, section, mut state) = player.into_inner();
 
+    if state.no_gravity_this_frame {
+        state.no_gravity_this_frame = false;
+        return;
+    }
+
     let mut gravity = Vec3::NEG_Y * GRAVITY * time.delta_secs();
     if state.grounded {
         gravity *= 0.01;
@@ -285,6 +288,38 @@ fn gravity_pass(
         &centers,
         section,
         &mut state.gravity,
+        &mut transform.translation,
+        &spatial_query,
+        &filter,
+        &time,
+    );
+}
+
+fn external_force_pass(
+    mut commands: Commands,
+    centers: Query<(&Position, &ComputedCenterOfMass)>,
+    time: Res<Time>,
+    spatial_query: SpatialQuery,
+    player: Option<Single<(Entity, &mut Transform, &Section, &mut PlayerMotion)>>,
+    sensors: Query<Entity, With<Sensor>>,
+) {
+    let Some(player) = player else {
+        return;
+    };
+
+    let (entity, mut transform, section, mut state) = player.into_inner();
+
+    state.external_force *= 1.0 - time.delta_secs() * 4.0; // damping
+
+    let mut filter_entities: Vec<Entity> = sensors.iter().collect();
+    filter_entities.push(entity);
+    let filter = SpatialQueryFilter::from_excluded_entities(filter_entities);
+
+    collide_and_slide(
+        &mut commands,
+        &centers,
+        section,
+        &mut state.external_force,
         &mut transform.translation,
         &spatial_query,
         &filter,

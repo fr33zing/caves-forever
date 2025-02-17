@@ -67,8 +67,12 @@ impl Section {
         )))
     }
 
+    pub fn top(&self, position: Vec3) -> Vec3 {
+        position + Vec3::Y * (self.height + self.offset)
+    }
+
     pub fn center(&self, position: Vec3) -> Vec3 {
-        position + Vec3::Y * (self.height / 2.0)
+        position + Vec3::Y * (self.height / 2.0 + self.offset)
     }
 
     pub fn gizmo(&self, position: Vec3, color: Color, gizmos: &mut Gizmos) {
