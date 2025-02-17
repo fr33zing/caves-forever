@@ -5,6 +5,7 @@ pub mod meshgen;
 pub mod physics;
 pub mod player;
 pub mod render_layer;
+pub mod weapon;
 pub mod worldgen;
 
 pub mod debug_aim;

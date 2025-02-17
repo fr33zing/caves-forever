@@ -9,11 +9,16 @@ use bevy::{
     prelude::*,
     render::{
         settings::{RenderCreation, WgpuFeatures, WgpuSettings},
+        view::RenderLayers,
         RenderPlugin,
     },
     window::PresentMode,
 };
 use bevy_egui::EguiPlugin;
+use lib::{
+    render_layer,
+    weapon::{weapons, PlayerWeapons, ViewModelCamera, WeaponPickup, WeaponPlugin, WeaponSlots},
+};
 use player::{Player, PlayerCamera, PlayerPlugin};
 
 fn main() {
@@ -58,7 +63,7 @@ fn main() {
         //PhysicsDebugPlugin::default(),
     ));
 
-    app.add_plugins(PlayerPlugin);
+    app.add_plugins((PlayerPlugin, WeaponPlugin));
 
     app.add_systems(Startup, (setup_world, setup_player).chain());
     app.add_systems(Update, setup_collider);
@@ -77,6 +82,7 @@ fn setup_world(mut commands: Commands, asset_server: Res<AssetServer>) {
     ));
 
     commands.spawn((
+        RenderLayers::from_layers(&[render_layer::WORLD, render_layer::VIEW_MODEL]),
         DirectionalLight {
             color: Color::WHITE,
             illuminance: 5000.0,
@@ -84,6 +90,11 @@ fn setup_world(mut commands: Commands, asset_server: Res<AssetServer>) {
             ..default()
         },
         Transform::from_translation(Vec3::ONE * 512.0).looking_at(Vec3::ZERO, Vec3::Y),
+    ));
+
+    commands.spawn((
+        Transform::from_translation(Vec3::Z * -4.0),
+        WeaponPickup::new(&weapons::SHOTGUN),
     ));
 }
 
@@ -105,6 +116,15 @@ fn setup_collider(
 }
 
 fn setup_player(mut commands: Commands) {
-    commands.spawn((Player, Transform::from_translation(Vec3::Y * 1.0)));
-    commands.spawn(PlayerCamera);
+    let mut viewmodel_camera = Entity::PLACEHOLDER;
+    commands.spawn(PlayerCamera).with_children(|parent| {
+        viewmodel_camera = parent.spawn(ViewModelCamera::default()).id();
+    });
+
+    commands.spawn((
+        Player,
+        WeaponSlots::new(1),
+        PlayerWeapons { viewmodel_camera },
+        Transform::from_translation(Vec3::Y * 1.0),
+    ));
 }

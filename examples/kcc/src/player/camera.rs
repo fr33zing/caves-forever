@@ -4,8 +4,10 @@ use avian3d::prelude::*;
 use bevy::{
     input::mouse::AccumulatedMouseMotion,
     prelude::*,
+    render::view::RenderLayers,
     window::{CursorGrabMode, PrimaryWindow},
 };
+use lib::render_layer;
 
 use super::{
     config::{PlayerCameraConfig, PlayerCameraMode},
@@ -82,6 +84,7 @@ fn add_required_components(
 
         let mut commands = commands.entity(child);
         commands
+            .insert_if_new(RenderLayers::layer(render_layer::WORLD))
             .insert_if_new(Transform::default())
             .insert_if_new(Camera3d::default())
             .insert_if_new(Projection::Perspective(PerspectiveProjection {

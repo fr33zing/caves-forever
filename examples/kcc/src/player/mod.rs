@@ -1,5 +1,5 @@
 use avian3d::prelude::LockedAxes;
-use bevy::prelude::*;
+use bevy::{pbr::NotShadowCaster, prelude::*};
 
 mod camera;
 mod config;
@@ -53,6 +53,7 @@ fn add_required_components(
             .insert_if_new(section.collider())
             .insert_if_new(Visibility::Visible)
             .insert_if_new(Transform::default())
+            .insert_if_new(NotShadowCaster)
             .insert_if_new(Mesh3d(meshes.add(section.mesh())))
             .insert_if_new(MeshMaterial3d(materials.add(StandardMaterial {
                 base_color: Color::srgb(0.4, 1.0, 0.4),
