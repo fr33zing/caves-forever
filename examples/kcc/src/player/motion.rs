@@ -14,9 +14,8 @@ use super::{
 
 const MAX_SLOPE_DEGREES: f32 = 55.0;
 const GROUND_DISTANCE: f32 = 0.1;
-const MAX_BOUNCES: u32 = 4;
-const MIN_VELOCITY: f32 = 1.0;
-const SKIN: f32 = 0.01;
+const MAX_BOUNCES: u32 = 3;
+const SKIN: f32 = 0.005;
 const JUMP_FORCE: f32 = 14.0;
 const JUMP_BUFFER_DISTANCE: f32 = 1.5;
 const GRAVITY: f32 = 48.0;
@@ -267,7 +266,7 @@ fn gravity_pass(
 
     let mut gravity = Vec3::NEG_Y * GRAVITY * time.delta_secs();
     if state.grounded {
-        gravity *= 0.01;
+        gravity *= 0.00;
     }
     state.gravity += gravity;
 
@@ -300,12 +299,9 @@ fn collide_and_slide(
     filter: &SpatialQueryFilter,
     time: &Res<Time>,
 ) {
-    if velocity.length() < MIN_VELOCITY {
-        return;
-    };
-
     let mut time_velocity = *velocity * time.delta_secs();
-    let initial_velocity = time_velocity * time.delta_secs();
+    let initial_velocity = *velocity;
+    let mut traveled = 0.0;
 
     for _ in 0..MAX_BOUNCES {
         let Ok((direction, distance)) = Dir3::new_and_length(time_velocity) else {
@@ -313,7 +309,7 @@ fn collide_and_slide(
         };
 
         let shapecast = spatial_query.cast_shape(
-            &section.inflated(-SKIN).collider_centered(),
+            &section.collider_centered(),
             section.center(*position),
             default(),
             direction,
@@ -321,7 +317,7 @@ fn collide_and_slide(
                 max_distance: distance,
                 target_distance: 0.0,
                 compute_contact_on_penetration: true,
-                ignore_origin_penetration: true,
+                ignore_origin_penetration: false,
             },
             filter,
         );
@@ -330,34 +326,14 @@ fn collide_and_slide(
             break;
         };
 
-        let snap_to_surface = direction * (hit.distance - SKIN);
-        let angle_of_normal = hit.normal1.angle_between(Vec3::Y);
+        let ratio = hit.distance / time_velocity.length();
+        let scaled_velocity = time_velocity * ratio + hit.normal1 * SKIN;
+        *position += scaled_velocity;
+        time_velocity -= scaled_velocity;
 
-        if snap_to_surface.length() <= SKIN {
-            time_velocity = Vec3::ZERO;
-            *velocity = Vec3::ZERO;
-        }
+        *velocity += -(*velocity * hit.normal1) * hit.normal1;
 
-        time_velocity = if angle_of_normal <= MAX_SLOPE_DEGREES.to_radians() {
-            if pass == Pass::Gravity {
-                snap_to_surface
-            } else {
-                time_velocity.length() * time_velocity.project_onto_normalized(hit.normal1)
-            }
-        } else {
-            let horizontal = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
-            let scale = 1.0 - horizontal(hit.normal1).dot(-horizontal(initial_velocity));
-
-            *velocity *= scale;
-
-            if grounded && pass != Pass::Gravity {
-                horizontal(time_velocity).project_onto_normalized(horizontal(hit.normal1)) * scale
-            } else {
-                time_velocity.length() * time_velocity.project_onto_normalized(hit.normal1) * scale
-            }
-        };
-
-        *position += time_velocity;
+        time_velocity = *velocity * time.delta_secs();
     }
 }
 
