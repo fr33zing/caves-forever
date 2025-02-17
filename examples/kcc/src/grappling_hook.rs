@@ -3,6 +3,8 @@ use bevy::prelude::*;
 
 use crate::player::{Player, PlayerCamera, PlayerMotion, Section};
 
+// TODO make sure grappling hook shoots from/to center of screen
+
 const GRAPPLING_HOOK_VELOCITY: f32 = 256.0;
 const MISS_TIME: f64 = 1.0;
 const SPRING_CONSTANT: f32 = 24.0;
@@ -174,17 +176,22 @@ fn attach_to_surface(
             return;
         };
 
-        if *entity1 == entity {
-            commands.entity(*entity2).add_child(entity);
+        let other = if *entity1 == entity {
+            entity2
         } else {
-            commands.entity(*entity1).add_child(entity);
             deepest_contact.flip();
-        }
+            entity1
+        };
 
+        let joint = commands
+            .spawn(FixedJoint::new(entity, *other).with_local_anchor_2(deepest_contact.point2))
+            .id();
         let mut commands = commands.entity(entity);
         commands.insert(Transform::from_translation(deepest_contact.point2));
-        commands.insert(RigidBody::Static);
+        commands.insert(RigidBody::Dynamic);
         commands.remove::<LinearVelocity>();
+        commands.add_child(joint);
+
         grappling_hook.hooked = true;
 
         return;
