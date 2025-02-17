@@ -1,4 +1,4 @@
-use avian3d::prelude::LockedAxes;
+use avian3d::prelude::{LockedAxes, RigidBody};
 use bevy::{pbr::NotShadowCaster, prelude::*};
 
 mod camera;
@@ -50,6 +50,7 @@ fn add_required_components(
             .insert(section.clone())
             .insert(PlayerMotion::default())
             .insert(LockedAxes::ROTATION_LOCKED)
+            .insert(RigidBody::Kinematic)
             .insert_if_new(section.collider())
             .insert_if_new(Visibility::Visible)
             .insert_if_new(Transform::default())

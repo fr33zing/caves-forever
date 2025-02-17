@@ -19,6 +19,7 @@ const SKIN: f32 = 0.005;
 const JUMP_FORCE: f32 = 14.0;
 const JUMP_BUFFER_DISTANCE: f32 = 1.5;
 const GRAVITY: f32 = 48.0;
+const PLAYER_PUSH_FORCE: f32 = 28.0;
 
 #[derive(Default, Component)]
 pub struct PlayerMotion {
@@ -209,6 +210,8 @@ fn snap_to_ground(
 }
 
 fn movement_pass(
+    mut commands: Commands,
+    centers: Query<(&Position, &ComputedCenterOfMass)>,
     time: Res<Time>,
     input: Res<PlayerInput>,
     spatial_query: SpatialQuery,
@@ -241,6 +244,8 @@ fn movement_pass(
     filter_entities.push(entity);
 
     collide_and_slide(
+        &mut commands,
+        &centers,
         section,
         &mut state.movement,
         &mut transform.translation,
@@ -251,6 +256,8 @@ fn movement_pass(
 }
 
 fn gravity_pass(
+    mut commands: Commands,
+    centers: Query<(&Position, &ComputedCenterOfMass)>,
     time: Res<Time>,
     spatial_query: SpatialQuery,
     player: Option<Single<(Entity, &mut Transform, &Section, &mut PlayerMotion)>>,
@@ -274,6 +281,8 @@ fn gravity_pass(
     let filter = SpatialQueryFilter::from_excluded_entities(filter_entities);
 
     collide_and_slide(
+        &mut commands,
+        &centers,
         section,
         &mut state.gravity,
         &mut transform.translation,
@@ -286,6 +295,8 @@ fn gravity_pass(
 }
 
 fn collide_and_slide(
+    commands: &mut Commands,
+    centers: &Query<(&Position, &ComputedCenterOfMass)>,
     section: &Section,
     velocity: &mut Vec3,
     position: &mut Vec3,
@@ -293,6 +304,8 @@ fn collide_and_slide(
     filter: &SpatialQueryFilter,
     time: &Res<Time>,
 ) {
+    let mut forces = Vec::<(Entity, Vec3, ExternalForce)>::new();
+
     for _ in 0..MAX_BOUNCES {
         let timescaled_velocity = *velocity * time.delta_secs();
 
@@ -319,8 +332,26 @@ fn collide_and_slide(
         };
 
         let ratio = hit.distance / timescaled_velocity.length();
+        let rejection = *velocity * hit.normal1 * hit.normal1;
+
         *position += timescaled_velocity * ratio + hit.normal1 * SKIN;
-        *velocity -= *velocity * hit.normal1 * hit.normal1;
+        *velocity -= rejection;
+
+        if let Some((_, center, force)) = forces
+            .iter_mut()
+            .find(|(entity, _, _)| *entity == hit.entity)
+        {
+            force.apply_force_at_point(rejection * PLAYER_PUSH_FORCE, hit.point1, *center);
+        } else if let Ok((position, local_center)) = centers.get(hit.entity) {
+            let center = position.0 + local_center.0;
+            let mut force = ExternalForce::default().with_persistence(false);
+            force.apply_force_at_point(rejection * PLAYER_PUSH_FORCE, hit.point1, center);
+            forces.push((hit.entity, center, force));
+        }
+    }
+
+    for (entity, _, force) in forces {
+        commands.entity(entity).insert(force);
     }
 }
 
