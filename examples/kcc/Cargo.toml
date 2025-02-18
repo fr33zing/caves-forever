@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-debug-gizmos = []
+default = ["crouch", "crouch-jump"]
+crouch = []
+crouch-jump = ["crouch"]
 
 [dependencies]
 lib = { path = "../../lib" }

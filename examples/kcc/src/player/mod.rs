@@ -7,6 +7,11 @@ mod motion;
 mod quakeish;
 mod utility;
 
+#[cfg(feature = "crouch")]
+mod crouch;
+#[cfg(feature = "crouch")]
+use crouch::PlayerCrouchPlugin;
+
 use camera::PlayerCameraPlugin;
 use config::PlayerCameraConfig;
 
@@ -26,7 +31,12 @@ impl Plugin for PlayerPlugin {
         app.init_resource::<PlayerConfig>();
         app.init_resource::<PlayerKeybinds>();
         app.init_resource::<PlayerCameraConfig>();
-        app.add_plugins((PlayerCameraPlugin, PlayerMotionPlugin));
+        app.add_plugins((
+            PlayerCameraPlugin,
+            PlayerMotionPlugin,
+            #[cfg(feature = "crouch")]
+            PlayerCrouchPlugin,
+        ));
         app.add_systems(Update, add_required_components);
     }
 }

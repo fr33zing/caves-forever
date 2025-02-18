@@ -201,5 +201,6 @@ fn attach_to_player(
 
     let (player, section) = player.into_inner();
 
-    camera.translation = player.translation() + Vec3::Y * (section.height - config.eye_offset);
+    camera.translation =
+        player.translation() + Vec3::Y * (section.height + section.offset - config.eye_offset);
 }

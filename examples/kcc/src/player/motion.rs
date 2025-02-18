@@ -44,16 +44,17 @@ pub struct PlayerMotion {
 #[derive(Resource, Default)]
 pub struct PlayerInput {
     /// Commanded movement direction, local XZ plane.
-    direction: Vec2,
-    crouch: bool,
-    sprint: bool,
-
-    actions: Vec<PlayerAction>,
+    pub direction: Vec2,
+    pub crouch: bool,
+    pub sprint: bool,
 }
-impl PlayerInput {
-    pub fn action(&mut self, action: PlayerAction) {
-        if !self.actions.contains(&action) {
-            self.actions.push(action);
+
+#[derive(Resource, Default, Deref, DerefMut)]
+pub struct PlayerActionBuffer(pub Vec<PlayerAction>);
+impl PlayerActionBuffer {
+    pub fn buffer(&mut self, action: PlayerAction) {
+        if !self.0.contains(&action) {
+            self.0.push(action);
         }
     }
 }
@@ -61,6 +62,7 @@ impl PlayerInput {
 #[derive(Clone, Copy, PartialEq)]
 pub enum PlayerAction {
     Jump,
+    Crouch(bool),
 }
 
 pub struct PlayerMotionPlugin;
@@ -68,6 +70,7 @@ pub struct PlayerMotionPlugin;
 impl Plugin for PlayerMotionPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PlayerInput>();
+        app.init_resource::<PlayerActionBuffer>();
         app.add_systems(
             Update,
             (process_input, perform_actions, snap_to_ground, motion).chain(),
@@ -77,6 +80,7 @@ impl Plugin for PlayerMotionPlugin {
 
 fn process_input(
     mut input: ResMut<PlayerInput>,
+    mut actions: ResMut<PlayerActionBuffer>,
     binds: Res<PlayerKeybinds>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
@@ -113,7 +117,7 @@ fn process_input(
         if let Some(state) = state {
             if let Some(ground_distance) = state.ground_distance {
                 if jump.just_pressed(&keyboard, &mouse) && ground_distance <= JUMP_BUFFER_DISTANCE {
-                    input.action(PlayerAction::Jump);
+                    actions.buffer(PlayerAction::Jump);
                 }
             }
         }
@@ -121,7 +125,11 @@ fn process_input(
 
     if let Some(crouch) = &binds.crouch {
         if crouch.pressed(&keyboard, &mouse) {
-            input.crouch = true;
+            if !input.crouch {
+                actions.buffer(PlayerAction::Crouch(true));
+            }
+        } else if input.crouch {
+            actions.buffer(PlayerAction::Crouch(false));
         }
     }
     if let Some(sprint) = &binds.sprint {
@@ -131,12 +139,16 @@ fn process_input(
     }
 }
 
-fn perform_actions(mut input: ResMut<PlayerInput>, state: Option<Single<&mut PlayerMotion>>) {
+fn perform_actions(
+    mut input: ResMut<PlayerInput>,
+    mut actions: ResMut<PlayerActionBuffer>,
+    state: Option<Single<&mut PlayerMotion>>,
+) {
     let Some(mut state) = state else {
         return;
     };
 
-    input.actions.retain(|action| {
+    actions.retain(|action| {
         let mut consumed = false;
         let mut consume = || consumed = true;
 
@@ -146,6 +158,10 @@ fn perform_actions(mut input: ResMut<PlayerInput>, state: Option<Single<&mut Pla
                     state.forces.gravity.y += JUMP_FORCE;
                     consume();
                 }
+            }
+            PlayerAction::Crouch(crouch) => {
+                input.crouch = *crouch;
+                consume();
             }
         };
 
