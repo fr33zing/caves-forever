@@ -45,8 +45,10 @@ pub struct PlayerMotion {
 pub struct PlayerInput {
     /// Commanded movement direction, local XZ plane.
     pub direction: Vec2,
-    pub crouch: bool,
     pub sprint: bool,
+
+    #[cfg(feature = "crouch")]
+    pub crouch: bool,
 }
 
 #[derive(Resource, Default, Deref, DerefMut)]
@@ -62,6 +64,8 @@ impl PlayerActionBuffer {
 #[derive(Clone, Copy, PartialEq)]
 pub enum PlayerAction {
     Jump,
+
+    #[cfg(feature = "crouch")]
     Crouch(bool),
 }
 
@@ -123,6 +127,7 @@ fn process_input(
         }
     };
 
+    #[cfg(feature = "crouch")]
     if let Some(crouch) = &binds.crouch {
         if crouch.pressed(&keyboard, &mouse) {
             if !input.crouch {
@@ -132,6 +137,7 @@ fn process_input(
             actions.buffer(PlayerAction::Crouch(false));
         }
     }
+
     if let Some(sprint) = &binds.sprint {
         if sprint.pressed(&keyboard, &mouse) {
             input.sprint = true;
@@ -140,7 +146,7 @@ fn process_input(
 }
 
 fn perform_actions(
-    mut input: ResMut<PlayerInput>,
+    #[allow(unused)] mut input: ResMut<PlayerInput>,
     mut actions: ResMut<PlayerActionBuffer>,
     state: Option<Single<&mut PlayerMotion>>,
 ) {
@@ -159,6 +165,8 @@ fn perform_actions(
                     consume();
                 }
             }
+
+            #[cfg(feature = "crouch")]
             PlayerAction::Crouch(crouch) => {
                 input.crouch = *crouch;
                 consume();

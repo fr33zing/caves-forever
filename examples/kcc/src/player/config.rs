@@ -14,8 +14,10 @@ pub struct PlayerKeybinds {
     pub left: Option<Keybind>,
     pub right: Option<Keybind>,
     pub jump: Option<Keybind>,
-    pub crouch: Option<Keybind>,
     pub sprint: Option<Keybind>,
+
+    #[cfg(feature = "crouch")]
+    pub crouch: Option<Keybind>,
 }
 
 pub enum Keybind {
@@ -57,8 +59,10 @@ impl Default for PlayerKeybinds {
             left: Some(Keybind::Keyboard(KeyCode::KeyA)),
             right: Some(Keybind::Keyboard(KeyCode::KeyD)),
             jump: Some(Keybind::Keyboard(KeyCode::Space)),
-            crouch: Some(Keybind::Keyboard(KeyCode::ControlLeft)),
             sprint: Some(Keybind::Keyboard(KeyCode::ShiftLeft)),
+
+            #[cfg(feature = "crouch")]
+            crouch: Some(Keybind::Keyboard(KeyCode::ControlLeft)),
         }
     }
 }
