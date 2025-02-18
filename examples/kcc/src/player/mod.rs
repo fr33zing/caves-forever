@@ -21,7 +21,7 @@ mod crouch;
 #[cfg(feature = "crouch")]
 use crouch::PlayerCrouchPlugin;
 
-pub use config::{PlayerConfig, PlayerKeybinds};
+pub use config::{PlayerConfig, PlayerInputConfig, PlayerWalkModMode};
 pub use motion::PlayerMotion;
 use motion::PlayerMotionPlugin;
 pub use utility::{Section, SectionShape};
@@ -34,7 +34,6 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PlayerConfig>();
-        app.init_resource::<PlayerKeybinds>();
         app.add_plugins((
             PlayerMotionPlugin,
             PlayerInputPlugin,

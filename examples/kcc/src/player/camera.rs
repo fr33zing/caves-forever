@@ -12,7 +12,7 @@ use lib::render_layer;
 use super::{config::PlayerCameraConfig, input::PlayerYaw, Player, PlayerConfig, Section};
 
 #[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
-use super::config::{PlayerCameraMode, PlayerKeybinds};
+use super::config::{PlayerCameraMode, PlayerInputConfig};
 
 const MOUSE_MOTION_SCALE: f32 = 0.00015;
 const PITCH_LIMIT: f32 = FRAC_PI_2 - 0.01;
@@ -168,12 +168,12 @@ fn mouselook(
 
 #[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
 fn switch_camera_mode(
-    keybinds: Res<PlayerKeybinds>,
+    input_config: Res<PlayerInputConfig>,
     mut config: ResMut<PlayerCameraConfig>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
 ) {
-    let Some(ref switch_camera) = keybinds.switch_camera else {
+    let Some(ref switch_camera) = input_config.binds.switch_camera else {
         return;
     };
 

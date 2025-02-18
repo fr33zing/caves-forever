@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 #[cfg(feature = "input")]
-use super::PlayerKeybinds;
+use super::PlayerInputConfig;
 
 #[cfg(feature = "jump")]
 use super::{
@@ -16,7 +16,7 @@ pub struct PlayerYaw(pub f32);
 pub struct PlayerInput {
     /// Commanded movement direction, local XZ plane.
     pub direction: Vec2,
-    pub sprint: bool,
+    pub walk_mod: bool,
 
     #[cfg(feature = "crouch")]
     pub crouch: bool,
@@ -55,6 +55,7 @@ pub struct PlayerInputPlugin;
 impl Plugin for PlayerInputPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PlayerInput>();
+        app.init_resource::<PlayerInputConfig>();
         app.init_resource::<PlayerYaw>();
 
         #[cfg(feature = "actions")]
@@ -65,7 +66,7 @@ impl Plugin for PlayerInputPlugin {
 
         #[cfg(feature = "input")]
         app.add_systems(Update, (process_input, perform_actions).chain());
-        #[cfg(all(not(feature = "input"), any(feature = "jump", feature = "crouch")))]
+        #[cfg(all(not(feature = "input"), feature = "actions"))]
         app.add_systems(Update, perform_actions);
     }
 }
@@ -75,33 +76,37 @@ pub fn process_input(
     mut input: ResMut<PlayerInput>,
     #[allow(unused_mut, unused)] mut actions: ResMut<PlayerActionBuffer>,
     #[cfg(any(feature = "jump", feature = "crouch"))] time: Res<Time>,
-    binds: Res<PlayerKeybinds>,
+    input_config: Res<PlayerInputConfig>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
     #[cfg(feature = "jump")] buffer_config: Res<PlayerBufferedActionsConfig>,
     #[cfg(feature = "jump")] state: Option<Single<&PlayerMotion>>,
 ) {
+    use crate::player::config::PlayerKeybinds;
+
+    use super::config::PlayerWalkModMode;
+
     #[cfg(any(feature = "jump", feature = "crouch"))]
     let now = time.elapsed_secs_f64();
 
     input.direction = Vec2::ZERO;
 
-    if let Some(forward) = &binds.forward {
+    if let Some(forward) = &input_config.binds.forward {
         if forward.pressed(&keyboard, &mouse) {
             input.direction += Vec2::NEG_Y;
         }
     }
-    if let Some(backward) = &binds.backward {
+    if let Some(backward) = &input_config.binds.backward {
         if backward.pressed(&keyboard, &mouse) {
             input.direction += Vec2::Y;
         }
     }
-    if let Some(left) = &binds.left {
+    if let Some(left) = &input_config.binds.left {
         if left.pressed(&keyboard, &mouse) {
             input.direction += Vec2::NEG_X;
         }
     }
-    if let Some(right) = &binds.right {
+    if let Some(right) = &input_config.binds.right {
         if right.pressed(&keyboard, &mouse) {
             input.direction += Vec2::X;
         }
@@ -112,7 +117,7 @@ pub fn process_input(
     }
 
     #[cfg(feature = "jump")]
-    if let Some(jump) = &binds.jump {
+    if let Some(jump) = &input_config.binds.jump {
         if let Some(state) = state {
             if let Some(ground_distance) = state.ground_distance {
                 if jump.just_pressed(&keyboard, &mouse)
@@ -125,7 +130,7 @@ pub fn process_input(
     };
 
     #[cfg(feature = "crouch")]
-    if let Some(crouch) = &binds.crouch {
+    if let Some(crouch) = &input_config.binds.crouch {
         if crouch.pressed(&keyboard, &mouse) {
             if !input.crouch {
                 actions.buffer(PlayerAction::Crouch(true), now);
@@ -135,9 +140,48 @@ pub fn process_input(
         }
     }
 
-    if let Some(sprint) = &binds.sprint {
-        if sprint.pressed(&keyboard, &mouse) {
-            input.sprint = true;
+    if let Some(walk_mod) = &input_config.binds.walk_mod {
+        match input_config.walk_mod_mode {
+            PlayerWalkModMode::Hold => {
+                input.walk_mod = walk_mod.pressed(&keyboard, &mouse);
+            }
+            PlayerWalkModMode::Toggle => {
+                if walk_mod.just_pressed(&keyboard, &mouse) {
+                    input.walk_mod = !input.walk_mod;
+                }
+            }
+            _ => {
+                let moving = PlayerKeybinds::any_pressed(
+                    [
+                        &input_config.binds.forward,
+                        &input_config.binds.backward,
+                        &input_config.binds.left,
+                        &input_config.binds.right,
+                    ],
+                    &keyboard,
+                    &mouse,
+                );
+
+                match input_config.walk_mod_mode {
+                    PlayerWalkModMode::ToggleHybrid => {
+                        input.walk_mod = if walk_mod.just_pressed(&keyboard, &mouse) {
+                            !input.walk_mod
+                        } else if input.walk_mod {
+                            moving
+                        } else {
+                            walk_mod.just_pressed(&keyboard, &mouse)
+                        };
+                    }
+                    PlayerWalkModMode::Hybrid => {
+                        input.walk_mod = if input.walk_mod {
+                            moving
+                        } else {
+                            walk_mod.just_pressed(&keyboard, &mouse)
+                        };
+                    }
+                    _ => unreachable!(),
+                }
+            }
         }
     }
 }

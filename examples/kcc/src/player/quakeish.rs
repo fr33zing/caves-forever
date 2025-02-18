@@ -4,15 +4,7 @@
 
 use bevy::prelude::{Vec3, *};
 
-// Ratios based on Quake/QW/server/sv_phys.c
-// Not sure how 1:1 this is with Quake.
-const FRICTION: f32 = 6.0;
-const FRICTION_DELAY_SECS: f64 = 1.0 / 20.0;
-const QUAKE_UNITS_PER_METER: f32 = 16.0;
-const GROUND_ACCELERATE: f32 = 10.0 * QUAKE_UNITS_PER_METER;
-const AIR_ACCELERATE: f32 = 0.7 * QUAKE_UNITS_PER_METER;
-const MAX_VELOCITY_GROUND: f32 = 320.0 / QUAKE_UNITS_PER_METER;
-const MAX_VELOCITY_AIR: f32 = 320.0 / QUAKE_UNITS_PER_METER;
+use super::config::PlayerMotionConfig;
 
 pub fn accelerate(
     direction: Vec3,
@@ -31,28 +23,41 @@ pub fn accelerate(
     curr_velocity + direction * acceleration
 }
 
-pub fn ground_move(direction: Vec3, landed_time: f64, curr_velocity: &mut Vec3, time: &Res<Time>) {
+pub fn ground_move(
+    direction: Vec3,
+    landed_time: f64,
+    curr_velocity: &mut Vec3,
+    time: &Res<Time>,
+    speed_mod: f32,
+    motion_config: &Res<PlayerMotionConfig>,
+) {
     let speed = curr_velocity.length();
 
-    if time.elapsed_secs_f64() - landed_time >= FRICTION_DELAY_SECS && speed != 0.0 {
-        let drop = speed * FRICTION * time.delta_secs();
+    if time.elapsed_secs_f64() - landed_time >= motion_config.friction_delay_secs && speed != 0.0 {
+        let drop = speed * motion_config.friction * time.delta_secs();
         *curr_velocity *= f32::max(speed - drop, 0.0) / speed;
     }
 
     *curr_velocity = accelerate(
         direction,
         *curr_velocity,
-        GROUND_ACCELERATE,
-        MAX_VELOCITY_GROUND,
+        motion_config.ground_accelerate * speed_mod,
+        motion_config.max_velocity_ground * speed_mod,
         time,
     );
 }
-pub fn air_move(direction: Vec3, curr_velocity: &mut Vec3, time: &Res<Time>) {
+pub fn air_move(
+    direction: Vec3,
+    curr_velocity: &mut Vec3,
+    time: &Res<Time>,
+    speed_mod: f32,
+    motion_config: &Res<PlayerMotionConfig>,
+) {
     *curr_velocity = accelerate(
         direction,
         *curr_velocity,
-        AIR_ACCELERATE,
-        MAX_VELOCITY_AIR,
+        motion_config.air_accelerate * speed_mod,
+        motion_config.max_velocity_air * speed_mod,
         time,
     );
 }

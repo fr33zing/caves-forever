@@ -13,7 +13,7 @@ use super::{
     config::PlayerMotionConfig,
     input::{PlayerInput, PlayerYaw},
     quakeish::{air_move, ground_move},
-    Section,
+    PlayerInputConfig, Section,
 };
 
 #[cfg(feature = "jump")]
@@ -119,6 +119,7 @@ fn motion(
     centers: Query<(&Position, &ComputedCenterOfMass)>,
     time: Res<Time>,
     input: Res<PlayerInput>,
+    input_config: Res<PlayerInputConfig>,
     motion_config: Res<PlayerMotionConfig>,
     spatial_query: SpatialQuery,
     player: Option<Single<(Entity, &mut Transform, &Section, &mut PlayerMotion)>>,
@@ -161,15 +162,29 @@ fn motion(
         let mut wishdir = Vec3::new(input.direction.x, 0.0, input.direction.y);
         let rotation = Transform::from_rotation(Quat::from_euler(EulerRot::YXZ, yaw.0, 0.0, 0.0));
         wishdir = rotation.transform_point(wishdir);
+
+        let speed_mod = match (input.walk_mod, input_config.always_run) {
+            (true, true) | (false, false) => 1.0,
+            (true, false) | (false, true) => motion_config.run_speed_mod,
+        };
+
         if state.grounded {
             ground_move(
                 wishdir,
                 state.landed_time,
                 &mut state.forces.movement,
                 &time,
+                speed_mod,
+                &motion_config,
             );
         } else {
-            air_move(wishdir, &mut state.forces.movement, &time);
+            air_move(
+                wishdir,
+                &mut state.forces.movement,
+                &time,
+                speed_mod,
+                &motion_config,
+            );
         }
         collide_and_slide(&mut state.forces.movement);
     };
