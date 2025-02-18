@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+use super::motion::PlayerAction;
+
 #[derive(Resource)]
 pub struct PlayerConfig {
     pub height: f32,
@@ -21,6 +23,13 @@ pub struct PlayerMotionConfig {
 
     #[cfg(feature = "jump")]
     pub jump_buffer_distance: f32,
+}
+
+#[derive(Resource)]
+pub struct PlayerBufferedActionsConfig {
+    /// Player must be within this distance to the ground in order to buffer a jump.
+    pub jump_buffer_distance: f32,
+    pub jump_expiry_secs: f64,
 }
 
 #[derive(Resource)]
@@ -95,6 +104,24 @@ impl Default for PlayerMotionConfig {
             jump_force: 16.0,
             #[cfg(feature = "jump")]
             jump_buffer_distance: 1.5,
+        }
+    }
+}
+
+impl PlayerBufferedActionsConfig {
+    pub fn expiry_for(&self, action: &PlayerAction) -> Option<f64> {
+        match action {
+            PlayerAction::Jump => Some(self.jump_expiry_secs),
+            PlayerAction::Crouch(_) => None,
+        }
+    }
+}
+
+impl Default for PlayerBufferedActionsConfig {
+    fn default() -> Self {
+        Self {
+            jump_buffer_distance: 1.5,
+            jump_expiry_secs: 0.5,
         }
     }
 }

@@ -23,7 +23,7 @@ mod crouch;
 #[cfg(feature = "crouch")]
 use crouch::PlayerCrouchPlugin;
 
-use config::PlayerCameraConfig;
+use config::{PlayerBufferedActionsConfig, PlayerCameraConfig};
 pub use config::{PlayerConfig, PlayerKeybinds};
 pub use motion::PlayerMotion;
 use motion::PlayerMotionPlugin;
@@ -37,6 +37,7 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PlayerConfig>();
+        app.init_resource::<PlayerBufferedActionsConfig>();
         app.init_resource::<PlayerKeybinds>();
         app.init_resource::<PlayerCameraConfig>();
         app.add_plugins((

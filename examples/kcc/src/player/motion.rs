@@ -46,16 +46,20 @@ pub struct PlayerInput {
 }
 
 #[derive(Resource, Default, Deref, DerefMut)]
-pub struct PlayerActionBuffer(pub Vec<PlayerAction>);
+pub struct PlayerActionBuffer(pub Vec<BufferedPlayerAction>);
 impl PlayerActionBuffer {
-    pub fn buffer(&mut self, action: PlayerAction) {
-        if !self.0.contains(&action) {
-            self.0.push(action);
-        }
+    pub fn buffer(&mut self, action: PlayerAction, now: f64) {
+        self.0.retain(|x| x.action != action);
+        self.0.push(BufferedPlayerAction { action, time: now });
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+pub struct BufferedPlayerAction {
+    pub time: f64,
+    pub action: PlayerAction,
+}
+
+#[derive(PartialEq)]
 pub enum PlayerAction {
     #[cfg(feature = "jump")]
     Jump,

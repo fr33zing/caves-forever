@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 
 use super::{
-    config::PlayerMotionConfig,
-    motion::{PlayerAction, PlayerActionBuffer, PlayerInput},
+    config::{PlayerBufferedActionsConfig, PlayerMotionConfig},
+    motion::{BufferedPlayerAction, PlayerAction, PlayerActionBuffer, PlayerInput},
     PlayerKeybinds, PlayerMotion,
 };
 
@@ -17,12 +17,14 @@ impl Plugin for PlayerInputPlugin {
 pub fn process_input(
     mut input: ResMut<PlayerInput>,
     mut actions: ResMut<PlayerActionBuffer>,
+    time: Res<Time>,
     binds: Res<PlayerKeybinds>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
     #[allow(unused)] motion_config: Res<PlayerMotionConfig>,
     #[allow(unused)] state: Option<Single<&PlayerMotion>>,
 ) {
+    let now = time.elapsed_secs_f64();
     input.direction = Vec2::ZERO;
 
     if let Some(forward) = &binds.forward {
@@ -57,7 +59,7 @@ pub fn process_input(
                 if jump.just_pressed(&keyboard, &mouse)
                     && ground_distance <= motion_config.jump_buffer_distance
                 {
-                    actions.buffer(PlayerAction::Jump);
+                    actions.buffer(PlayerAction::Jump, now);
                 }
             }
         }
@@ -67,10 +69,10 @@ pub fn process_input(
     if let Some(crouch) = &binds.crouch {
         if crouch.pressed(&keyboard, &mouse) {
             if !input.crouch {
-                actions.buffer(PlayerAction::Crouch(true));
+                actions.buffer(PlayerAction::Crouch(true), now);
             }
         } else if input.crouch {
-            actions.buffer(PlayerAction::Crouch(false));
+            actions.buffer(PlayerAction::Crouch(false), now);
         }
     }
 
@@ -82,9 +84,11 @@ pub fn process_input(
 }
 
 pub fn perform_actions(
+    time: Res<Time>,
     mut actions: ResMut<PlayerActionBuffer>,
     #[allow(unused)] mut input: ResMut<PlayerInput>,
     #[allow(unused)] motion_config: Res<PlayerMotionConfig>,
+    #[allow(unused)] buffer_config: Res<PlayerBufferedActionsConfig>,
     #[allow(unused)] state: Option<Single<&mut PlayerMotion>>,
 ) {
     #[cfg(feature = "jump")]
@@ -93,7 +97,19 @@ pub fn perform_actions(
         return;
     };
 
-    actions.retain(|action| {
+    let now = time.elapsed_secs_f64();
+    actions.retain(|BufferedPlayerAction { action, time }| {
+        let elapsed = now - time;
+        let expired = if let Some(expiry) = buffer_config.expiry_for(action) {
+            elapsed >= expiry
+        } else {
+            false
+        };
+
+        !expired
+    });
+
+    actions.retain(|BufferedPlayerAction { action, .. }| {
         let mut consumed = false;
         let mut consume = || consumed = true;
 
