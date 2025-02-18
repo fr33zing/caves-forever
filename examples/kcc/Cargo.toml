@@ -7,12 +7,14 @@ edition = "2021"
 default = [
   "first-person-camera",
   "third-person-camera",
+  "input",
   "jump",
   "crouch",
   "crouch-jump"
 ]
 first-person-camera = []
 third-person-camera = []
+input = []
 jump = []
 crouch = []
 crouch-jump = ["crouch", "jump"]
