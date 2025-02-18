@@ -20,7 +20,7 @@ use lib::{
     render_layer,
     weapon::{weapons, PlayerWeapons, WeaponPickup, WeaponPlugin, WeaponSlots},
 };
-use player::{Player, PlayerPlugin};
+use player::{Player, PlayerInputConfig, PlayerPlugin, PlayerWalkModMode};
 
 #[allow(unused)]
 use lib::weapon::ViewModelCamera;
@@ -134,6 +134,12 @@ fn setup_collider(
 }
 
 fn setup_player(mut commands: Commands) {
+    commands.insert_resource(PlayerInputConfig {
+        always_run: true,
+        walk_mod_mode: PlayerWalkModMode::Hybrid,
+        ..default()
+    });
+
     #[allow(unused_mut)]
     let mut viewmodel_camera = Entity::PLACEHOLDER;
 
