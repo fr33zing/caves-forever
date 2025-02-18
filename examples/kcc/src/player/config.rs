@@ -68,6 +68,10 @@ pub enum PlayerCameraMode {
     ThirdPerson,
 }
 
+//
+// Implementations
+//
+
 impl Default for PlayerConfig {
     fn default() -> Self {
         Self {
@@ -90,7 +94,7 @@ impl Default for PlayerMotionConfig {
             #[cfg(feature = "jump")]
             jump_force: 16.0,
             #[cfg(feature = "jump")]
-            jump_buffer_distance: 1.25,
+            jump_buffer_distance: 1.5,
         }
     }
 }

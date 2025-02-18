@@ -8,7 +8,6 @@ mod utility;
 
 #[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
 mod camera;
-
 #[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
 pub use camera::PlayerCamera;
 #[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
@@ -16,7 +15,6 @@ use camera::PlayerCameraPlugin;
 
 #[cfg(feature = "input")]
 mod input;
-
 #[cfg(feature = "input")]
 use input::PlayerInputPlugin;
 
