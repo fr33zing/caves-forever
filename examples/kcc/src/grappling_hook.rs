@@ -11,7 +11,7 @@ const PLAYER_ACCELERATION: f32 = 512.0;
 const DETACH_DISTANCE: f32 = 2.0;
 
 #[derive(Component)]
-pub struct HasGrapplingHook;
+pub struct HasGrapplingHook; // TODO
 
 #[derive(Component)]
 pub struct GrapplingHook {
@@ -120,6 +120,7 @@ fn despawn_missed_hooks(
 fn attach_to_surface(
     mut commands: Commands,
     mut collisions: EventReader<Collision>,
+    positions: Query<&Position>,
     grappling_hook: Option<Single<(Entity, &mut GrapplingHook)>>,
     player: Option<Single<Entity, With<Player>>>,
     sensors: Query<(), With<Sensor>>,
@@ -154,24 +155,28 @@ fn attach_to_surface(
             continue;
         }
 
-        let Some(mut deepest_contact) = ({
-            let mut deepest: Option<ContactData> = None;
+        let Some(mut shallowest_contact) = ({
+            let mut shallowest_of_collision: Option<ContactData> = None;
             for manifold in manifolds {
-                let d = manifold.find_deepest_contact();
-
-                if let Some(ContactData { penetration, .. }) = deepest {
-                    let Some(d) = d else {
-                        continue;
-                    };
-
-                    if d.penetration > penetration {
-                        deepest = Some(*d);
+                let shallowest_of_manifold =
+                    manifold
+                        .contacts
+                        .iter()
+                        .fold(&manifold.contacts[0], |acc, val| {
+                            if val.penetration < acc.penetration {
+                                return val;
+                            }
+                            acc
+                        });
+                if let Some(ContactData { penetration, .. }) = shallowest_of_collision {
+                    if shallowest_of_manifold.penetration < penetration {
+                        shallowest_of_collision = Some(*shallowest_of_manifold);
                     }
                 } else {
-                    deepest = d.copied();
+                    shallowest_of_collision = Some(*shallowest_of_manifold);
                 }
             }
-            deepest
+            shallowest_of_collision
         }) else {
             return;
         };
@@ -179,15 +184,25 @@ fn attach_to_surface(
         let other = if *entity1 == entity {
             entity2
         } else {
-            deepest_contact.flip();
+            shallowest_contact.flip();
             entity1
         };
 
+        let Ok(other_position) = positions.get(*other) else {
+            return;
+        };
+
         let joint = commands
-            .spawn(FixedJoint::new(entity, *other).with_local_anchor_2(deepest_contact.point2))
+            .spawn(
+                FixedJoint::new(entity, *other)
+                    .with_local_anchor_1(Vec3::ZERO)
+                    .with_local_anchor_2(shallowest_contact.point2),
+            )
             .id();
         let mut commands = commands.entity(entity);
-        commands.insert(Transform::from_translation(deepest_contact.point2));
+        commands.insert(Transform::from_translation(
+            **other_position + shallowest_contact.point2,
+        ));
         commands.insert(RigidBody::Dynamic);
         commands.remove::<LinearVelocity>();
         commands.add_child(joint);
