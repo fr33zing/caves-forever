@@ -1,30 +1,89 @@
 use bevy::prelude::*;
 
+#[cfg(feature = "input")]
+use super::PlayerKeybinds;
+
+#[cfg(feature = "jump")]
 use super::{
     config::{PlayerBufferedActionsConfig, PlayerMotionConfig},
-    motion::{BufferedPlayerAction, PlayerAction, PlayerActionBuffer, PlayerInput},
-    PlayerKeybinds, PlayerMotion,
+    PlayerMotion,
 };
+
+#[derive(Resource, Default)]
+pub struct PlayerYaw(pub f32);
+
+#[derive(Resource, Default)]
+pub struct PlayerInput {
+    /// Commanded movement direction, local XZ plane.
+    pub direction: Vec2,
+    pub sprint: bool,
+
+    #[cfg(feature = "crouch")]
+    pub crouch: bool,
+}
+
+#[cfg(feature = "actions")]
+#[derive(Resource, Default, Deref, DerefMut)]
+pub struct PlayerActionBuffer(pub Vec<BufferedPlayerAction>);
+
+#[cfg(feature = "actions")]
+impl PlayerActionBuffer {
+    pub fn buffer(&mut self, action: PlayerAction, now: f64) {
+        self.0.retain(|x| x.action != action);
+        self.0.push(BufferedPlayerAction { action, time: now });
+    }
+}
+
+#[cfg(feature = "actions")]
+pub struct BufferedPlayerAction {
+    pub time: f64,
+    pub action: PlayerAction,
+}
+
+#[cfg(feature = "actions")]
+#[derive(PartialEq)]
+pub enum PlayerAction {
+    #[cfg(feature = "jump")]
+    Jump,
+
+    #[cfg(feature = "crouch")]
+    Crouch(bool),
+}
 
 pub struct PlayerInputPlugin;
 
 impl Plugin for PlayerInputPlugin {
     fn build(&self, app: &mut App) {
+        app.init_resource::<PlayerInput>();
+        app.init_resource::<PlayerYaw>();
+
+        #[cfg(feature = "actions")]
+        app.init_resource::<PlayerActionBuffer>();
+
+        #[cfg(feature = "jump")]
+        app.init_resource::<PlayerBufferedActionsConfig>();
+
+        #[cfg(feature = "input")]
         app.add_systems(Update, (process_input, perform_actions).chain());
+        #[cfg(all(not(feature = "input"), any(feature = "jump", feature = "crouch")))]
+        app.add_systems(Update, perform_actions);
     }
 }
 
+#[cfg(feature = "input")]
 pub fn process_input(
     mut input: ResMut<PlayerInput>,
-    mut actions: ResMut<PlayerActionBuffer>,
-    time: Res<Time>,
+    #[allow(unused_mut, unused)] mut actions: ResMut<PlayerActionBuffer>,
+    #[cfg(any(feature = "jump", feature = "crouch"))] time: Res<Time>,
     binds: Res<PlayerKeybinds>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
-    #[allow(unused)] motion_config: Res<PlayerMotionConfig>,
-    #[allow(unused)] state: Option<Single<&PlayerMotion>>,
+    #[cfg(feature = "jump")] buffer_config: Res<PlayerBufferedActionsConfig>,
+    #[cfg(feature = "jump")] state: Option<Single<&PlayerMotion>>,
 ) {
+    #[cfg(any(feature = "jump", feature = "crouch"))]
     let now = time.elapsed_secs_f64();
+
     input.direction = Vec2::ZERO;
 
     if let Some(forward) = &binds.forward {
@@ -57,7 +116,7 @@ pub fn process_input(
         if let Some(state) = state {
             if let Some(ground_distance) = state.ground_distance {
                 if jump.just_pressed(&keyboard, &mouse)
-                    && ground_distance <= motion_config.jump_buffer_distance
+                    && ground_distance <= buffer_config.jump_buffer_distance
                 {
                     actions.buffer(PlayerAction::Jump, now);
                 }
@@ -83,13 +142,14 @@ pub fn process_input(
     }
 }
 
+#[cfg(any(feature = "jump", feature = "crouch"))]
 pub fn perform_actions(
     time: Res<Time>,
+    buffer_config: Res<PlayerBufferedActionsConfig>,
     mut actions: ResMut<PlayerActionBuffer>,
-    #[allow(unused)] mut input: ResMut<PlayerInput>,
-    #[allow(unused)] motion_config: Res<PlayerMotionConfig>,
-    #[allow(unused)] buffer_config: Res<PlayerBufferedActionsConfig>,
-    #[allow(unused)] state: Option<Single<&mut PlayerMotion>>,
+    #[cfg(feature = "jump")] motion_config: Res<PlayerMotionConfig>,
+    #[cfg(feature = "jump")] state: Option<Single<&mut PlayerMotion>>,
+    #[cfg(feature = "crouch")] mut input: ResMut<PlayerInput>,
 ) {
     #[cfg(feature = "jump")]
     let Some(mut state) = state
@@ -127,6 +187,9 @@ pub fn perform_actions(
                 input.crouch = *crouch;
                 consume();
             }
+
+            #[allow(unreachable_patterns)]
+            _ => {}
         };
 
         !consumed

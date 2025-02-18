@@ -15,8 +15,9 @@ default = [
 first-person-camera = []
 third-person-camera = []
 input = []
-jump = []
-crouch = []
+actions = []
+jump = ["actions"]
+crouch = ["actions"]
 crouch-jump = ["crouch", "jump"]
 
 [dependencies]

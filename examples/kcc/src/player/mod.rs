@@ -13,9 +13,7 @@ pub use camera::PlayerCamera;
 #[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
 use camera::PlayerCameraPlugin;
 
-#[cfg(feature = "input")]
 mod input;
-#[cfg(feature = "input")]
 use input::PlayerInputPlugin;
 
 #[cfg(feature = "crouch")]
@@ -23,7 +21,6 @@ mod crouch;
 #[cfg(feature = "crouch")]
 use crouch::PlayerCrouchPlugin;
 
-use config::{PlayerBufferedActionsConfig, PlayerCameraConfig};
 pub use config::{PlayerConfig, PlayerKeybinds};
 pub use motion::PlayerMotion;
 use motion::PlayerMotionPlugin;
@@ -37,15 +34,12 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PlayerConfig>();
-        app.init_resource::<PlayerBufferedActionsConfig>();
         app.init_resource::<PlayerKeybinds>();
-        app.init_resource::<PlayerCameraConfig>();
         app.add_plugins((
             PlayerMotionPlugin,
+            PlayerInputPlugin,
             #[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
             PlayerCameraPlugin,
-            #[cfg(feature = "input")]
-            PlayerInputPlugin,
             #[cfg(feature = "crouch")]
             PlayerCrouchPlugin,
         ));

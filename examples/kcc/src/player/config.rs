@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
-use super::motion::PlayerAction;
+#[cfg(feature = "actions")]
+use super::input::PlayerAction;
 
 #[derive(Resource)]
 pub struct PlayerConfig {
@@ -20,15 +21,15 @@ pub struct PlayerMotionConfig {
 
     #[cfg(feature = "jump")]
     pub jump_force: f32,
-
-    #[cfg(feature = "jump")]
-    pub jump_buffer_distance: f32,
 }
 
+#[cfg(feature = "actions")]
 #[derive(Resource)]
 pub struct PlayerBufferedActionsConfig {
     /// Player must be within this distance to the ground in order to buffer a jump.
+    #[cfg(feature = "jump")]
     pub jump_buffer_distance: f32,
+    #[cfg(feature = "jump")]
     pub jump_expiry_secs: f64,
 }
 
@@ -102,25 +103,28 @@ impl Default for PlayerMotionConfig {
 
             #[cfg(feature = "jump")]
             jump_force: 16.0,
-            #[cfg(feature = "jump")]
-            jump_buffer_distance: 1.5,
         }
     }
 }
 
+#[cfg(feature = "actions")]
 impl PlayerBufferedActionsConfig {
     pub fn expiry_for(&self, action: &PlayerAction) -> Option<f64> {
         match action {
+            #[cfg(feature = "jump")]
             PlayerAction::Jump => Some(self.jump_expiry_secs),
-            PlayerAction::Crouch(_) => None,
+            _ => None,
         }
     }
 }
 
+#[cfg(feature = "actions")]
 impl Default for PlayerBufferedActionsConfig {
     fn default() -> Self {
         Self {
+            #[cfg(feature = "jump")]
             jump_buffer_distance: 1.5,
+            #[cfg(feature = "jump")]
             jump_expiry_secs: 0.5,
         }
     }
@@ -182,6 +186,7 @@ impl Keybind {
     }
 }
 
+#[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
 impl Default for PlayerCameraConfig {
     fn default() -> Self {
         Self {

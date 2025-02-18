@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use super::{motion::PlayerInput, Player, PlayerConfig, PlayerMotion, Section};
+use super::{input::PlayerInput, Player, PlayerConfig, PlayerMotion, Section};
 
 const CROUCH_TRANSITION_SPEED: f32 = 12.0;
 const CROUCH_EPSILON: f32 = 0.0001;

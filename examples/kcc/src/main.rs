@@ -18,9 +18,12 @@ use bevy::{
 use bevy_egui::EguiPlugin;
 use lib::{
     render_layer,
-    weapon::{weapons, PlayerWeapons, ViewModelCamera, WeaponPickup, WeaponPlugin, WeaponSlots},
+    weapon::{weapons, PlayerWeapons, WeaponPickup, WeaponPlugin, WeaponSlots},
 };
 use player::{Player, PlayerPlugin};
+
+#[allow(unused)]
+use lib::weapon::ViewModelCamera;
 
 #[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
 use grappling_hook::GrapplingHookPlugin;
@@ -69,7 +72,10 @@ fn main() {
         //PhysicsDebugPlugin::default(),
     ));
 
-    app.add_plugins((PlayerPlugin, WeaponPlugin, GrapplingHookPlugin));
+    app.add_plugins((PlayerPlugin, WeaponPlugin));
+
+    #[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
+    app.add_plugins(GrapplingHookPlugin);
 
     app.add_systems(Startup, (setup_world, setup_player).chain());
     app.add_systems(Update, setup_collider);
@@ -128,7 +134,10 @@ fn setup_collider(
 }
 
 fn setup_player(mut commands: Commands) {
+    #[allow(unused_mut)]
     let mut viewmodel_camera = Entity::PLACEHOLDER;
+
+    #[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
     commands.spawn(PlayerCamera).with_children(|parent| {
         viewmodel_camera = parent.spawn(ViewModelCamera::default()).id();
     });

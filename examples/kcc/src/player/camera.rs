@@ -9,7 +9,7 @@ use bevy::{
 };
 use lib::render_layer;
 
-use super::{config::PlayerCameraConfig, motion::PlayerYaw, Player, PlayerConfig, Section};
+use super::{config::PlayerCameraConfig, input::PlayerYaw, Player, PlayerConfig, Section};
 
 #[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
 use super::config::{PlayerCameraMode, PlayerKeybinds};
@@ -29,6 +29,9 @@ impl Plugin for PlayerCameraPlugin {
     fn build(&self, app: &mut App) {
         #[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
         app.add_systems(Update, (switch_camera_mode, transition_camera_mode).chain());
+
+        #[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
+        app.init_resource::<PlayerCameraConfig>();
 
         app.add_systems(
             Update,

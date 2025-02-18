@@ -11,9 +11,13 @@ use bevy::prelude::*;
 
 use super::{
     config::PlayerMotionConfig,
+    input::{PlayerInput, PlayerYaw},
     quakeish::{air_move, ground_move},
     Section,
 };
+
+#[cfg(feature = "jump")]
+use super::config::PlayerBufferedActionsConfig;
 
 #[derive(Default)]
 pub struct PlayerForces {
@@ -32,50 +36,11 @@ pub struct PlayerMotion {
     pub forces: PlayerForces,
 }
 
-#[derive(Resource, Default)]
-pub struct PlayerYaw(pub f32);
-
-#[derive(Resource, Default)]
-pub struct PlayerInput {
-    /// Commanded movement direction, local XZ plane.
-    pub direction: Vec2,
-    pub sprint: bool,
-
-    #[cfg(feature = "crouch")]
-    pub crouch: bool,
-}
-
-#[derive(Resource, Default, Deref, DerefMut)]
-pub struct PlayerActionBuffer(pub Vec<BufferedPlayerAction>);
-impl PlayerActionBuffer {
-    pub fn buffer(&mut self, action: PlayerAction, now: f64) {
-        self.0.retain(|x| x.action != action);
-        self.0.push(BufferedPlayerAction { action, time: now });
-    }
-}
-
-pub struct BufferedPlayerAction {
-    pub time: f64,
-    pub action: PlayerAction,
-}
-
-#[derive(PartialEq)]
-pub enum PlayerAction {
-    #[cfg(feature = "jump")]
-    Jump,
-
-    #[cfg(feature = "crouch")]
-    Crouch(bool),
-}
-
 pub struct PlayerMotionPlugin;
 
 impl Plugin for PlayerMotionPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PlayerMotionConfig>();
-        app.init_resource::<PlayerInput>();
-        app.init_resource::<PlayerYaw>();
-        app.init_resource::<PlayerActionBuffer>();
 
         #[cfg(feature = "input")]
         app.add_systems(
@@ -94,6 +59,7 @@ fn snap_to_ground(
     time: Res<Time>,
     spatial_query: SpatialQuery,
     motion_config: Res<PlayerMotionConfig>,
+    #[cfg(feature = "jump")] buffer_config: Res<PlayerBufferedActionsConfig>,
     player: Option<Single<(Entity, &mut Transform, &Section, &mut PlayerMotion)>>,
 ) {
     let Some(player) = player else {
@@ -105,7 +71,7 @@ fn snap_to_ground(
     #[cfg(not(feature = "jump"))]
     let distance = motion_config.snap_to_ground_distance;
     #[cfg(feature = "jump")]
-    let distance = motion_config.jump_buffer_distance;
+    let distance = buffer_config.jump_buffer_distance;
 
     let shapecast = spatial_query.cast_shape(
         &section.collider(),
