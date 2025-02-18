@@ -9,10 +9,10 @@ use bevy::{
 };
 use lib::render_layer;
 
-use super::{
-    config::{PlayerCameraConfig, PlayerCameraMode},
-    Player, PlayerConfig, PlayerKeybinds, Section,
-};
+use super::{config::PlayerCameraConfig, motion::PlayerYaw, Player, PlayerConfig, Section};
+
+#[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
+use super::config::{PlayerCameraMode, PlayerKeybinds};
 
 const MOUSE_MOTION_SCALE: f32 = 0.00015;
 const PITCH_LIMIT: f32 = FRAC_PI_2 - 0.01;
@@ -27,14 +27,12 @@ pub struct PlayerCameraPlugin;
 
 impl Plugin for PlayerCameraPlugin {
     fn build(&self, app: &mut App) {
+        #[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
+        app.add_systems(Update, (switch_camera_mode, transition_camera_mode).chain());
+
         app.add_systems(
             Update,
-            (
-                add_required_components,
-                toggle_cursor_lock,
-                mouselook,
-                (switch_camera_mode, transition_camera_mode).chain(),
-            ),
+            (add_required_components, toggle_cursor_lock, mouselook),
         );
         app.add_systems(
             PostUpdate,
@@ -82,10 +80,19 @@ fn add_required_components(
             child
         };
 
+        let transform = if cfg!(all(
+            feature = "third-person-camera",
+            not(feature = "first-person-camera")
+        )) {
+            Transform::from_translation(Vec3::Z * camera_config.third_person_distance)
+        } else {
+            Transform::default()
+        };
+
         let mut commands = commands.entity(child);
         commands
+            .insert_if_new(transform)
             .insert_if_new(RenderLayers::layer(render_layer::WORLD))
-            .insert_if_new(Transform::default())
             .insert_if_new(Camera3d::default())
             .insert_if_new(Projection::Perspective(PerspectiveProjection {
                 fov: camera_config.fov_degrees.to_radians(),
@@ -123,6 +130,7 @@ fn mouselook(
     config: Res<PlayerCameraConfig>,
     mouse: Res<AccumulatedMouseMotion>,
     camera: Option<Single<&mut Transform, With<PlayerCamera>>>,
+    mut player_yaw: ResMut<PlayerYaw>,
 ) {
     let Some(window) = window else {
         return;
@@ -150,9 +158,12 @@ fn mouselook(
     let (yaw, pitch, _) = camera.rotation.to_euler(EulerRot::YXZ);
     let pitch = (pitch - delta.y).clamp(-PITCH_LIMIT, PITCH_LIMIT);
     let yaw = yaw - delta.x;
+
+    player_yaw.0 = yaw;
     camera.rotation = Quat::from_euler(EulerRot::YXZ, yaw, pitch, 0.0);
 }
 
+#[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
 fn switch_camera_mode(
     keybinds: Res<PlayerKeybinds>,
     mut config: ResMut<PlayerCameraConfig>,
@@ -171,6 +182,7 @@ fn switch_camera_mode(
     }
 }
 
+#[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
 fn transition_camera_mode(
     time: Res<Time>,
     config: Res<PlayerCameraConfig>,

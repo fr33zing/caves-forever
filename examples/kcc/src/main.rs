@@ -16,12 +16,16 @@ use bevy::{
     window::PresentMode,
 };
 use bevy_egui::EguiPlugin;
-use grappling_hook::GrapplingHookPlugin;
 use lib::{
     render_layer,
     weapon::{weapons, PlayerWeapons, ViewModelCamera, WeaponPickup, WeaponPlugin, WeaponSlots},
 };
-use player::{Player, PlayerCamera, PlayerPlugin};
+use player::{Player, PlayerPlugin};
+
+#[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
+use grappling_hook::GrapplingHookPlugin;
+#[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
+use player::PlayerCamera;
 
 fn main() {
     let mut app = App::new();

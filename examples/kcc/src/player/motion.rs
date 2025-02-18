@@ -11,7 +11,7 @@ use bevy::prelude::*;
 
 use super::{
     quakeish::{air_move, ground_move},
-    PlayerCamera, PlayerKeybinds, Section,
+    PlayerKeybinds, Section,
 };
 
 const MAX_SLOPE_DEGREES: f32 = 55.0;
@@ -31,7 +31,7 @@ pub struct PlayerForces {
     pub gravity: Vec3,
 }
 
-#[derive(Default, Component)]
+#[derive(Component, Default)]
 pub struct PlayerMotion {
     pub grounded: bool,
     pub ground_normal: Option<Vec3>,
@@ -40,6 +40,9 @@ pub struct PlayerMotion {
     pub no_gravity_this_frame: bool,
     pub forces: PlayerForces,
 }
+
+#[derive(Resource, Default)]
+pub struct PlayerYaw(pub f32);
 
 #[derive(Resource, Default)]
 pub struct PlayerInput {
@@ -74,6 +77,7 @@ pub struct PlayerMotionPlugin;
 impl Plugin for PlayerMotionPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PlayerInput>();
+        app.init_resource::<PlayerYaw>();
         app.init_resource::<PlayerActionBuffer>();
         app.add_systems(
             Update,
@@ -237,13 +241,10 @@ fn motion(
     input: Res<PlayerInput>,
     spatial_query: SpatialQuery,
     player: Option<Single<(Entity, &mut Transform, &Section, &mut PlayerMotion)>>,
-    camera: Option<Single<&GlobalTransform, With<PlayerCamera>>>,
     sensors: Query<Entity, With<Sensor>>,
+    yaw: Res<PlayerYaw>,
 ) {
     let Some(player) = player else {
-        return;
-    };
-    let Some(camera) = camera else {
         return;
     };
 
@@ -274,8 +275,7 @@ fn motion(
     // Movement
     {
         let mut wishdir = Vec3::new(input.direction.x, 0.0, input.direction.y);
-        let yaw = camera.rotation().to_euler(EulerRot::YXZ).0;
-        let rotation = Transform::from_rotation(Quat::from_euler(EulerRot::YXZ, yaw, 0.0, 0.0));
+        let rotation = Transform::from_rotation(Quat::from_euler(EulerRot::YXZ, yaw.0, 0.0, 0.0));
         wishdir = rotation.transform_point(wishdir);
         if state.grounded {
             ground_move(

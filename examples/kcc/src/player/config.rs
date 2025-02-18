@@ -8,13 +8,15 @@ pub struct PlayerConfig {
 
 #[derive(Resource)]
 pub struct PlayerKeybinds {
-    pub switch_camera: Option<Keybind>,
     pub forward: Option<Keybind>,
     pub backward: Option<Keybind>,
     pub left: Option<Keybind>,
     pub right: Option<Keybind>,
     pub jump: Option<Keybind>,
     pub sprint: Option<Keybind>,
+
+    #[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
+    pub switch_camera: Option<Keybind>,
 
     #[cfg(feature = "crouch")]
     pub crouch: Option<Keybind>,
@@ -27,17 +29,26 @@ pub enum Keybind {
 
 #[derive(Resource)]
 pub struct PlayerCameraConfig {
-    pub mode: PlayerCameraMode,
     pub eye_offset: f32,
     pub sensitivity: f32,
     pub fov_degrees: f32,
+
+    #[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
+    pub mode: PlayerCameraMode,
+
+    #[cfg(feature = "third-person-camera")]
     pub third_person_distance: f32,
 }
 
+#[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
 #[derive(Default)]
 pub enum PlayerCameraMode {
-    #[default]
+    #[cfg_attr(feature = "first-person-camera", default)]
     FirstPerson,
+    #[cfg_attr(
+        all(feature = "third-person-camera", not(feature = "first-person-camera")),
+        default
+    )]
     ThirdPerson,
 }
 
@@ -53,13 +64,15 @@ impl Default for PlayerConfig {
 impl Default for PlayerKeybinds {
     fn default() -> Self {
         Self {
-            switch_camera: Some(Keybind::Mouse(MouseButton::Middle)),
             forward: Some(Keybind::Keyboard(KeyCode::KeyW)),
             backward: Some(Keybind::Keyboard(KeyCode::KeyS)),
             left: Some(Keybind::Keyboard(KeyCode::KeyA)),
             right: Some(Keybind::Keyboard(KeyCode::KeyD)),
             jump: Some(Keybind::Keyboard(KeyCode::Space)),
             sprint: Some(Keybind::Keyboard(KeyCode::ShiftLeft)),
+
+            #[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
+            switch_camera: Some(Keybind::Mouse(MouseButton::Middle)),
 
             #[cfg(feature = "crouch")]
             crouch: Some(Keybind::Keyboard(KeyCode::ControlLeft)),
@@ -105,10 +118,14 @@ impl Keybind {
 impl Default for PlayerCameraConfig {
     fn default() -> Self {
         Self {
-            mode: default(),
             eye_offset: 0.1524, // 6"
             sensitivity: 1.0,
             fov_degrees: 45.0,
+
+            #[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
+            mode: default(),
+
+            #[cfg(feature = "third-person-camera")]
             third_person_distance: 8.0,
         }
     }

@@ -1,7 +1,13 @@
 use avian3d::prelude::{LockedAxes, RigidBody};
 use bevy::{pbr::NotShadowCaster, prelude::*};
 
+#[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
 mod camera;
+#[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
+pub use camera::PlayerCamera;
+#[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
+use camera::PlayerCameraPlugin;
+
 mod config;
 mod motion;
 mod quakeish;
@@ -12,10 +18,8 @@ mod crouch;
 #[cfg(feature = "crouch")]
 use crouch::PlayerCrouchPlugin;
 
-use camera::PlayerCameraPlugin;
 use config::PlayerCameraConfig;
 
-pub use camera::PlayerCamera;
 pub use config::{PlayerConfig, PlayerKeybinds};
 pub use motion::PlayerMotion;
 use motion::PlayerMotionPlugin;
@@ -32,6 +36,7 @@ impl Plugin for PlayerPlugin {
         app.init_resource::<PlayerKeybinds>();
         app.init_resource::<PlayerCameraConfig>();
         app.add_plugins((
+            #[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
             PlayerCameraPlugin,
             PlayerMotionPlugin,
             #[cfg(feature = "crouch")]
