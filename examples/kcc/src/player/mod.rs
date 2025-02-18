@@ -36,9 +36,9 @@ impl Plugin for PlayerPlugin {
         app.init_resource::<PlayerKeybinds>();
         app.init_resource::<PlayerCameraConfig>();
         app.add_plugins((
+            PlayerMotionPlugin,
             #[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
             PlayerCameraPlugin,
-            PlayerMotionPlugin,
             #[cfg(feature = "crouch")]
             PlayerCrouchPlugin,
         ));

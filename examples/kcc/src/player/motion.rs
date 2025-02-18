@@ -10,19 +10,10 @@ use avian3d::prelude::*;
 use bevy::prelude::*;
 
 use super::{
+    config::PlayerMotionConfig,
     quakeish::{air_move, ground_move},
     PlayerKeybinds, Section,
 };
-
-const MAX_SLOPE_DEGREES: f32 = 55.0;
-const GROUND_DISTANCE: f32 = 0.1;
-const MAX_BOUNCES: u32 = 3;
-const SKIN: f32 = 0.005;
-const JUMP_FORCE: f32 = 16.0;
-const JUMP_BUFFER_DISTANCE: f32 = 1.5;
-const GRAVITY: f32 = 64.0;
-const PLAYER_PUSH_FORCE: f32 = 28.0;
-// const TERMINAL_VELOCITY: f32 = TODO
 
 #[derive(Default)]
 pub struct PlayerForces {
@@ -66,6 +57,7 @@ impl PlayerActionBuffer {
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum PlayerAction {
+    #[cfg(feature = "jump")]
     Jump,
 
     #[cfg(feature = "crouch")]
@@ -76,6 +68,7 @@ pub struct PlayerMotionPlugin;
 
 impl Plugin for PlayerMotionPlugin {
     fn build(&self, app: &mut App) {
+        app.init_resource::<PlayerMotionConfig>();
         app.init_resource::<PlayerInput>();
         app.init_resource::<PlayerYaw>();
         app.init_resource::<PlayerActionBuffer>();
@@ -92,7 +85,8 @@ fn process_input(
     binds: Res<PlayerKeybinds>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
-    state: Option<Single<&PlayerMotion>>,
+    #[allow(unused)] motion_config: Res<PlayerMotionConfig>,
+    #[allow(unused)] state: Option<Single<&PlayerMotion>>,
 ) {
     input.direction = Vec2::ZERO;
 
@@ -121,10 +115,13 @@ fn process_input(
         input.direction = input.direction.normalize();
     }
 
+    #[cfg(feature = "jump")]
     if let Some(jump) = &binds.jump {
         if let Some(state) = state {
             if let Some(ground_distance) = state.ground_distance {
-                if jump.just_pressed(&keyboard, &mouse) && ground_distance <= JUMP_BUFFER_DISTANCE {
+                if jump.just_pressed(&keyboard, &mouse)
+                    && ground_distance <= motion_config.jump_buffer_distance
+                {
                     actions.buffer(PlayerAction::Jump);
                 }
             }
@@ -150,11 +147,14 @@ fn process_input(
 }
 
 fn perform_actions(
-    #[allow(unused)] mut input: ResMut<PlayerInput>,
     mut actions: ResMut<PlayerActionBuffer>,
-    state: Option<Single<&mut PlayerMotion>>,
+    #[allow(unused)] mut input: ResMut<PlayerInput>,
+    #[allow(unused)] motion_config: Res<PlayerMotionConfig>,
+    #[allow(unused)] state: Option<Single<&mut PlayerMotion>>,
 ) {
-    let Some(mut state) = state else {
+    #[cfg(feature = "jump")]
+    let Some(mut state) = state
+    else {
         return;
     };
 
@@ -163,9 +163,10 @@ fn perform_actions(
         let mut consume = || consumed = true;
 
         match action {
+            #[cfg(feature = "jump")]
             PlayerAction::Jump => {
                 if state.grounded {
-                    state.forces.gravity.y += JUMP_FORCE;
+                    state.forces.gravity.y += motion_config.jump_force;
                     consume();
                 }
             }
@@ -184,6 +185,7 @@ fn perform_actions(
 fn snap_to_ground(
     time: Res<Time>,
     spatial_query: SpatialQuery,
+    motion_config: Res<PlayerMotionConfig>,
     player: Option<Single<(Entity, &mut Transform, &Section, &mut PlayerMotion)>>,
 ) {
     let Some(player) = player else {
@@ -192,13 +194,17 @@ fn snap_to_ground(
 
     let (entity, mut transform, section, mut state) = player.into_inner();
 
-    let bottom = transform.translation;
+    #[cfg(not(feature = "jump"))]
+    let distance = motion_config.snap_to_ground_distance;
+    #[cfg(feature = "jump")]
+    let distance = motion_config.jump_buffer_distance;
+
     let shapecast = spatial_query.cast_shape(
         &section.collider(),
-        bottom,
+        transform.translation,
         default(),
         Dir3::NEG_Y,
-        &ShapeCastConfig::from_max_distance(JUMP_BUFFER_DISTANCE),
+        &ShapeCastConfig::from_max_distance(distance),
         &SpatialQueryFilter::from_excluded_entities(vec![entity]),
     );
     let Some(hit) = shapecast else {
@@ -209,7 +215,7 @@ fn snap_to_ground(
 
     state.ground_distance = Some(hit.distance);
 
-    if hit.distance > GROUND_DISTANCE {
+    if hit.distance > motion_config.snap_to_ground_distance {
         state.grounded = false;
         return;
     }
@@ -217,7 +223,7 @@ fn snap_to_ground(
     let prev_grounded = state.grounded;
 
     let angle = hit.normal1.angle_between(Vec3::Y);
-    state.grounded = angle < MAX_SLOPE_DEGREES.to_radians();
+    state.grounded = angle < motion_config.max_slope_degrees.to_radians();
     state.ground_normal = Some(hit.normal1);
 
     if !state.grounded {
@@ -225,7 +231,7 @@ fn snap_to_ground(
     }
 
     if state.forces.gravity.y <= 0.0 {
-        transform.translation.y -= hit.distance - SKIN;
+        transform.translation.y -= hit.distance - motion_config.skin;
     }
     state.forces.gravity.y = state.forces.gravity.y.max(0.0);
 
@@ -239,6 +245,7 @@ fn motion(
     centers: Query<(&Position, &ComputedCenterOfMass)>,
     time: Res<Time>,
     input: Res<PlayerInput>,
+    motion_config: Res<PlayerMotionConfig>,
     spatial_query: SpatialQuery,
     player: Option<Single<(Entity, &mut Transform, &Section, &mut PlayerMotion)>>,
     sensors: Query<Entity, With<Sensor>>,
@@ -257,6 +264,9 @@ fn motion(
         collide_and_slide(
             &mut commands,
             &centers,
+            motion_config.collide_and_slide_bounces,
+            motion_config.skin,
+            motion_config.push_force,
             section,
             velocity,
             &mut transform.translation,
@@ -296,7 +306,7 @@ fn motion(
             state.no_gravity_this_frame = false;
             break 'gravity;
         }
-        let mut gravity = Vec3::NEG_Y * GRAVITY * time.delta_secs();
+        let mut gravity = Vec3::NEG_Y * motion_config.gravity * time.delta_secs();
         if state.grounded {
             gravity *= 0.01;
         }
@@ -305,7 +315,13 @@ fn motion(
     };
 
     // Just in case
-    depenetrate(&spatial_query, &filter, &section.collider(), &mut transform);
+    depenetrate(
+        &spatial_query,
+        &filter,
+        motion_config.skin,
+        &section.collider(),
+        &mut transform,
+    );
 }
 
 //
@@ -315,6 +331,9 @@ fn motion(
 fn collide_and_slide(
     commands: &mut Commands,
     centers: &Query<(&Position, &ComputedCenterOfMass)>,
+    max_bounces: u8,
+    skin: f32,
+    push_force: f32,
     section: &Section,
     velocity: &mut Vec3,
     position: &mut Vec3,
@@ -324,7 +343,7 @@ fn collide_and_slide(
 ) {
     let mut forces = Vec::<(Entity, Vec3, ExternalForce)>::new();
 
-    for _ in 0..MAX_BOUNCES {
+    for _ in 0..max_bounces {
         let timescaled_velocity = *velocity * time.delta_secs();
 
         let Ok((direction, distance)) = Dir3::new_and_length(timescaled_velocity) else {
@@ -352,18 +371,18 @@ fn collide_and_slide(
         let ratio = hit.distance / timescaled_velocity.length();
         let rejection = *velocity * hit.normal1 * hit.normal1;
 
-        *position += timescaled_velocity * ratio + hit.normal1 * SKIN;
+        *position += timescaled_velocity * ratio + hit.normal1 * skin;
         *velocity -= rejection;
 
         if let Some((_, center, force)) = forces
             .iter_mut()
             .find(|(entity, _, _)| *entity == hit.entity)
         {
-            force.apply_force_at_point(rejection * PLAYER_PUSH_FORCE, hit.point1, *center);
+            force.apply_force_at_point(rejection * push_force, hit.point1, *center);
         } else if let Ok((position, local_center)) = centers.get(hit.entity) {
             let center = position.0 + local_center.0;
             let mut force = ExternalForce::default().with_persistence(false);
-            force.apply_force_at_point(rejection * PLAYER_PUSH_FORCE, hit.point1, center);
+            force.apply_force_at_point(rejection * push_force, hit.point1, center);
             forces.push((hit.entity, center, force));
         }
     }
@@ -376,6 +395,7 @@ fn collide_and_slide(
 fn depenetrate(
     spatial_query: &SpatialQuery,
     filter: &SpatialQueryFilter,
+    skin: f32,
     collider: &Collider,
     transform: &mut Transform,
 ) {
@@ -396,6 +416,6 @@ fn depenetrate(
     );
 
     if let Some(hit) = hit {
-        transform.translation += hit.normal1 * (hit.distance + SKIN);
+        transform.translation += hit.normal1 * (hit.distance + skin);
     }
 }

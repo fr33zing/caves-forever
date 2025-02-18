@@ -7,13 +7,32 @@ pub struct PlayerConfig {
 }
 
 #[derive(Resource)]
+pub struct PlayerMotionConfig {
+    // TODO terminal_velocity: f32
+    pub max_slope_degrees: f32,
+    pub snap_to_ground_distance: f32,
+    pub collide_and_slide_bounces: u8,
+    pub skin: f32,
+    pub gravity: f32,
+    pub push_force: f32,
+
+    #[cfg(feature = "jump")]
+    pub jump_force: f32,
+
+    #[cfg(feature = "jump")]
+    pub jump_buffer_distance: f32,
+}
+
+#[derive(Resource)]
 pub struct PlayerKeybinds {
     pub forward: Option<Keybind>,
     pub backward: Option<Keybind>,
     pub left: Option<Keybind>,
     pub right: Option<Keybind>,
-    pub jump: Option<Keybind>,
     pub sprint: Option<Keybind>,
+
+    #[cfg(feature = "jump")]
+    pub jump: Option<Keybind>,
 
     #[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
     pub switch_camera: Option<Keybind>,
@@ -27,6 +46,7 @@ pub enum Keybind {
     Mouse(MouseButton),
 }
 
+#[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
 #[derive(Resource)]
 pub struct PlayerCameraConfig {
     pub eye_offset: f32,
@@ -43,12 +63,8 @@ pub struct PlayerCameraConfig {
 #[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
 #[derive(Default)]
 pub enum PlayerCameraMode {
-    #[cfg_attr(feature = "first-person-camera", default)]
+    #[default]
     FirstPerson,
-    #[cfg_attr(
-        all(feature = "third-person-camera", not(feature = "first-person-camera")),
-        default
-    )]
     ThirdPerson,
 }
 
@@ -61,6 +77,24 @@ impl Default for PlayerConfig {
     }
 }
 
+impl Default for PlayerMotionConfig {
+    fn default() -> Self {
+        Self {
+            max_slope_degrees: 50.0,
+            snap_to_ground_distance: 0.1,
+            collide_and_slide_bounces: 3,
+            skin: 0.005,
+            gravity: 64.0,
+            push_force: 28.0,
+
+            #[cfg(feature = "jump")]
+            jump_force: 16.0,
+            #[cfg(feature = "jump")]
+            jump_buffer_distance: 1.25,
+        }
+    }
+}
+
 impl Default for PlayerKeybinds {
     fn default() -> Self {
         Self {
@@ -68,11 +102,13 @@ impl Default for PlayerKeybinds {
             backward: Some(Keybind::Keyboard(KeyCode::KeyS)),
             left: Some(Keybind::Keyboard(KeyCode::KeyA)),
             right: Some(Keybind::Keyboard(KeyCode::KeyD)),
-            jump: Some(Keybind::Keyboard(KeyCode::Space)),
             sprint: Some(Keybind::Keyboard(KeyCode::ShiftLeft)),
 
             #[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
             switch_camera: Some(Keybind::Mouse(MouseButton::Middle)),
+
+            #[cfg(feature = "jump")]
+            jump: Some(Keybind::Keyboard(KeyCode::Space)),
 
             #[cfg(feature = "crouch")]
             crouch: Some(Keybind::Keyboard(KeyCode::ControlLeft)),
