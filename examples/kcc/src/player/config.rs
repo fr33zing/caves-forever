@@ -30,6 +30,7 @@ pub struct PlayerMotionConfig {
 pub struct PlayerActionsConfig {
     pub jump: Option<JumpActionConfig>,
     pub crouch: Option<CrouchActionConfig>,
+    pub slide: Option<SlideActionConfig>,
 }
 
 pub struct JumpActionConfig {
@@ -42,6 +43,22 @@ pub struct JumpActionConfig {
 pub struct CrouchActionConfig {
     pub transition_speed: f32,
     pub crouchjump_additional_clearance: bool,
+    pub slide_if_running: bool,
+}
+
+pub struct SlideActionConfig {
+    /// The initial push applied to the player when they start sliding.
+    pub force: f32,
+    /// The player cannot stop sliding if they are moving faster than this.
+    /// Gravity doesn't count.
+    pub stop_sliding_velocity: f32,
+    /// Additional acceleration applied to the player when the ground slope
+    /// is at least `max_acceleration_slope_degrees`.
+    pub max_slope_acceleration: f32,
+    /// Any slope steeper than this applies adds additional acceleration beyond the maximum.
+    pub max_acceleration_slope_degrees: f32,
+    /// Any slope shallower than this is considered flat, applying no acceleration.
+    pub min_acceleration_slope_degrees: f32,
 }
 
 #[derive(Resource, Default)]
@@ -160,6 +177,7 @@ impl Default for PlayerActionsConfig {
         Self {
             jump: Some(default()),
             crouch: Some(default()),
+            slide: Some(default()),
         }
     }
 }
@@ -180,6 +198,19 @@ impl Default for CrouchActionConfig {
         Self {
             transition_speed: 12.0,
             crouchjump_additional_clearance: true,
+            slide_if_running: true,
+        }
+    }
+}
+
+impl Default for SlideActionConfig {
+    fn default() -> Self {
+        Self {
+            force: 32.0,
+            stop_sliding_velocity: 22.0,
+            max_slope_acceleration: 75.0,
+            max_acceleration_slope_degrees: 45.0,
+            min_acceleration_slope_degrees: 1.0,
         }
     }
 }

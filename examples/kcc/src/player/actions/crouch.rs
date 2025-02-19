@@ -1,8 +1,11 @@
 use bevy::prelude::*;
 
 use crate::player::{
-    config::PlayerActionsConfig, input::PlayerInput, Player, PlayerConfig, PlayerMotion, Section,
+    config::PlayerActionsConfig, input::PlayerInput, motion::PlayerForces, Player, PlayerConfig,
+    PlayerMotion, Section,
 };
+
+use super::slide::can_stop_sliding;
 
 const CROUCH_EPSILON: f32 = 0.0001;
 
@@ -12,6 +15,20 @@ impl Plugin for PlayerCrouchPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, crouch);
     }
+}
+
+pub fn can_stand(
+    input: &PlayerInput,
+    actions_config: &PlayerActionsConfig,
+    forces: &PlayerForces,
+) -> bool {
+    if let Some(slide_config) = &actions_config.slide {
+        if input.slide && !can_stop_sliding(&slide_config, &forces) {
+            return false;
+        }
+    }
+
+    true
 }
 
 fn crouch(
@@ -50,8 +67,6 @@ fn crouch(
         section.height = target_height;
     };
 
-    let mut commands = commands.entity(entity);
-
     if diff != 0.0 {
         if let Some(crouch) = &actions_config.crouch {
             if crouch.crouchjump_additional_clearance {
@@ -64,6 +79,7 @@ fn crouch(
             }
         }
 
+        let mut commands = commands.entity(entity);
         commands.insert(section.collider());
         commands.insert(Mesh3d(meshes.add(section.mesh())));
     }

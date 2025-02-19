@@ -7,13 +7,13 @@ use bevy::prelude::{Vec3, *};
 use super::config::PlayerMotionConfig;
 
 pub fn accelerate(
-    direction: Vec3,
+    direction: Dir3,
     curr_velocity: Vec3,
     acceleration: f32,
     max_velocity: f32,
     time: &Res<Time>,
 ) -> Vec3 {
-    let projected = curr_velocity.dot(direction);
+    let projected = curr_velocity.dot(*direction);
     let mut acceleration = acceleration * time.delta_secs();
 
     if projected + acceleration > max_velocity {
@@ -24,7 +24,7 @@ pub fn accelerate(
 }
 
 pub fn ground_move(
-    direction: Vec3,
+    direction: Dir3,
     landed_time: f64,
     curr_velocity: &mut Vec3,
     time: &Res<Time>,
@@ -47,7 +47,7 @@ pub fn ground_move(
     );
 }
 pub fn air_move(
-    direction: Vec3,
+    direction: Dir3,
     curr_velocity: &mut Vec3,
     time: &Res<Time>,
     speed_mod: f32,

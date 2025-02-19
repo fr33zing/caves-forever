@@ -14,6 +14,7 @@ use super::{
     config::{PlayerActionsConfig, PlayerMotionConfig},
     input::{self, PlayerInput, PlayerYaw},
     quakeish::{air_move, ground_move},
+    utility::{running, wish_dir},
     PlayerInputConfig, Section,
 };
 
@@ -22,6 +23,11 @@ pub struct PlayerForces {
     pub movement: Vec3,
     pub external: Vec3,
     pub gravity: Vec3,
+}
+impl PlayerForces {
+    pub fn sum(&self) -> Vec3 {
+        self.movement + self.external + self.gravity
+    }
 }
 
 #[derive(Component, Default)]
@@ -63,6 +69,7 @@ fn snap_to_ground(
     spatial_query: SpatialQuery,
     motion_config: Res<PlayerMotionConfig>,
     actions_config: Res<PlayerActionsConfig>,
+    input: Res<PlayerInput>,
     player: Option<Single<(Entity, &mut Transform, &Section, &mut PlayerMotion)>>,
 ) {
     let Some(player) = player else {
@@ -111,7 +118,10 @@ fn snap_to_ground(
     if state.forces.gravity.y <= 0.0 {
         transform.translation.y -= hit.distance - motion_config.skin;
     }
-    state.forces.gravity.y = state.forces.gravity.y.max(0.0);
+
+    if !input.slide {
+        state.forces.gravity.y = state.forces.gravity.y.max(0.0);
+    }
 
     if !prev_grounded {
         state.landed_time = time.elapsed_secs_f64();
@@ -163,18 +173,15 @@ fn motion(
 
     // Movement
     {
-        let mut wishdir = Vec3::new(input.direction.x, 0.0, input.direction.y);
-        let rotation = Transform::from_rotation(Quat::from_euler(EulerRot::YXZ, yaw.0, 0.0, 0.0));
-        wishdir = rotation.transform_point(wishdir);
-
-        let speed_mod = match (input.walk_mod, input_config.always_run) {
-            (true, true) | (false, false) => 1.0,
-            (true, false) | (false, true) => motion_config.run_speed_mod,
+        let wish_dir = wish_dir(&yaw, &input);
+        let speed_mod = match running(&input, &input_config) {
+            false => 1.0,
+            true => motion_config.run_speed_mod,
         };
 
         if state.grounded {
             ground_move(
-                wishdir,
+                wish_dir,
                 state.landed_time,
                 &mut state.forces.movement,
                 &time,
@@ -183,7 +190,7 @@ fn motion(
             );
         } else {
             air_move(
-                wishdir,
+                wish_dir,
                 &mut state.forces.movement,
                 &time,
                 speed_mod,

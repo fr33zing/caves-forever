@@ -1,7 +1,10 @@
 use bevy::prelude::*;
 
 #[cfg(feature = "input")]
-use super::{config::PlayerKeybinds, PlayerInputConfig, PlayerWalkModMode};
+use super::{
+    actions::PlayerAction, config::PlayerKeybinds, utility::running, PlayerInputConfig,
+    PlayerWalkModMode,
+};
 
 use super::{actions::PlayerActionBuffer, config::PlayerActionsConfig, PlayerMotion};
 
@@ -14,6 +17,7 @@ pub struct PlayerInput {
     pub direction: Vec2,
     pub walk_mod: bool,
     pub crouch: bool,
+    pub slide: bool,
 }
 
 pub struct PlayerInputPlugin;
@@ -36,13 +40,17 @@ pub fn process_input(
     mut input: ResMut<PlayerInput>,
     mut actions: ResMut<PlayerActionBuffer>,
     time: Res<Time>,
+    actions_config: Res<PlayerActionsConfig>,
     input_config: Res<PlayerInputConfig>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
-    actions_config: Res<PlayerActionsConfig>,
     state: Option<Single<&PlayerMotion>>,
 ) {
-    use super::actions::PlayerAction;
+    use super::actions::can_stand;
+
+    let Some(state) = state else {
+        return;
+    };
 
     let now = time.elapsed_secs_f64();
 
@@ -74,24 +82,33 @@ pub fn process_input(
     }
 
     if let (Some(jump_bind), Some(jump_config)) = (&input_config.binds.jump, &actions_config.jump) {
-        if let Some(state) = state {
-            if let Some(ground_distance) = state.ground_distance {
-                if jump_bind.just_pressed(&keyboard, &mouse)
-                    && ground_distance <= jump_config.buffer_distance
-                {
+        if let Some(ground_distance) = state.ground_distance {
+            if jump_bind.just_pressed(&keyboard, &mouse)
+                && ground_distance <= jump_config.buffer_distance
+            {
+                if jump_config.bufferable {
                     actions.buffer(PlayerAction::Jump, now);
+                } else {
+                    actions.instant(PlayerAction::Jump);
                 }
             }
         }
     };
 
-    if let (Some(crouch_bind), Some(_)) = (&input_config.binds.crouch, &actions_config.crouch) {
+    if let (Some(crouch_bind), Some(crouch_config)) =
+        (&input_config.binds.crouch, &actions_config.crouch)
+    {
         if crouch_bind.pressed(&keyboard, &mouse) {
             if !input.crouch {
-                actions.buffer(PlayerAction::Crouch(true), now);
+                if crouch_config.slide_if_running && !input.crouch && running(&input, &input_config)
+                {
+                    actions.instant(PlayerAction::Slide);
+                }
+
+                actions.instant(PlayerAction::Crouch(true));
             }
-        } else if input.crouch {
-            actions.buffer(PlayerAction::Crouch(false), now);
+        } else if input.crouch && can_stand(&input, &actions_config, &state.forces) {
+            actions.instant(PlayerAction::Crouch(false));
         }
     }
 

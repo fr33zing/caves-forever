@@ -3,6 +3,11 @@ use std::f32::consts::{FRAC_PI_2, PI};
 use avian3d::prelude::*;
 use bevy::prelude::*;
 
+use super::{
+    input::{PlayerInput, PlayerYaw},
+    PlayerInputConfig,
+};
+
 #[derive(Clone, Copy)]
 pub enum SectionShape {
     Capsule,
@@ -167,4 +172,15 @@ fn cylinder_gizmo(position: Vec3, radius: f32, height: f32, color: Color, gizmos
                 color,
             );
         });
+}
+
+pub fn wish_dir(yaw: &PlayerYaw, input: &PlayerInput) -> Dir3 {
+    let mut wishdir = Vec3::new(input.direction.x, 0.0, input.direction.y);
+    wishdir = Quat::from_euler(EulerRot::YXZ, yaw.0, 0.0, 0.0).mul_vec3(wishdir);
+
+    Dir3::new_unchecked(wishdir)
+}
+
+pub fn running(input: &PlayerInput, input_config: &PlayerInputConfig) -> bool {
+    input.walk_mod != input_config.always_run
 }
