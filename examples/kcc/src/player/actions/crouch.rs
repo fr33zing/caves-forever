@@ -4,7 +4,6 @@ use crate::player::{
     config::PlayerActionsConfig, input::PlayerInput, Player, PlayerConfig, PlayerMotion, Section,
 };
 
-const CROUCH_TRANSITION_SPEED: f32 = 12.0;
 const CROUCH_EPSILON: f32 = 0.0001;
 
 pub struct PlayerCrouchPlugin;
@@ -26,6 +25,9 @@ fn crouch(
     // TEMP
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
+    let Some(crouch_config) = &actions_config.crouch else {
+        return;
+    };
     let Some(player) = player else {
         return;
     };
@@ -37,7 +39,7 @@ fn crouch(
         config.height
     };
 
-    let t = (CROUCH_TRANSITION_SPEED * time.delta_secs()).clamp(0.0, 1.0);
+    let t = (crouch_config.transition_speed * time.delta_secs()).clamp(0.0, 1.0);
     let height = section.height.lerp(target_height, t);
     let mut diff = height - section.height;
 

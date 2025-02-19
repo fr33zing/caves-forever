@@ -178,7 +178,7 @@ impl Default for JumpActionConfig {
 impl Default for CrouchActionConfig {
     fn default() -> Self {
         Self {
-            transition_speed: Default::default(),
+            transition_speed: 12.0,
             crouchjump_additional_clearance: true,
         }
     }
