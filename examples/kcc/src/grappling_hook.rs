@@ -1,4 +1,4 @@
-#![cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
+#![cfg(feature = "camera")]
 
 use avian3d::prelude::*;
 use bevy::prelude::*;

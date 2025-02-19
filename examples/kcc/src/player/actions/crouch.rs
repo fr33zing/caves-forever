@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 
-use super::{input::PlayerInput, Player, PlayerConfig, PlayerMotion, Section};
+use crate::player::{
+    config::PlayerActionsConfig, input::PlayerInput, Player, PlayerConfig, PlayerMotion, Section,
+};
 
 const CROUCH_TRANSITION_SPEED: f32 = 12.0;
 const CROUCH_EPSILON: f32 = 0.0001;
@@ -15,6 +17,7 @@ impl Plugin for PlayerCrouchPlugin {
 
 fn crouch(
     mut commands: Commands,
+    actions_config: Res<PlayerActionsConfig>,
     player: Option<Single<(Entity, &mut Section, &mut Transform, &PlayerMotion), With<Player>>>,
     time: Res<Time>,
     input: Res<PlayerInput>,
@@ -48,12 +51,14 @@ fn crouch(
     let mut commands = commands.entity(entity);
 
     if diff != 0.0 {
-        if cfg!(feature = "crouch-jump") {
-            if state.grounded {
-                transform.translation.y += section.offset;
-                section.offset = 0.0;
-            } else {
-                section.offset -= diff;
+        if let Some(crouch) = &actions_config.crouch {
+            if crouch.crouchjump_additional_clearance {
+                if state.grounded {
+                    transform.translation.y += section.offset;
+                    section.offset = 0.0;
+                } else {
+                    section.offset -= diff;
+                }
             }
         }
 

@@ -10,14 +10,12 @@ use avian3d::prelude::*;
 use bevy::prelude::*;
 
 use super::{
-    config::PlayerMotionConfig,
-    input::{PlayerInput, PlayerYaw},
+    actions,
+    config::{PlayerActionsConfig, PlayerMotionConfig},
+    input::{self, PlayerInput, PlayerYaw},
     quakeish::{air_move, ground_move},
     PlayerInputConfig, Section,
 };
-
-#[cfg(feature = "jump")]
-use super::config::PlayerBufferedActionsConfig;
 
 #[derive(Default)]
 pub struct PlayerForces {
@@ -46,12 +44,17 @@ impl Plugin for PlayerMotionPlugin {
         app.add_systems(
             Update,
             (snap_to_ground, motion)
-                .after(super::input::process_input)
-                .after(super::input::perform_actions)
+                .after(input::process_input)
+                .after(actions::perform_actions)
                 .chain(),
         );
         #[cfg(not(feature = "input"))]
-        app.add_systems(Update, (snap_to_ground, motion).chain());
+        app.add_systems(
+            Update,
+            (snap_to_ground, motion)
+                .after(actions::perform_actions)
+                .chain(),
+        );
     }
 }
 
@@ -59,7 +62,7 @@ fn snap_to_ground(
     time: Res<Time>,
     spatial_query: SpatialQuery,
     motion_config: Res<PlayerMotionConfig>,
-    #[cfg(feature = "jump")] buffer_config: Res<PlayerBufferedActionsConfig>,
+    actions_config: Res<PlayerActionsConfig>,
     player: Option<Single<(Entity, &mut Transform, &Section, &mut PlayerMotion)>>,
 ) {
     let Some(player) = player else {
@@ -68,10 +71,11 @@ fn snap_to_ground(
 
     let (entity, mut transform, section, mut state) = player.into_inner();
 
-    #[cfg(not(feature = "jump"))]
-    let distance = motion_config.snap_to_ground_distance;
-    #[cfg(feature = "jump")]
-    let distance = buffer_config.jump_buffer_distance;
+    let distance = if let Some(jump) = &actions_config.jump {
+        jump.buffer_distance
+    } else {
+        motion_config.snap_to_ground_distance
+    };
 
     let shapecast = spatial_query.cast_shape(
         &section.collider(),

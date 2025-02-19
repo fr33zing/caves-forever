@@ -25,9 +25,9 @@ use player::{Player, PlayerInputConfig, PlayerPlugin, PlayerWalkModMode};
 #[allow(unused)]
 use lib::weapon::ViewModelCamera;
 
-#[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
+#[cfg(feature = "camera")]
 use grappling_hook::GrapplingHookPlugin;
-#[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
+#[cfg(feature = "camera")]
 use player::PlayerCamera;
 
 fn main() {
@@ -74,7 +74,7 @@ fn main() {
 
     app.add_plugins((PlayerPlugin, WeaponPlugin));
 
-    #[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
+    #[cfg(feature = "camera")]
     app.add_plugins(GrapplingHookPlugin);
 
     app.add_systems(Startup, (setup_world, setup_player).chain());
@@ -143,7 +143,7 @@ fn setup_player(mut commands: Commands) {
     #[allow(unused_mut)]
     let mut viewmodel_camera = Entity::PLACEHOLDER;
 
-    #[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
+    #[cfg(feature = "camera")]
     commands.spawn(PlayerCamera).with_children(|parent| {
         viewmodel_camera = parent.spawn(ViewModelCamera::default()).id();
     });

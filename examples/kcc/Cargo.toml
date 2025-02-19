@@ -4,21 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = [
-  "first-person-camera",
-  "third-person-camera",
-  "input",
-  "jump",
-  "crouch",
-  "crouch-jump"
-]
-first-person-camera = []
-third-person-camera = []
+default = [ "camera", "input" ]
+camera = []
 input = []
-actions = []
-jump = ["actions"]
-crouch = ["actions"]
-crouch-jump = ["crouch", "jump"]
 
 [dependencies]
 lib = { path = "../../lib" }

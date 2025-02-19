@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 
-#[cfg(feature = "actions")]
-use super::input::PlayerAction;
+use super::actions::PlayerAction;
 
 #[derive(Resource)]
 pub struct PlayerConfig {
@@ -25,19 +24,24 @@ pub struct PlayerMotionConfig {
     pub air_accelerate: f32,
     pub max_velocity_ground: f32,
     pub max_velocity_air: f32,
-
-    #[cfg(feature = "jump")]
-    pub jump_force: f32,
 }
 
-#[cfg(feature = "actions")]
 #[derive(Resource)]
-pub struct PlayerBufferedActionsConfig {
-    /// Player must be within this distance to the ground in order to buffer a jump.
-    #[cfg(feature = "jump")]
-    pub jump_buffer_distance: f32,
-    #[cfg(feature = "jump")]
-    pub jump_expiry_secs: f64,
+pub struct PlayerActionsConfig {
+    pub jump: Option<JumpActionConfig>,
+    pub crouch: Option<CrouchActionConfig>,
+}
+
+pub struct JumpActionConfig {
+    pub force: f32,
+    pub bufferable: bool,
+    pub buffer_distance: f32,
+    pub buffer_expiry_secs: f64,
+}
+
+pub struct CrouchActionConfig {
+    pub transition_speed: f32,
+    pub crouchjump_additional_clearance: bool,
 }
 
 #[derive(Resource, Default)]
@@ -69,18 +73,14 @@ pub struct PlayerKeybinds {
     pub backward: Option<Keybind>,
     pub left: Option<Keybind>,
     pub right: Option<Keybind>,
+    pub jump: Option<Keybind>,
+    pub crouch: Option<Keybind>,
 
     /// Run, unless [PlayerInputConfig.always_run], then it's walk.
     pub walk_mod: Option<Keybind>,
 
-    #[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
+    #[cfg(feature = "camera")]
     pub switch_camera: Option<Keybind>,
-
-    #[cfg(feature = "jump")]
-    pub jump: Option<Keybind>,
-
-    #[cfg(feature = "crouch")]
-    pub crouch: Option<Keybind>,
 }
 
 pub enum Keybind {
@@ -88,21 +88,18 @@ pub enum Keybind {
     Mouse(MouseButton),
 }
 
-#[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
+#[cfg(feature = "camera")]
 #[derive(Resource)]
 pub struct PlayerCameraConfig {
+    pub mode: PlayerCameraMode,
+    pub allowed_modes: Vec<PlayerCameraMode>,
     pub eye_offset: f32,
     pub sensitivity: f32,
     pub fov_degrees: f32,
-
-    #[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
-    pub mode: PlayerCameraMode,
-
-    #[cfg(feature = "third-person-camera")]
     pub third_person_distance: f32,
 }
 
-#[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
+#[cfg(feature = "camera")]
 #[derive(Default)]
 pub enum PlayerCameraMode {
     #[default]
@@ -145,32 +142,44 @@ impl Default for PlayerMotionConfig {
             air_accelerate: 0.35 * QUAKE_UNITS_PER_METER,
             max_velocity_ground: 160.0 / QUAKE_UNITS_PER_METER,
             max_velocity_air: 160.0 / QUAKE_UNITS_PER_METER,
-
-            #[cfg(feature = "jump")]
-            jump_force: 16.0,
         }
     }
 }
 
-#[cfg(feature = "actions")]
-impl PlayerBufferedActionsConfig {
+impl PlayerActionsConfig {
     pub fn expiry_for(&self, action: &PlayerAction) -> Option<f64> {
         match action {
-            #[cfg(feature = "jump")]
-            PlayerAction::Jump => Some(self.jump_expiry_secs),
+            PlayerAction::Jump => self.jump.as_ref().map(|j| j.buffer_expiry_secs),
             _ => None,
         }
     }
 }
 
-#[cfg(feature = "actions")]
-impl Default for PlayerBufferedActionsConfig {
+impl Default for PlayerActionsConfig {
     fn default() -> Self {
         Self {
-            #[cfg(feature = "jump")]
-            jump_buffer_distance: 1.5,
-            #[cfg(feature = "jump")]
-            jump_expiry_secs: 0.5,
+            jump: Some(default()),
+            crouch: Some(default()),
+        }
+    }
+}
+
+impl Default for JumpActionConfig {
+    fn default() -> Self {
+        Self {
+            force: 16.0,
+            bufferable: true,
+            buffer_distance: 1.5,
+            buffer_expiry_secs: 0.5,
+        }
+    }
+}
+
+impl Default for CrouchActionConfig {
+    fn default() -> Self {
+        Self {
+            transition_speed: Default::default(),
+            crouchjump_additional_clearance: true,
         }
     }
 }
@@ -198,15 +207,11 @@ impl Default for PlayerKeybinds {
             left: Some(Keybind::Keyboard(KeyCode::KeyA)),
             right: Some(Keybind::Keyboard(KeyCode::KeyD)),
             walk_mod: Some(Keybind::Keyboard(KeyCode::ShiftLeft)),
-
-            #[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
-            switch_camera: Some(Keybind::Mouse(MouseButton::Middle)),
-
-            #[cfg(feature = "jump")]
             jump: Some(Keybind::Keyboard(KeyCode::Space)),
-
-            #[cfg(feature = "crouch")]
             crouch: Some(Keybind::Keyboard(KeyCode::ControlLeft)),
+
+            #[cfg(feature = "camera")]
+            switch_camera: Some(Keybind::Mouse(MouseButton::Middle)),
         }
     }
 }
@@ -246,18 +251,15 @@ impl Keybind {
     }
 }
 
-#[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
+#[cfg(feature = "camera")]
 impl Default for PlayerCameraConfig {
     fn default() -> Self {
         Self {
+            mode: default(),
+            allowed_modes: vec![PlayerCameraMode::FirstPerson, PlayerCameraMode::ThirdPerson],
             eye_offset: 0.1524, // 6"
             sensitivity: 1.0,
             fov_degrees: 45.0,
-
-            #[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
-            mode: default(),
-
-            #[cfg(feature = "third-person-camera")]
             third_person_distance: 8.0,
         }
     }

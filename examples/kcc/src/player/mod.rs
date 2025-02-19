@@ -2,28 +2,28 @@ use avian3d::prelude::{LockedAxes, RigidBody};
 use bevy::{pbr::NotShadowCaster, prelude::*};
 
 mod config;
-mod motion;
-mod quakeish;
-mod utility;
+pub use config::{PlayerConfig, PlayerInputConfig, PlayerWalkModMode};
 
-#[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
+#[cfg(feature = "camera")]
 mod camera;
-#[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
+#[cfg(feature = "camera")]
 pub use camera::PlayerCamera;
-#[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
+#[cfg(feature = "camera")]
 use camera::PlayerCameraPlugin;
 
 mod input;
 use input::PlayerInputPlugin;
 
-#[cfg(feature = "crouch")]
-mod crouch;
-#[cfg(feature = "crouch")]
-use crouch::PlayerCrouchPlugin;
+mod actions;
+use actions::PlayerActionsPlugin;
 
-pub use config::{PlayerConfig, PlayerInputConfig, PlayerWalkModMode};
+mod motion;
 pub use motion::PlayerMotion;
 use motion::PlayerMotionPlugin;
+
+mod quakeish;
+
+mod utility;
 pub use utility::{Section, SectionShape};
 
 #[derive(Component)]
@@ -37,10 +37,9 @@ impl Plugin for PlayerPlugin {
         app.add_plugins((
             PlayerMotionPlugin,
             PlayerInputPlugin,
-            #[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
+            PlayerActionsPlugin,
+            #[cfg(feature = "camera")]
             PlayerCameraPlugin,
-            #[cfg(feature = "crouch")]
-            PlayerCrouchPlugin,
         ));
         app.add_systems(Update, add_required_components);
     }

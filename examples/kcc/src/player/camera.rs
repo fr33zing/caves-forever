@@ -11,7 +11,6 @@ use lib::render_layer;
 
 use super::{config::PlayerCameraConfig, input::PlayerYaw, Player, PlayerConfig, Section};
 
-#[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
 use super::config::{PlayerCameraMode, PlayerInputConfig};
 
 const MOUSE_MOTION_SCALE: f32 = 0.00015;
@@ -27,15 +26,14 @@ pub struct PlayerCameraPlugin;
 
 impl Plugin for PlayerCameraPlugin {
     fn build(&self, app: &mut App) {
-        #[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
-        app.add_systems(Update, (switch_camera_mode, transition_camera_mode).chain());
-
-        #[cfg(any(feature = "first-person-camera", feature = "third-person-camera"))]
         app.init_resource::<PlayerCameraConfig>();
-
         app.add_systems(
             Update,
             (add_required_components, toggle_cursor_lock, mouselook),
+        );
+        app.add_systems(
+            Update,
+            (switch_camera_mode, transition_camera_mode).run_if(can_switch_mode),
         );
         app.add_systems(
             PostUpdate,
@@ -83,13 +81,11 @@ fn add_required_components(
             child
         };
 
-        let transform = if cfg!(all(
-            feature = "third-person-camera",
-            not(feature = "first-person-camera")
-        )) {
-            Transform::from_translation(Vec3::Z * camera_config.third_person_distance)
-        } else {
-            Transform::default()
+        let transform = match camera_config.mode {
+            PlayerCameraMode::FirstPerson => Transform::default(),
+            PlayerCameraMode::ThirdPerson => {
+                Transform::from_translation(Vec3::Z * camera_config.third_person_distance)
+            }
         };
 
         let mut commands = commands.entity(child);
@@ -166,7 +162,10 @@ fn mouselook(
     camera.rotation = Quat::from_euler(EulerRot::YXZ, yaw, pitch, 0.0);
 }
 
-#[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
+fn can_switch_mode(config: Res<PlayerCameraConfig>) -> bool {
+    config.allowed_modes.len() > 1
+}
+
 fn switch_camera_mode(
     input_config: Res<PlayerInputConfig>,
     mut config: ResMut<PlayerCameraConfig>,
@@ -185,7 +184,6 @@ fn switch_camera_mode(
     }
 }
 
-#[cfg(all(feature = "first-person-camera", feature = "third-person-camera"))]
 fn transition_camera_mode(
     time: Res<Time>,
     config: Res<PlayerCameraConfig>,
