@@ -11,7 +11,7 @@ pub struct PlayerSlidePlugin;
 
 impl Plugin for PlayerSlidePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, sliding);
+        app.add_systems(Update, slide);
     }
 }
 
@@ -19,7 +19,7 @@ pub fn can_stop_sliding(slide_config: &SlideActionConfig, forces: &PlayerForces)
     (forces.external + forces.movement).length() < slide_config.stop_sliding_velocity
 }
 
-fn sliding(
+fn slide(
     input: Res<PlayerInput>,
     time: Res<Time>,
     actions_config: Res<PlayerActionsConfig>,
@@ -43,7 +43,10 @@ fn sliding(
         slide_config.max_acceleration_slope_degrees,
     );
 
-    let slope_degrees = (180.0 - ground_normal.dot(Vec3::Y) * 180.0).clamp(0.0, max_slope);
+    let slope_degrees = ground_normal
+        .angle_between(Vec3::Y)
+        .to_degrees()
+        .clamp(0.0, slide_config.max_acceleration_slope_degrees);
 
     if slope_degrees < min_slope {
         return;
@@ -51,7 +54,7 @@ fn sliding(
 
     let ratio = (slope_degrees - min_slope) / (max_slope - min_slope);
     let acceleration = ratio * slide_config.max_slope_acceleration * time.delta_secs();
-    let direction = Vec3::NEG_Y.reject_from(ground_normal);
+    let direction = Vec3::NEG_Y.reject_from_normalized(ground_normal);
 
     state.forces.external += acceleration * direction;
 }

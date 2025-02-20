@@ -90,6 +90,7 @@ fn snap_to_ground(
         default(),
         Dir3::NEG_Y,
         &ShapeCastConfig::from_max_distance(distance),
+        // TODO also filter sensors
         &SpatialQueryFilter::from_excluded_entities(vec![entity]),
     );
     let Some(hit) = shapecast else {
@@ -98,6 +99,9 @@ fn snap_to_ground(
         return;
     };
 
+    let angle = hit.normal1.angle_between(Vec3::Y);
+    state.grounded = angle < motion_config.max_slope_degrees.to_radians();
+    state.ground_normal = Some(hit.normal1);
     state.ground_distance = Some(hit.distance);
 
     if hit.distance > motion_config.snap_to_ground_distance {
@@ -107,21 +111,15 @@ fn snap_to_ground(
 
     let prev_grounded = state.grounded;
 
-    let angle = hit.normal1.angle_between(Vec3::Y);
-    state.grounded = angle < motion_config.max_slope_degrees.to_radians();
-    state.ground_normal = Some(hit.normal1);
-
     if !state.grounded {
         return;
     }
 
-    if state.forces.gravity.y <= 0.0 {
+    if state.forces.gravity.y <= 0.0 && !state.no_gravity_this_frame {
         transform.translation.y -= hit.distance - motion_config.skin;
     }
 
-    if !input.slide {
-        state.forces.gravity.y = state.forces.gravity.y.max(0.0);
-    }
+    state.forces.gravity.y = state.forces.gravity.y.max(0.0);
 
     if !prev_grounded {
         state.landed_time = time.elapsed_secs_f64();
@@ -207,7 +205,7 @@ fn motion(
             break 'gravity;
         }
         let mut gravity = Vec3::NEG_Y * motion_config.gravity * time.delta_secs();
-        if state.grounded {
+        if state.grounded && !input.slide {
             gravity *= 0.01;
         }
         state.forces.gravity += gravity;

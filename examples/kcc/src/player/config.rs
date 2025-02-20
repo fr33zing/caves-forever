@@ -206,9 +206,9 @@ impl Default for CrouchActionConfig {
 impl Default for SlideActionConfig {
     fn default() -> Self {
         Self {
-            force: 32.0,
+            force: 48.0,
             stop_sliding_velocity: 22.0,
-            max_slope_acceleration: 75.0,
+            max_slope_acceleration: 400.0,
             max_acceleration_slope_degrees: 45.0,
             min_acceleration_slope_degrees: 1.0,
         }
