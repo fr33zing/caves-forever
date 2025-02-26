@@ -8,7 +8,7 @@ pub const ROOM_SHYNESS: f32 = 16.0;
 pub const TUNNEL_SHYNESS: f32 = 24.0;
 
 /// Distance colliders are depenetrated by per iteration when arranging them.
-pub const DEPENETRATION_DISTANCE: f32 = 4.0;
+pub const DEPENETRATION_DISTANCE: f32 = 8.0;
 
 /// Number of points per unit of volume in the navigable hull between two rooms.
 pub const HULL_DENSITY: f32 = 0.00001;

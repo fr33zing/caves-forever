@@ -48,15 +48,15 @@ pub fn arrange_by_depenetration(
         let direction = if dynamic_collider.spherical && static_collider.spherical {
             (static_collider.position.0 - dynamic_collider.position.0).normalize()
         } else {
-            /*
-            Prefer horizontal depenetration to minimize steep paths
-            */
-            let y_scale = 0.05;
-            let xz_scale = 1.0 + (1.0 - y_scale) / 2.0;
-            contact.normal1 * Vec3::new(xz_scale, y_scale, xz_scale)
+            contact.normal1
         };
 
-        *dynamic_collider.position -= direction * DEPENETRATION_DISTANCE * desperation;
+        // Prefer horizontal depenetration to minimize steep paths
+        let y_scale = 0.01;
+        let xz_scale = 1.0 + (1.0 - y_scale) / 2.0;
+        let scale = Vec3::new(xz_scale, y_scale, xz_scale);
+
+        *dynamic_collider.position -= direction * scale * DEPENETRATION_DISTANCE * desperation;
 
         false
     }
@@ -64,7 +64,7 @@ pub fn arrange_by_depenetration(
     let len = dynamic_colliders.len();
     let mut done = false;
     let mut desperation = 1.0;
-    let acceleration = 1.0001;
+    let acceleration = 1.01;
 
     while !done {
         done = true;
