@@ -129,13 +129,7 @@ fn switch_weapons(
         };
 
         let child = commands
-            .spawn((
-                Transform::default(),
-                ViewModel {
-                    offset: weapon.viewmodel_offset,
-                    ..default()
-                },
-            ))
+            .spawn((Transform::default(), ViewModel::default()))
             .with_children(|parent| {
                 parent.spawn((
                     Transform::from_translation(weapon.viewmodel_offset),

@@ -10,7 +10,6 @@ pub const VIEWMODEL_FOV: f32 = 65.0;
 pub struct ViewModel {
     pub yaw: f32,
     pub pitch: f32,
-    pub offset: Vec3,
 }
 
 #[derive(Component)]
@@ -28,91 +27,16 @@ impl Plugin for ViewModelPlugin {
     }
 }
 
-// fn inertia(
-//     time: Res<Time>,
-//     parents: Query<&GlobalTransform, Without<ViewModelCamera>>,
-//     mut viewmodel_cameras: Query<
-//         (&mut ViewModelCamera, &mut Transform, &Parent),
-//         With<ViewModelCamera>,
-//     >,
-// ) {
-//     const CIRCLE: f32 = PI * 2.0;
-//     fn interpolate_angle(a: f32, b: f32, t: f32) -> f32 {
-//         let shortest = ((b - a) % CIRCLE + CIRCLE * 1.5) % CIRCLE - CIRCLE / 2.0;
-//         a + shortest * t
-//     }
-
-//     fn interpolate_angle_clamped(a: f32, b: f32, t: f32) -> f32 {
-//         const CLAMP: f32 = (PI / 180.0) * 20.0;
-//         const CIRCLE: f32 = PI * 2.0;
-
-//         let shortest = ((b - a) % CIRCLE + CIRCLE * 1.5) % CIRCLE - CIRCLE / 2.0;
-//         let mut result = a + shortest * t;
-
-//         if shortest.abs() > CLAMP {
-//             if shortest < 0.0 {
-//                 result = b + CLAMP;
-//             } else {
-//                 result = b - CLAMP;
-//             }
-//         }
-
-//         result
-//     }
-
-//     viewmodel_cameras
-//         .iter_mut()
-//         .for_each(|(mut camera, mut transform, parent)| {
-//             let Ok(parent) = parents.get(**parent) else {
-//                 return;
-//             };
-
-//             let (parent_yaw, parent_pitch, _) = parent.rotation().to_euler(EulerRot::YXZ);
-
-//             let t = (time.delta_secs() * 1.0).clamp(0.0, 1.0);
-
-//             camera.yaw = interpolate_angle(camera.yaw, parent_yaw, t);
-//             camera.pitch = interpolate_angle(camera.pitch, parent_pitch, t);
-
-//             println!("{}  {}", camera.yaw, parent_yaw);
-
-//             // let mul_yaw = 0.15;
-//             // let mul_pitch = 0.3;
-//             // // println!("{}", offset);
-//             // // *transform = Transform::from_translation(viewmodel.offset + offset)
-//             // //     .looking_at(Vec3::NEG_Z * 100.0, Vec3::Y);
-
-//             transform.rotation = Quat::from_euler(EulerRot::YXZ, camera.yaw, camera.pitch, 0.0);
-//         });
-// }
-
 fn inertia(
     time: Res<Time>,
     parents: Query<&GlobalTransform, Without<ViewModel>>,
     mut viewmodels: Query<(&mut ViewModel, &mut Transform, &Parent), With<ViewModel>>,
 ) {
     const CIRCLE: f32 = PI * 2.0;
+
     fn interpolate_angle(a: f32, b: f32, t: f32) -> f32 {
         let shortest = ((b - a) % CIRCLE + CIRCLE * 1.5) % CIRCLE - CIRCLE / 2.0;
         a + shortest * t.clamp(0.0, 1.0)
-    }
-
-    fn interpolate_angle_clamped(a: f32, b: f32, t: f32) -> f32 {
-        const CLAMP: f32 = (PI / 180.0) * 20.0;
-        const CIRCLE: f32 = PI * 2.0;
-
-        let shortest = ((b - a) % CIRCLE + CIRCLE * 1.5) % CIRCLE - CIRCLE / 2.0;
-        let mut result = a + shortest * t;
-
-        if shortest.abs() > CLAMP {
-            if shortest < 0.0 {
-                result = b + CLAMP;
-            } else {
-                result = b - CLAMP;
-            }
-        }
-
-        result
     }
 
     viewmodels

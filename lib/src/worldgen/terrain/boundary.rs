@@ -4,6 +4,7 @@ use bevy_tnua::TnuaToggle;
 
 use super::CHUNK_SIZE_F;
 
+#[allow(unused)]
 #[derive(Component)]
 pub struct IntersectsBoundary;
 
@@ -24,6 +25,7 @@ impl LoadingBoundary {
     }
 }
 
+#[allow(unused)]
 pub fn enforce_loading_chunk_boundaries(
     mut commands: Commands,
     spatial_query: SpatialQuery,

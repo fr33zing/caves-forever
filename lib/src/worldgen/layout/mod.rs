@@ -134,14 +134,13 @@ fn triggers(
                 }
             }
             LayoutTrigger::UnloadPreviousSequence => {
-                let Ok((to_portal_parent, to_portal)) = portals.get(connection.to_portal) else {
+                let Ok((to_portal_parent, _)) = portals.get(connection.to_portal) else {
                     continue;
                 };
-                let Ok(to_room) = rooms.get(**to_portal_parent) else {
+                let Ok(_) = rooms.get(**to_portal_parent) else {
                     continue;
                 };
-                let Ok((from_portal_parent, from_portal)) = portals.get(connection.from_portal)
-                else {
+                let Ok((from_portal_parent, _)) = portals.get(connection.from_portal) else {
                     continue;
                 };
                 let Ok(from_room) = rooms.get(**from_portal_parent) else {
@@ -149,14 +148,6 @@ fn triggers(
                 };
 
                 let mut entity_distances = vec![(connection_entity, 0)];
-                // walk_room(
-                //     &mut entity_distances,
-                //     &connections,
-                //     &portals,
-                //     &rooms,
-                //     to_room,
-                //     1,
-                // );
                 walk_room(
                     &mut entity_distances,
                     &connections,
@@ -165,8 +156,6 @@ fn triggers(
                     from_room,
                     -1,
                 );
-
-                println!("{entity_distances:?}");
 
                 for (entity, distance) in entity_distances.into_iter() {
                     if distance < 0 {

@@ -5,7 +5,6 @@ use bevy::{
     prelude::*,
     utils::{HashMap, HashSet},
 };
-use boundary::enforce_loading_chunk_boundaries;
 use fast_surface_nets::ndshape::{ConstShape, ConstShape3u32};
 
 use crate::materials::{CaveMaterial, CaveMaterialExtension};

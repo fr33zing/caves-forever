@@ -6,10 +6,7 @@ use bevy::{
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
-use crate::{
-    materials::{ATTRIBUTE_VOXEL_RATIO, ATTRIBUTE_VOXEL_TYPE},
-    worldgen::voxel::{VoxelMaterial, VoxelSample},
-};
+use crate::materials::{ATTRIBUTE_VOXEL_RATIO, ATTRIBUTE_VOXEL_TYPE};
 
 use super::{
     fast_surface_nets::{ndshape::ConstShape, surface_nets, SurfaceNetsBuffer},
@@ -110,20 +107,6 @@ where
     }
 
     changed
-}
-
-pub fn postprocess_sample(sample: &mut VoxelSample) {
-    // if sample.distance > 50.0 {
-    //     if sample.distance > 100.0 {
-    //         if sample.distance > 104.0 {
-    //             sample.material = VoxelMaterial::Boundary;
-    //         } else {
-    //             sample.material = VoxelMaterial::FakeBoundary;
-    //         }
-    //     } else {
-    //         sample.material = VoxelMaterial::ShinyGreenRock;
-    //     }
-    // }
 }
 
 pub fn mesh_chunk(data: &ChunkData) -> Option<(Mesh, Collider)> {

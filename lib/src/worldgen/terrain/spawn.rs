@@ -181,13 +181,11 @@ fn spawn_chunks(params: ChunkSpawnParams) -> Option<ChunkSpawnResult> {
 
             // Sample brushes
             for brush in brushes.iter() {
-                let mut sample = brush.sample(pos);
+                let sample = brush.sample(pos);
                 if sample.distance < *distance {
-                    postprocess_sample(&mut sample);
                     *distance = sample.distance;
                     *material = sample.material;
                 } else if material == &VoxelMaterial::Unset {
-                    postprocess_sample(&mut sample);
                     *material = sample.material;
                 }
             }

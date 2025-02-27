@@ -69,7 +69,6 @@ fn snap_to_ground(
     spatial_query: SpatialQuery,
     motion_config: Res<PlayerMotionConfig>,
     actions_config: Res<PlayerActionsConfig>,
-    input: Res<PlayerInput>,
     player: Option<Single<(Entity, &mut Transform, &Section, &mut PlayerMotion)>>,
 ) {
     let Some(player) = player else {

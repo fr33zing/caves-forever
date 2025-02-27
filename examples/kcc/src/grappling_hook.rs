@@ -13,9 +13,6 @@ const PLAYER_ACCELERATION: f32 = 512.0;
 const DETACH_DISTANCE: f32 = 2.0;
 
 #[derive(Component)]
-pub struct HasGrapplingHook; // TODO
-
-#[derive(Component)]
 pub struct GrapplingHook {
     pub spawned: f64,
     pub hooked: bool,

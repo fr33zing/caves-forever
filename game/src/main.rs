@@ -1,10 +1,5 @@
 use avian3d::prelude::*;
-use bevy::{
-    audio::{AudioPlugin, SpatialScale},
-    ecs::{system::SystemBuffer, world::CommandQueue},
-    prelude::*,
-    window::PresentMode,
-};
+use bevy::{ecs::world::CommandQueue, prelude::*, window::PresentMode};
 use bevy_egui::EguiPlugin;
 use bevy_rand::{plugin::EntropyPlugin, prelude::WyRand};
 use noisy_bevy::NoisyShaderPlugin;

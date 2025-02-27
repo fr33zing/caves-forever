@@ -223,22 +223,6 @@ fn is_line_navigable(start: &Vec3, end: &Vec3, arrangements: &[Arrangement]) -> 
     })
 }
 
-fn is_line_navigable2(start: &Vec3, end: &Vec3, arrangements: &[Arrangement]) -> bool {
-    let c = Collider::capsule_endpoints(TUNNEL_SHYNESS, *start, *end);
-    !arrangements.iter().any(|arrangement| {
-        contact(
-            &c,
-            Position::default(),
-            Rotation::default(),
-            &arrangement.collider,
-            arrangement.position,
-            arrangement.rotation,
-            TUNNEL_SHYNESS * 2.0,
-        )
-        .is_ok_and(|x| x.is_some())
-    })
-}
-
 pub fn penalty_curve(fault: f32) -> f32 {
     1.0 - (1.0 - fault).powi(3)
 }
